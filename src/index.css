@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif !important;
+  }
+
+  /* Hide all non-printable application elements */
+  header, footer, main, nav, .print\:hidden, [role="dialog"]:not(.print-target) {
+    display: none !important;
+  }
+
+  /* Reset container positioning in print mode */
+  .fixed, .relative, .overflow-hidden, .overflow-auto {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #ghpr-print-area {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    visibility: visible !important;
+    height: auto !important;
+  }
+
+  .ghpr-page-sheet {
+    display: block !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #ghpr-sheet-2, .html2pdf__page-break, .page-break-before-always, .page-break-before, [style*="page-break-before: always"], [style*="break-before: page"], [data-split-applied="true"] {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .ghpr-step-wrapper {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .page-break-divider {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  td, th {
+    border: 1px solid #000000 !important;
+  }
+
+  .avoid-break, .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  @page {
+    size: legal portrait;
+    margin: 6mm 8mm;
+  }
+}
+

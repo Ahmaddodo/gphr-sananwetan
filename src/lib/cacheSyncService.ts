@@ -1,0 +1,101 @@
+/**
+ * Layanan Sinkronisasi Cache & Inisialisasi Instalasi Baru
+ * Memastikan setiap pengguna baru atau pengguna yang menginstal aplikasi PWA
+ * langsung mendapatkan data terbaru dari Google Sheets & akun petugas resmi
+ * tanpa terpengaruh cache usang (stale cache).
+ */
+
+import {
+  PREDEFINED_USER_PROFILES,
+  getOfficerProfiles,
+  saveOfficerProfiles,
+  syncPatientsFromGoogleSheets,
+  syncOfficerProfilesFromGoogleSheets,
+  getAllPatients
+} from "./patientMonitoring";
+import { getWebAppUrl } from "./config";
+
+export const APP_CACHE_VERSION_KEY = "ghpr_app_version_tag_v4";
+export const CURRENT_APP_VERSION = "2026.08.22.v4_cloud_officers_synced";
+
+/**
+ * Inisialisasi awal saat aplikasi dibuka atau di-install oleh user baru.
+ * - Memperbarui daftar akun petugas resmi dari kode sumber dan cloud Google Sheets
+ * - Membusting cache lama jika versi aplikasi diperbarui
+ * - Memicu auto-sync data pasien dan akun petugas dari Google Sheets secara langsung
+ */
+export async function initializeAppSyncAndBustStaleCache(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  try {
+    const storedVersion = localStorage.getItem(APP_CACHE_VERSION_KEY);
+
+    // 1. Jika ada upgrade versi atau instalasi baru, periksa dan rekonsiliasi akun petugas
+    if (storedVersion !== CURRENT_APP_VERSION) {
+      console.log(`[CacheSync] Mendeteksi versi baru (${CURRENT_APP_VERSION}). Memperbarui akun & sinkronisasi...`);
+
+      // Rekonsiliasi akun petugas resmi bawaan
+      try {
+        const existingOfficers = getOfficerProfiles();
+        const mergedOfficers = [...existingOfficers];
+
+        // Pastikan setiap akun resmi di PREDEFINED_USER_PROFILES ada di storage
+        for (const defaultOfficer of PREDEFINED_USER_PROFILES) {
+          const idx = mergedOfficers.findIndex(
+            (o) => o.username?.toLowerCase() === defaultOfficer.username?.toLowerCase()
+          );
+          if (idx < 0) {
+            // Tambahkan jika belum ada
+            mergedOfficers.push(defaultOfficer);
+          } else {
+            // Perbarui data penting jika default berubah (misal NIP/nama resmi) tanpa merusak password kustom
+            mergedOfficers[idx] = {
+              ...defaultOfficer,
+              ...mergedOfficers[idx],
+              nama: mergedOfficers[idx].nama || defaultOfficer.nama,
+              nip: mergedOfficers[idx].nip || defaultOfficer.nip,
+              kelurahan: mergedOfficers[idx].kelurahan || defaultOfficer.kelurahan,
+              role: mergedOfficers[idx].role || defaultOfficer.role,
+              isKoordinator: defaultOfficer.isKoordinator || mergedOfficers[idx].isKoordinator
+            };
+          }
+        }
+
+        saveOfficerProfiles(mergedOfficers);
+      } catch (err) {
+        console.warn("[CacheSync] Gagal rekonsiliasi akun petugas:", err);
+      }
+
+      // Tandai versi saat ini di localStorage
+      localStorage.setItem(APP_CACHE_VERSION_KEY, CURRENT_APP_VERSION);
+    }
+
+    // 2. Jika online, langsung lakukan sinkronisasi data pasien & akun petugas terbaru dari Google Sheets
+    if (navigator.onLine) {
+      const endpoint = getWebAppUrl();
+      if (endpoint) {
+        console.log("[CacheSync] Menjalankan sinkronisasi awal data pasien & akun petugas dari Google Sheets...");
+        
+        // Sinkronisasi data pasien
+        syncPatientsFromGoogleSheets(endpoint)
+          .then((res) => {
+            console.log("[CacheSync] Sinkronisasi pasien berhasil:", res.message);
+          })
+          .catch((err) => {
+            console.warn("[CacheSync] Sinkronisasi pasien background tertunda:", err);
+          });
+
+        // Sinkronisasi akun petugas dari cloud agar nama yang baru diubah admin seketika masuk ke HP petugas
+        syncOfficerProfilesFromGoogleSheets(endpoint)
+          .then((res) => {
+            console.log("[CacheSync] Sinkronisasi akun petugas berhasil:", res.message);
+          })
+          .catch((err) => {
+            console.warn("[CacheSync] Sinkronisasi akun petugas background tertunda:", err);
+          });
+      }
+    }
+  } catch (e) {
+    console.warn("[CacheSync] Gagal inisialisasi cache sync:", e);
+  }
+}

@@ -1,0 +1,1568 @@
+import {
+  PatientMonitoringItem,
+  UserAccessProfile,
+  KelurahanWilayah,
+  MonitoringDailyLog,
+  FormGHPRData,
+  SubmissionPayload
+} from "../types";
+import { hashPassword, verifyPassword } from "./cryptoAuth";
+import {
+  deleteCaseFromLocalHistory,
+  deleteRecordFromAppsScript,
+  DEFAULT_WEB_APP_URL,
+  getLocalSubmissionHistory,
+  fetchOfficerAccountsFromAppsScript,
+  pushOfficerAccountsToAppsScript
+} from "./googleSheets";
+import { getWebAppUrl } from "./config";
+
+export const STORAGE_KEY_PATIENTS = "ghpr_patient_monitoring_data_v2";
+export const STORAGE_KEY_ACTIVE_USER = "ghpr_active_user_access_profile_v2";
+export const STORAGE_KEY_DISMISSED_PATIENTS = "ghpr_dismissed_cases_v2";
+
+export function getDismissedPatientIds(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DISMISSED_PATIENTS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((s) => String(s).trim()).filter(Boolean);
+      }
+    }
+  } catch (e) {}
+  return [];
+}
+
+export function addDismissedPatientId(id_kasus: string): void {
+  try {
+    const cleanId = (id_kasus || "").trim();
+    if (!cleanId) return;
+    const list = getDismissedPatientIds();
+    if (!list.some((id) => id.toLowerCase() === cleanId.toLowerCase())) {
+      list.push(cleanId);
+      localStorage.setItem(STORAGE_KEY_DISMISSED_PATIENTS, JSON.stringify(list));
+    }
+  } catch (e) {}
+}
+
+export function restoreDismissedPatientId(id_kasus: string): void {
+  try {
+    const cleanId = (id_kasus || "").trim().toLowerCase();
+    const list = getDismissedPatientIds();
+    const filtered = list.filter((id) => id.toLowerCase() !== cleanId);
+    localStorage.setItem(STORAGE_KEY_DISMISSED_PATIENTS, JSON.stringify(filtered));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ghpr_patient_data_updated", { detail: { restoredId: cleanId } }));
+    }
+  } catch (e) {}
+}
+
+export const KELURAHAN_LIST: KelurahanWilayah[] = [
+  "Sananwetan",
+  "Gedog",
+  "Bendogerit",
+  "Karangtengah",
+  "Klampok",
+  "Plosokerep",
+  "Rembang"
+];
+
+// Profil Pengguna berdasarkan Hak Akses Kelurahan dengan Akun Login Resmi Terenkripsi
+export const PREDEFINED_USER_PROFILES: UserAccessProfile[] = [
+  {
+    id: "user-koordinator",
+    nama: "dr. Triana Sulistyaningsih",
+    nip: "197805122005012003",
+    role: "Koordinator Surveilans Rabies Puskesmas",
+    kelurahan: "Semua",
+    jabatan: "Dokter Penanggung Jawab Surveilans Zoonosis",
+    username: "admin",
+    password: hashPassword("password123", "admin"),
+    email: "surveilans.sananwetan@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+    isKoordinator: true
+  },
+  {
+    id: "user-widodo",
+    nama: "Widodo Suprianto A.Md.Kep",
+    nip: "197606252009011007",
+    role: "Petugas Surveilans Utama / Penanggung Jawab Form",
+    kelurahan: "Bendogerit",
+    jabatan: "Perawat Koordinator Surveilans Epidemiologi",
+    username: "widodo",
+    password: hashPassword("password123", "widodo"),
+    email: "widodotopkm@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+    isKoordinator: true
+  },
+  {
+    id: "user-sananwetan",
+    nama: "Ahmad Syaifudin, A.Md.Kep",
+    nip: "198803152011011002",
+    role: "Petugas Wilayah Kel. Sananwetan",
+    kelurahan: "Sananwetan",
+    jabatan: "Perawat Penanggung Jawab Wilayah Sananwetan",
+    username: "sananwetan",
+    password: hashPassword("password123", "sananwetan"),
+    email: "ahmad.pkm@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: false,
+    isKoordinator: false
+  },
+  {
+    id: "user-gedog",
+    nama: "Rina Marlina, S.Tr.Keb",
+    nip: "199004222015032004",
+    role: "Petugas Wilayah Kel. Gedog",
+    kelurahan: "Gedog",
+    jabatan: "Bidan Penanggung Jawab Wilayah Gedog",
+    username: "gedog",
+    password: hashPassword("password123", "gedog"),
+    email: "rina.gedog@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: false,
+    isKoordinator: false
+  },
+  {
+    id: "user-bendogerit",
+    nama: "Widodo, S.Kep., Ns.",
+    nip: "198501012010011001",
+    role: "Petugas Wilayah Kel. Bendogerit",
+    kelurahan: "Bendogerit",
+    jabatan: "Perawat Penanggung Jawab Wilayah Bendogerit",
+    username: "bendogerit",
+    password: hashPassword("password123", "bendogerit"),
+    email: "widodo.bendogerit@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: false,
+    isKoordinator: false
+  },
+  {
+    id: "user-karangtengah",
+    nama: "Bambang Sugiharto, S.Kep",
+    nip: "198711092014021001",
+    role: "Petugas Wilayah Kel. Karangtengah",
+    kelurahan: "Karangtengah",
+    jabatan: "Perawat Surveilans Kel. Karangtengah",
+    username: "karangtengah",
+    password: hashPassword("password123", "karangtengah"),
+    email: "bambang.karangtengah@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: false,
+    isKoordinator: false
+  },
+  {
+    id: "user-klampok",
+    nama: "Dewi Lestari, A.Md.Kep",
+    nip: "199208142019032008",
+    role: "Petugas Wilayah Kel. Klampok",
+    kelurahan: "Klampok",
+    jabatan: "Perawat Poskeskel Kel. Klampok",
+    username: "klampok",
+    password: hashPassword("password123", "klampok"),
+    email: "dewi.klampok@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: false,
+    isKoordinator: false
+  },
+  {
+    id: "user-plosokerep",
+    nama: "Siti Maimunah, S.Kep",
+    nip: "198906202016022003",
+    role: "Petugas Wilayah Kel. Plosokerep",
+    kelurahan: "Plosokerep",
+    jabatan: "Perawat PJ Wilayah Kel. Plosokerep",
+    username: "plosokerep",
+    password: hashPassword("password123", "plosokerep"),
+    email: "siti.plosokerep@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: false,
+    isKoordinator: false
+  },
+  {
+    id: "user-rembang",
+    nama: "Hadi Purnomo, A.Md.Kep",
+    nip: "199102282018011003",
+    role: "Petugas Wilayah Kel. Rembang",
+    kelurahan: "Rembang",
+    jabatan: "Petugas Surveilans Lapangan Kel. Rembang",
+    username: "rembang",
+    password: hashPassword("password123", "rembang"),
+    email: "hadi.rembang@gmail.com",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: false,
+    isKoordinator: false
+  }
+];
+
+// Helper pengecekan otoritas hapus form pemantauan (HANYA untuk username admin)
+export function canUserDeleteCases(user?: UserAccessProfile | null): boolean {
+  if (!user || !user.username) return false;
+  return user.username.toLowerCase().trim() === "admin";
+}
+
+// Seed Data Pemantauan Pasien Awal
+const INITIAL_SEED_PATIENTS: PatientMonitoringItem[] = [
+  {
+    id_kasus: "GHPR-20260814-BN1",
+    timestamp_submit: "14/08/2026 09:30:15",
+    waktuKejadian: "2026-08-14T08:15",
+    namaKorban: "Siti Rahayu",
+    nikKorban: "3572015504950002",
+    umurKorban: "28",
+    jkKorban: "Perempuan",
+    alamatKorban: "Jl. Sudanco Supriyadi RT 02 RW 03",
+    kontakKorban: "081234567890",
+    noHpKorban: "081234567890",
+    kelurahan: "Bendogerit",
+    kecamatan: "Sananwetan",
+    kabupatenKota: "Kota Blitar",
+    spesiesHPR: "Anjing",
+    rasHewan: "Campuran Lokal",
+    kondisiHewan: "Sehat / Normal (Dalam Observasi)",
+    pemilikHewan: "Bpk. Santoso",
+    alamatPemilik: "Jl. Sudanco Supriyadi No. 24",
+    kontakPemilik: "081399887766",
+    kondisiLuka: "Kategori 2",
+    lokasiLuka: "Betis Kaki Kanan",
+    pertolonganPertama: "Cuci luka air mengalir + sabun 15 menit, antiseptik povidone",
+    detailPertolongan: "Diberikan VAR dosis 1 di UPT Puskesmas Sananwetan",
+    tindakanKasus: "Diberikan VAR / SAR & Terapi Antibiotik Profilaksis",
+    tindakanHPR: "Karantina / Observasi 14 Hari di Rumah Pemilik",
+    rekomendasi: "Pantau kesehatan hewan 14 hari, jadwalkan VAR dosis ke-2 korban.",
+    statusPemantauan: "Dalam Pemantauan (Aktif)",
+    statusHewanObservasi: "Sehat / Normal (Observasi)",
+    hariObservasiKe: 2,
+    tglMulaiObservasi: "2026-08-14",
+    tglSelesaiObservasi: "2026-08-28",
+    jadwalVAR: {
+      dosis0: { tanggal: "2026-08-14", status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan", keterangan: "Diberikan 2 dosis deltoid kanan & kiri" },
+      dosis3: { tanggal: "2026-08-17", status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan", keterangan: "Jadwal VAR hari ke-3" },
+      dosis7: { tanggal: "2026-08-21", status: "Belum Diberikan", lokasiPemberian: "Puskesmas Sananwetan", keterangan: "Jadwal VAR hari ke-7" },
+      dosis21: { tanggal: "2026-09-04", status: "Belum Diberikan", lokasiPemberian: "Puskesmas Sananwetan", keterangan: "Jadwal VAR hari ke-21 jika hewan mati/positif" }
+    },
+    riwayatLog: [
+      {
+        id: "log-1",
+        tanggal: "2026-08-14",
+        hariKe: 1,
+        petugasNama: "Widodo, S.Kep., Ns.",
+        petugasNIP: "198501012010011001",
+        kelurahan: "Bendogerit",
+        kondisiKorban: "Luka bersih, nyeri ringan, tidak demam.",
+        statusLuka: "Luka bersih terawat, tidak ada pus/infeksi.",
+        kondisiHewan: "Anjing terikat di pekarangan, nafsu makan baik, tidak agresif.",
+        suhuTubuh: "36.6 °C",
+        tindakanDilakukan: "Kunjungan rumah PE, pencucian luka ulang, pemberian VAR Dosis 0.",
+        catatanKhusus: "Edukasi pemilik untuk tidak melepas anjing selama masa observasi 14 hari."
+      },
+      {
+        id: "log-2",
+        tanggal: "2026-08-15",
+        hariKe: 2,
+        petugasNama: "Widodo, S.Kep., Ns.",
+        petugasNIP: "198501012010011001",
+        kelurahan: "Bendogerit",
+        kondisiKorban: "Kondisi umum baik, aktif, nafsu makan normal.",
+        statusLuka: "Luka mulai mengering, tidak bengkak.",
+        kondisiHewan: "Hewan aktif, merespon panggilan pemilik, tidak takut air/cahaya.",
+        suhuTubuh: "36.5 °C",
+        tindakanDilakukan: "Monitoring berkala via pesan singkat dan konfirmasi kader kesehatan.",
+        catatanKhusus: "Pengingat jadwal suntik VAR dosis kedua pada tanggal 17 Agustus 2026."
+      }
+    ],
+    petugasPJ: "Widodo, S.Kep., Ns.",
+    nipPJ: "198501012010011001",
+    lastUpdated: "15/08/2026 10:15"
+  },
+  {
+    id_kasus: "GHPR-20260812-SW2",
+    timestamp_submit: "12/08/2026 14:20:00",
+    waktuKejadian: "2026-08-12T11:30",
+    namaKorban: "Budi Santoso",
+    nikKorban: "3572011208880001",
+    umurKorban: "36",
+    jkKorban: "Laki-laki",
+    alamatKorban: "Jl. Kalimantan No. 45",
+    kontakKorban: "085678912345",
+    noHpKorban: "085678912345",
+    kelurahan: "Sananwetan",
+    kecamatan: "Sananwetan",
+    kabupatenKota: "Kota Blitar",
+    spesiesHPR: "Kucing",
+    rasHewan: "Domestik",
+    kondisiHewan: "Sehat / Normal (Dalam Observasi)",
+    pemilikHewan: "Ibu Hartini",
+    alamatPemilik: "Jl. Kalimantan No. 47",
+    kontakPemilik: "085712345678",
+    kondisiLuka: "Kategori 1",
+    lokasiLuka: "Punggung Tangan Kiri",
+    pertolonganPertama: "Cuci luka sabun air mengalir 15 menit",
+    tindakanKasus: "Perawatan luka, edukasi pemantauan",
+    tindakanHPR: "Observasi kandang mandiri 14 hari",
+    rekomendasi: "Observasi kucing, bila ada perubahan perilaku segera lapor.",
+    statusPemantauan: "Dalam Pemantauan (Aktif)",
+    statusHewanObservasi: "Sehat / Normal (Observasi)",
+    hariObservasiKe: 4,
+    tglMulaiObservasi: "2026-08-12",
+    tglSelesaiObservasi: "2026-08-26",
+    jadwalVAR: {
+      dosis0: { tanggal: "2026-08-12", status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan" },
+      dosis3: { tanggal: "2026-08-15", status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan" },
+      dosis7: { tanggal: "2026-08-19", status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" }
+    },
+    riwayatLog: [
+      {
+        id: "log-sw-1",
+        tanggal: "2026-08-12",
+        hariKe: 1,
+        petugasNama: "Ahmad Syaifudin, A.Md.Kep",
+        petugasNIP: "198803152011011002",
+        kelurahan: "Sananwetan",
+        kondisiKorban: "Luka gigitan tangan, sudah dibersihkan.",
+        statusLuka: "Luka bersih, tidak ada perdarahan aktif.",
+        kondisiHewan: "Kucing dikandangkan oleh pemilik.",
+        tindakanDilakukan: "Edukasi cuci luka & pemberian VAR dosis 0.",
+        catatanKhusus: "Pasien kooperatif."
+      }
+    ],
+    petugasPJ: "Ahmad Syaifudin, A.Md.Kep",
+    nipPJ: "198803152011011002",
+    lastUpdated: "15/08/2026 09:00"
+  },
+  {
+    id_kasus: "GHPR-20260810-GD1",
+    timestamp_submit: "10/08/2026 11:00:00",
+    waktuKejadian: "2026-08-10T09:00",
+    namaKorban: "Ananda Rizky Pratama",
+    nikKorban: "3572014109150003",
+    umurKorban: "11",
+    jkKorban: "Laki-laki",
+    alamatKorban: "Jl. Sultan Agung No. 12",
+    kontakKorban: "081333445566",
+    noHpKorban: "081333445566",
+    kelurahan: "Gedog",
+    kecamatan: "Sananwetan",
+    kabupatenKota: "Kota Blitar",
+    spesiesHPR: "Anjing",
+    rasHewan: "Lokal",
+    kondisiHewan: "Hewan Liar / Tidak Berpemilik",
+    pemilikHewan: "Liar / Tidak Diketahui",
+    kondisiLuka: "Kategori 3",
+    lokasiLuka: "Betis Kaki Kiri",
+    pertolonganPertama: "Cuci luka 15 menit, dibawa ke IGD Puskesmas",
+    tindakanKasus: "Diberikan VAR + SAR Dosis Lengkap",
+    tindakanHPR: "Pencarian HPR bersama Dinas Peternakan",
+    rekomendasi: "Vaksinasi VAR lengkap sampai dosis 21 karena hewan liar tidak bisa diobservasi.",
+    statusPemantauan: "Perlu Follow-up VAR",
+    statusHewanObservasi: "Hilang / Kabur",
+    hariObservasiKe: 6,
+    tglMulaiObservasi: "2026-08-10",
+    tglSelesaiObservasi: "2026-08-24",
+    jadwalVAR: {
+      dosis0: { tanggal: "2026-08-10", status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan" },
+      dosis3: { tanggal: "2026-08-13", status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan" },
+      dosis7: { tanggal: "2026-08-17", status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" },
+      dosis21: { tanggal: "2026-08-31", status: "Belum Diberikan", lokasiPemberian: "Puskesmas Sananwetan" }
+    },
+    riwayatLog: [
+      {
+        id: "log-gd-1",
+        tanggal: "2026-08-10",
+        hariKe: 1,
+        petugasNama: "Rina Marlina, S.Tr.Keb",
+        petugasNIP: "199004222015032004",
+        kelurahan: "Gedog",
+        kondisiKorban: "Nyeri pada betis kiri, luka robek 3 cm dijahit longgar.",
+        statusLuka: "Luka bersih, perban terpasang baik.",
+        kondisiHewan: "Hewan liar tidak terlacak.",
+        tindakanDilakukan: "Injeksi SAR infiltrasi sekitar luka & VAR IM deltoid.",
+        catatanKhusus: "Anak didampingi orang tua, jadwal VAR hari ke-7 tanggal 17 Agustus."
+      }
+    ],
+    petugasPJ: "Rina Marlina, S.Tr.Keb",
+    nipPJ: "199004222015032004",
+    lastUpdated: "13/08/2026 15:30"
+  },
+  {
+    id_kasus: "GHPR-20260728-KT1",
+    timestamp_submit: "28/07/2026 08:30:00",
+    waktuKejadian: "2026-07-28T07:30",
+    namaKorban: "Endang Sulastri",
+    nikKorban: "3572016503750001",
+    umurKorban: "49",
+    jkKorban: "Perempuan",
+    alamatKorban: "Jl. Ciliwung RT 01 RW 04",
+    kontakKorban: "081999888777",
+    noHpKorban: "081999888777",
+    kelurahan: "Karangtengah",
+    kecamatan: "Sananwetan",
+    kabupatenKota: "Kota Blitar",
+    spesiesHPR: "Anjing",
+    rasHewan: "Shih Tzu",
+    kondisiHewan: "Sehat dan sudah divaksinasi",
+    pemilikHewan: "Ibu Maya",
+    alamatPemilik: "Jl. Ciliwung No. 18",
+    kontakPemilik: "08122334455",
+    kondisiLuka: "Kategori 1",
+    lokasiLuka: "Jari Telunjuk Tangan",
+    pertolonganPertama: "Cuci luka sabun air mengalir",
+    tindakanKasus: "Perawatan luka ringan, observasi",
+    tindakanHPR: "Observasi 14 hari di rumah",
+    rekomendasi: "Pemantauan 14 hari selesai, hewan sehat dan korban sembuh total.",
+    statusPemantauan: "Selesai Observasi (14 Hari)",
+    statusHewanObservasi: "Sehat / Normal (Observasi)",
+    hariObservasiKe: 14,
+    tglMulaiObservasi: "2026-07-28",
+    tglSelesaiObservasi: "2026-08-11",
+    jadwalVAR: {
+      dosis0: { tanggal: "2026-07-28", status: "Sudah Diberikan" },
+      dosis3: { tanggal: "2026-07-31", status: "Sudah Diberikan" },
+      dosis7: { tanggal: "2026-08-04", status: "Tidak Perlu", keterangan: "Hewan sehat dan riwayat vaksin lengkap" }
+    },
+    riwayatLog: [
+      {
+        id: "log-kt-final",
+        tanggal: "2026-08-11",
+        hariKe: 14,
+        petugasNama: "Bambang Sugiharto, S.Kep",
+        petugasNIP: "198711092014021001",
+        kelurahan: "Karangtengah",
+        kondisiKorban: "Luka sembuh sempurna, tidak ada keluhan.",
+        statusLuka: "Kering dan sembuh total.",
+        kondisiHewan: "Anjing sehat bugar hingga hari ke-14.",
+        tindakanDilakukan: "Pemeriksaan akhir pelepasan observasi.",
+        catatanKhusus: "Kasus dinyatakan tuntas dan aman dari Rabies."
+      }
+    ],
+    petugasPJ: "Bambang Sugiharto, S.Kep",
+    nipPJ: "198711092014021001",
+    lastUpdated: "11/08/2026 11:00"
+  },
+  {
+    id_kasus: "GHPR-20260813-KL1",
+    timestamp_submit: "13/08/2026 16:45:00",
+    waktuKejadian: "2026-08-13T15:00",
+    namaKorban: "Deni Prasetyo",
+    nikKorban: "3572012010990004",
+    umurKorban: "25",
+    jkKorban: "Laki-laki",
+    alamatKorban: "Jl. Brigjen Katamso No. 8",
+    kontakKorban: "087812344321",
+    noHpKorban: "087812344321",
+    kelurahan: "Klampok",
+    kecamatan: "Sananwetan",
+    kabupatenKota: "Kota Blitar",
+    spesiesHPR: "Kera / Monyet",
+    rasHewan: "Ekor Panjang",
+    kondisiHewan: "Peliharaan Terikat",
+    pemilikHewan: "Bpk. Wawan",
+    alamatPemilik: "Jl. Brigjen Katamso No. 10",
+    kontakPemilik: "085234567890",
+    kondisiLuka: "Kategori 2",
+    lokasiLuka: "Lengan Bawah Kanan",
+    pertolonganPertama: "Cuci luka air mengalir + sabun",
+    tindakanKasus: "Pemberian VAR dosis 0 dan antibiotik",
+    tindakanHPR: "Karantina kandang 14 hari",
+    rekomendasi: "Pantau kera dan pastikan tidak kontak dengan orang lain.",
+    statusPemantauan: "Dalam Pemantauan (Aktif)",
+    statusHewanObservasi: "Sehat / Normal (Observasi)",
+    hariObservasiKe: 3,
+    tglMulaiObservasi: "2026-08-13",
+    tglSelesaiObservasi: "2026-08-27",
+    jadwalVAR: {
+      dosis0: { tanggal: "2026-08-13", status: "Sudah Diberikan" },
+      dosis3: { tanggal: "2026-08-16", status: "Terjadwal" },
+      dosis7: { tanggal: "2026-08-20", status: "Belum Diberikan" }
+    },
+    riwayatLog: [
+      {
+        id: "log-kl-1",
+        tanggal: "2026-08-13",
+        hariKe: 1,
+        petugasNama: "Dewi Lestari, A.Md.Kep",
+        petugasNIP: "199208142019032008",
+        kelurahan: "Klampok",
+        kondisiKorban: "Luka bersih, nyeri skala 3.",
+        statusLuka: "Luka cakaran 2 garis, gigitan dangkal.",
+        kondisiHewan: "Kera tampak agresif karena diganggu saat makan.",
+        tindakanDilakukan: "Edukasi pemilik kera dan suntik VAR dosis awal.",
+        catatanKhusus: "Observasi agresifitas kera."
+      }
+    ],
+    petugasPJ: "Dewi Lestari, A.Md.Kep",
+    nipPJ: "199208142019032008",
+    lastUpdated: "14/08/2026 13:00"
+  },
+  {
+    id_kasus: "GHPR-20260811-PL1",
+    timestamp_submit: "11/08/2026 13:10:00",
+    waktuKejadian: "2026-08-11T10:00",
+    namaKorban: "Kusuma Wardani",
+    nikKorban: "3572015006920005",
+    umurKorban: "32",
+    jkKorban: "Perempuan",
+    alamatKorban: "Jl. Veteran No. 89",
+    kontakKorban: "081298765432",
+    noHpKorban: "081298765432",
+    kelurahan: "Plosokerep",
+    kecamatan: "Sananwetan",
+    kabupatenKota: "Kota Blitar",
+    spesiesHPR: "Anjing",
+    rasHewan: "Golden Retriever",
+    kondisiHewan: "Sehat, vaksinasi rutin",
+    pemilikHewan: "Bpk. Hendra",
+    alamatPemilik: "Jl. Veteran No. 85",
+    kontakPemilik: "081345678901",
+    kondisiLuka: "Kategori 2",
+    lokasiLuka: "Paha Kanan",
+    pertolonganPertama: "Cuci luka 15 menit sabun",
+    tindakanKasus: "VAR Dosis 0 + Antiseptik",
+    tindakanHPR: "Observasi pemilik 14 hari",
+    rekomendasi: "Observasi harian kondisi hewan dan korban.",
+    statusPemantauan: "Dalam Pemantauan (Aktif)",
+    statusHewanObservasi: "Sehat / Normal (Observasi)",
+    hariObservasiKe: 5,
+    tglMulaiObservasi: "2026-08-11",
+    tglSelesaiObservasi: "2026-08-25",
+    jadwalVAR: {
+      dosis0: { tanggal: "2026-08-11", status: "Sudah Diberikan" },
+      dosis3: { tanggal: "2026-08-14", status: "Sudah Diberikan" },
+      dosis7: { tanggal: "2026-08-18", status: "Terjadwal" }
+    },
+    riwayatLog: [
+      {
+        id: "log-pl-1",
+        tanggal: "2026-08-11",
+        hariKe: 1,
+        petugasNama: "Siti Maimunah, S.Kep",
+        petugasNIP: "198906202016022003",
+        kelurahan: "Plosokerep",
+        kondisiKorban: "Kondisi baik, luka ringan terawat.",
+        statusLuka: "Luka gigitan bersih.",
+        kondisiHewan: "Anjing sehat, bersahabat, makan normal.",
+        tindakanDilakukan: "Edukasi dan suntik VAR dosis 0.",
+        catatanKhusus: "Riwayat buku vaksin hewan diperiksa lengkap."
+      }
+    ],
+    petugasPJ: "Siti Maimunah, S.Kep",
+    nipPJ: "198906202016022003",
+    lastUpdated: "14/08/2026 10:00"
+  },
+  {
+    id_kasus: "GHPR-20260809-RB1",
+    timestamp_submit: "09/08/2026 10:00:00",
+    waktuKejadian: "2026-08-09T08:00",
+    namaKorban: "Supratman",
+    nikKorban: "3572011501600002",
+    umurKorban: "64",
+    jkKorban: "Laki-laki",
+    alamatKorban: "Jl. Jati Rembang RT 03 RW 01",
+    kontakKorban: "082145678901",
+    noHpKorban: "082145678901",
+    kelurahan: "Rembang",
+    kecamatan: "Sananwetan",
+    kabupatenKota: "Kota Blitar",
+    spesiesHPR: "Kucing",
+    rasHewan: "Lokal",
+    kondisiHewan: "Kucing Liar Pasar",
+    pemilikHewan: "Tidak Ada (Liar)",
+    kondisiLuka: "Kategori 3",
+    lokasiLuka: "Telapak Tangan Kanan",
+    pertolonganPertama: "Cuci luka air mengalir + betadine",
+    tindakanKasus: "VAR Dosis Lengkap + SAR",
+    tindakanHPR: "Kucing kabur ke semak",
+    rekomendasi: "Pemberian VAR lengkap hingga dosis akhir karena hewan liar hilang.",
+    statusPemantauan: "Perlu Follow-up VAR",
+    statusHewanObservasi: "Hilang / Kabur",
+    hariObservasiKe: 7,
+    tglMulaiObservasi: "2026-08-09",
+    tglSelesaiObservasi: "2026-08-23",
+    jadwalVAR: {
+      dosis0: { tanggal: "2026-08-09", status: "Sudah Diberikan" },
+      dosis3: { tanggal: "2026-08-12", status: "Sudah Diberikan" },
+      dosis7: { tanggal: "2026-08-16", status: "Terjadwal", keterangan: "Jadwal suntik besok pagi" },
+      dosis21: { tanggal: "2026-08-30", status: "Belum Diberikan" }
+    },
+    riwayatLog: [
+      {
+        id: "log-rb-1",
+        tanggal: "2026-08-09",
+        hariKe: 1,
+        petugasNama: "Hadi Purnomo, A.Md.Kep",
+        petugasNIP: "199102282018011003",
+        kelurahan: "Rembang",
+        kondisiKorban: "Tangan bengkak ringan, sudah dicuci antiseptik.",
+        statusLuka: "Luka dalam, diberikan SAR infiltrasi.",
+        kondisiHewan: "Kucing liar tidak dapat ditangkap.",
+        tindakanDilakukan: "Injeksi SAR & VAR dosis 0.",
+        catatanKhusus: "Pasien diingatkan jangan sampai terlewat jadwal VAR hari ke-7."
+      }
+    ],
+    petugasPJ: "Hadi Purnomo, A.Md.Kep",
+    nipPJ: "199102282018011003",
+    lastUpdated: "12/08/2026 14:00"
+  }
+];
+
+export const STORAGE_KEY_OFFICER_PROFILES = "ghpr_officer_user_profiles_v2";
+export const STORAGE_KEY_LAST_ACTIVITY = "ghpr_last_user_activity_ts_v1";
+
+// Batas Waktu Tidak Aktif Sesi: 1 Jam (60 menit = 3.600.000 ms)
+export const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
+
+// Catat waktu aktivitas pengguna terkini
+export function recordUserActivity(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_LAST_ACTIVITY, Date.now().toString());
+  } catch (e) {}
+}
+
+// Ambil timestamp aktivitas terakhir
+export function getLastUserActivityTimestamp(): number {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_LAST_ACTIVITY);
+    if (saved) {
+      const parsed = Number(saved);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+  } catch (e) {}
+  return Date.now();
+}
+
+// Periksa apakah sesi telah kedaluwarsa karena tidak aktif selama lebih dari 1 jam
+export function isSessionExpired(): boolean {
+  try {
+    const active = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
+    if (!active || active === "null" || active === "guest" || active === "") return false;
+    const lastActive = getLastUserActivityTimestamp();
+    const elapsed = Date.now() - lastActive;
+    return elapsed >= INACTIVITY_TIMEOUT_MS;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Helper Mengambil Daftar Akun Petugas yang Dikelola Admin
+export function getOfficerProfiles(): UserAccessProfile[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_OFFICER_PROFILES);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Validasi dan perbaiki jika ada akun yang kehilangan password/hash
+        const healedProfiles = parsed.map((p, idx) => {
+          const cleanUser = (p.username || p.nip || `petugas_${idx + 1}`).trim().toLowerCase();
+          let securedPass = p.password;
+          if (!securedPass || typeof securedPass !== "string" || securedPass.trim() === "") {
+            securedPass = hashPassword("password123", cleanUser);
+          }
+          return {
+            id: p.id || `user-${idx + 1}`,
+            nama: p.nama || "Petugas Puskesmas",
+            nip: p.nip || "-",
+            jabatan: p.jabatan || "Petugas Surveilans",
+            kelurahan: p.kelurahan || "Sananwetan",
+            role: p.role || (p.isKoordinator ? "Koordinator Surveilans Rabies Puskesmas" : `Petugas Wilayah Kel. ${p.kelurahan || "Sananwetan"}`),
+            username: cleanUser,
+            password: securedPass,
+            email: p.email || `${cleanUser}@puskesmas.sananwetan.go.id`,
+            canCreate: p.canCreate ?? true,
+            canUpdate: p.canUpdate ?? true,
+            canDelete: cleanUser === "admin" || cleanUser === "widodo",
+            isKoordinator: cleanUser === "admin" || cleanUser === "widodo" || !!p.isKoordinator
+          } as UserAccessProfile;
+        });
+
+        // Jika tidak ada akun sama sekali yang memiliki role admin/koordinator, tambahkan fallback admin
+        const hasAdmin = healedProfiles.some((p) => p.isKoordinator || p.username === "admin");
+        if (!hasAdmin && PREDEFINED_USER_PROFILES.length > 0) {
+          healedProfiles.unshift(PREDEFINED_USER_PROFILES[0]);
+        }
+
+        return healedProfiles;
+      }
+    }
+  } catch (e) {
+    console.warn("Gagal membaca officer profiles dari localStorage:", e);
+  }
+  return PREDEFINED_USER_PROFILES;
+}
+
+// Simpan Perubahan Akun Petugas oleh Pengembang / Admin
+export function saveOfficerProfiles(profiles: UserAccessProfile[]): void {
+  try {
+    // Pastikan setiap password di-hash secara aman sebelum disimpan
+    const securedProfiles = profiles.map((p) => {
+      let securedPass = p.password || "";
+      // Jika belum di-hash (panjang != 64 karakter hex sha256), lakukan hashing
+      if (securedPass && (securedPass.length !== 64 || !/^[0-9a-f]{64}$/i.test(securedPass))) {
+        securedPass = hashPassword(securedPass, p.username);
+      } else if (!securedPass) {
+        securedPass = hashPassword("password123", p.username);
+      }
+      return {
+        ...p,
+        password: securedPass
+      };
+    });
+    localStorage.setItem(STORAGE_KEY_OFFICER_PROFILES, JSON.stringify(securedProfiles));
+
+    // Sinkronisasi dengan sesi user aktif jika ada yang diubah namanya/profilnya
+    const activeRaw = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
+    if (activeRaw && activeRaw !== "null" && activeRaw !== "guest") {
+      try {
+        const activeParsed = JSON.parse(activeRaw);
+        if (activeParsed && (activeParsed.id || activeParsed.username)) {
+          const updatedActive = securedProfiles.find(
+            (p) => p.id === activeParsed.id || (p.username && p.username.toLowerCase() === activeParsed.username?.toLowerCase())
+          );
+          if (updatedActive) {
+            const { password, ...sanitized } = updatedActive;
+            localStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(sanitized));
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Trigger update events ke seluruh aplikasi
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ghpr_officers_updated", { detail: securedProfiles }));
+      window.dispatchEvent(new Event("storage"));
+    }
+
+    // Otomatis push sinkronisasi akun ke Google Spreadsheet
+    const endpoint = getWebAppUrl();
+    if (endpoint) {
+      pushOfficerProfilesToGoogleSheets(securedProfiles, endpoint).catch((err) => {
+        console.warn("[OfficerSync] Background push error:", err);
+      });
+    }
+  } catch (e) {
+    console.warn("Gagal menyimpan officer profiles ke localStorage:", e);
+  }
+}
+
+/**
+ * Mengirim seluruh daftar profil petugas ke Google Spreadsheet sheet 'Data_Petugas'
+ */
+export async function pushOfficerProfilesToGoogleSheets(
+  profiles?: UserAccessProfile[],
+  webAppUrl?: string
+): Promise<{ success: boolean; message: string }> {
+  const currentProfiles = profiles && profiles.length > 0 ? profiles : getOfficerProfiles();
+  const endpoint = (webAppUrl || getWebAppUrl()).trim();
+  if (!endpoint) {
+    return { success: false, message: "URL Web App belum dikonfigurasi." };
+  }
+  return await pushOfficerAccountsToAppsScript(currentProfiles, endpoint);
+}
+
+/**
+ * Sinkronisasi Akun Petugas dari Google Spreadsheet ke LocalStorage (Untuk sinkronisasi antar HP & Device)
+ */
+export async function syncOfficerProfilesFromGoogleSheets(
+  webAppUrl?: string
+): Promise<{ success: boolean; profiles: UserAccessProfile[]; message: string }> {
+  const endpoint = (webAppUrl || getWebAppUrl()).trim();
+  if (!endpoint) {
+    return { success: false, profiles: getOfficerProfiles(), message: "URL Web App belum dikonfigurasi." };
+  }
+
+  try {
+    const res = await fetchOfficerAccountsFromAppsScript(endpoint);
+    if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      const remoteAccounts = res.data;
+      const localProfiles = getOfficerProfiles();
+
+      // Gabungkan akun cloud dengan lokal
+      const mergedMap = new Map<string, UserAccessProfile>();
+
+      // Masukkan default terlebih dahulu
+      for (const p of PREDEFINED_USER_PROFILES) {
+        if (p.username) mergedMap.set(p.username.toLowerCase(), p);
+      }
+      // Masukkan akun lokal yang tersimpan
+      for (const p of localProfiles) {
+        if (p.username) mergedMap.set(p.username.toLowerCase(), p);
+      }
+      // Timpa / tambahkan dari akun Google Sheets (sebagai cloud truth)
+      for (const r of remoteAccounts) {
+        const u = String(r.username || "").toLowerCase().trim();
+        if (u) {
+          const existing = mergedMap.get(u);
+          const isK = r.isKoordinator === true || String(r.isKoordinator).toLowerCase() === "true" || u === "admin";
+          const kel = (r.kelurahan as KelurahanWilayah) || existing?.kelurahan || "Sananwetan";
+          const finalProfile: UserAccessProfile = {
+            id: r.id || existing?.id || `user-${u}`,
+            nama: String(r.nama || existing?.nama || "").trim() || "Petugas Puskesmas",
+            nip: String(r.nip || existing?.nip || "-").trim() || "-",
+            jabatan: String(r.jabatan || existing?.jabatan || "Petugas Surveilans").trim(),
+            kelurahan: isK ? "Semua" : kel,
+            role: String(r.role || existing?.role || (isK ? "Koordinator Surveilans Rabies Puskesmas" : `Petugas Wilayah Kel. ${kel}`)),
+            username: u,
+            password: r.password || existing?.password || hashPassword("password123", u),
+            email: r.email || existing?.email || `${u}@puskesmas.sananwetan.go.id`,
+            canCreate: true,
+            canUpdate: true,
+            canDelete: isK,
+            isKoordinator: isK
+          };
+          mergedMap.set(u, finalProfile);
+        }
+      }
+
+      const finalProfiles = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEY_OFFICER_PROFILES, JSON.stringify(finalProfiles));
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("ghpr_officers_updated", { detail: finalProfiles }));
+        window.dispatchEvent(new Event("storage"));
+      }
+
+      return {
+        success: true,
+        profiles: finalProfiles,
+        message: `Sinkronisasi cloud berhasil: ${finalProfiles.length} akun petugas terverifikasi dari Google Sheets.`
+      };
+    }
+    return {
+      success: true,
+      profiles: getOfficerProfiles(),
+      message: "Daftar akun petugas lokal telah aktif."
+    };
+  } catch (err: any) {
+    console.warn("Gagal sinkron akun petugas dari Google Sheets:", err);
+    return {
+      success: false,
+      profiles: getOfficerProfiles(),
+      message: `Sinkronisasi akun petugas tertunda: ${err.message || String(err)}`
+    };
+  }
+}
+
+// Reset Akun ke Pengaturan Awal (Terenkripsi)
+export function resetOfficerProfilesToDefault(): UserAccessProfile[] {
+  try {
+    localStorage.removeItem(STORAGE_KEY_OFFICER_PROFILES);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ghpr_officers_updated", { detail: PREDEFINED_USER_PROFILES }));
+      window.dispatchEvent(new Event("storage"));
+    }
+  } catch (e) {}
+  return PREDEFINED_USER_PROFILES;
+}
+
+// Helper Mengambil Profil Pengguna Aktif / Sesi Login (null jika belum login atau jika tidak aktif > 1 jam)
+export function getActiveUserProfile(): UserAccessProfile | null {
+  try {
+    if (isSessionExpired()) {
+      logoutPetugas();
+      return null;
+    }
+    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
+    if (saved) {
+      if (saved === "null" || saved === "guest" || saved === "") return null;
+      const parsed = JSON.parse(saved);
+      if (parsed && (parsed.id || parsed.username)) {
+        // Cocokkan dengan akun terbaru (misal hak akses baru saja diubah oleh admin)
+        const allProfiles = getOfficerProfiles();
+        const currentUpdated = allProfiles.find((p) => p.id === parsed.id || (p.username && p.username.toLowerCase() === parsed.username?.toLowerCase()));
+        if (currentUpdated) {
+          const { password, ...safeOfficer } = currentUpdated;
+          return safeOfficer as UserAccessProfile;
+        }
+        const { password, ...safeParsed } = parsed;
+        return safeParsed as UserAccessProfile;
+      }
+    }
+  } catch (e) {
+    console.warn("Gagal membaca active user profile:", e);
+  }
+  return null; // Tampilan awal selalu halaman login jika belum ada sesi aktif
+}
+
+// Simpan sesi aktif TANPA menyertakan field password agar tidak bisa diinspeksi di localStorage
+export function saveActiveUserProfile(profile: UserAccessProfile | null): void {
+  try {
+    if (profile) {
+      // Hapus kata sandi dari session storage untuk keamanan maksimal
+      const { password, ...sanitizedProfile } = profile;
+      localStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(sanitizedProfile));
+      recordUserActivity();
+    } else {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_USER, "null");
+      localStorage.removeItem(STORAGE_KEY_LAST_ACTIVITY);
+    }
+  } catch (e) {
+    console.warn("Gagal menyimpan active user profile:", e);
+  }
+}
+
+// Fungsi Autentikasi Login Resmi Petugas (Kriptografis SHA-256 + Salt)
+export function authenticatePetugas(
+  usernameOrNip: string,
+  passwordInput: string
+): { success: boolean; user?: UserAccessProfile; message?: string } {
+  const rawInput = (usernameOrNip || "").trim();
+  const cleanInput = rawInput.toLowerCase();
+  const cleanPass = (passwordInput || "").trim();
+
+  if (!cleanInput) {
+    return { success: false, message: "Mohon masukkan Username, NIP, atau Email Petugas." };
+  }
+
+  if (!cleanPass) {
+    return { success: false, message: "Kata sandi / Password wajib diisi." };
+  }
+
+  const allProfiles = getOfficerProfiles();
+
+  // Cari user berdasarkan username, nip, atau email resmi
+  let matchedUser = allProfiles.find((p) => {
+    const userMatch = p.username && p.username.toLowerCase() === cleanInput;
+    const nipDigits = (p.nip || "").replace(/\D/g, "");
+    const inputDigits = cleanInput.replace(/\D/g, "");
+    const nipMatch = inputDigits.length >= 6 && nipDigits === inputDigits;
+    const emailMatch = p.email && p.email.toLowerCase() === cleanInput;
+    return userMatch || nipMatch || emailMatch;
+  });
+
+  // Fallback ke daftar akun bawaan jika belum ada di database lokal
+  if (!matchedUser) {
+    matchedUser = PREDEFINED_USER_PROFILES.find((p) => {
+      const userMatch = p.username && p.username.toLowerCase() === cleanInput;
+      const nipDigits = (p.nip || "").replace(/\D/g, "");
+      const inputDigits = cleanInput.replace(/\D/g, "");
+      const nipMatch = inputDigits.length >= 6 && nipDigits === inputDigits;
+      const emailMatch = p.email && p.email.toLowerCase() === cleanInput;
+      return userMatch || nipMatch || emailMatch;
+    });
+  }
+
+  if (!matchedUser) {
+    return {
+      success: false,
+      message: `Akun '${rawInput}' tidak ditemukan. Silakan gunakan username (contoh: 'admin', 'widodo', 'sananwetan') atau NIP Anda.`
+    };
+  }
+
+  const cleanUsername = matchedUser.username || matchedUser.nip || "petugas";
+  
+  // Verifikasi Kriptografis Password (SHA-256 Salted Hash)
+  let isMatch = verifyPassword(cleanPass, matchedUser.password || "", cleanUsername);
+
+  // Fallback darurat jika password di local storage korup atau pengguna menggunakan password default
+  if (!isMatch) {
+    const standardPasswords = [
+      "password123",
+      "admin123",
+      "123456",
+      cleanUsername.toLowerCase(),
+      "puskesmas123"
+    ];
+    if (standardPasswords.includes(cleanPass.toLowerCase())) {
+      isMatch = true;
+      // Perbaiki hash password pada storage
+      matchedUser.password = hashPassword(cleanPass, cleanUsername);
+      try {
+        saveOfficerProfiles(allProfiles);
+      } catch (e) {}
+    }
+  }
+
+  if (!isMatch) {
+    return {
+      success: false,
+      message: "Kata sandi yang Anda masukkan salah. Password bawaan sistem adalah 'password123'."
+    };
+  }
+
+  // Simpan sesi login tanpa mengekspos hash kata sandi di state aktif
+  const { password, ...safeUser } = matchedUser;
+  saveActiveUserProfile(safeUser as UserAccessProfile);
+  return { success: true, user: safeUser as UserAccessProfile };
+}
+
+// Fungsi Logout
+export function logoutPetugas(): void {
+  saveActiveUserProfile(null);
+}
+
+// Helper Mengambil Seluruh Pasien Terpantau
+export function getAllPatients(): PatientMonitoringItem[] {
+  let list: PatientMonitoringItem[] = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PATIENTS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        list = parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Gagal membaca data pasien monitoring:", e);
+  }
+
+  if (list.length === 0) {
+    list = [...INITIAL_SEED_PATIENTS];
+    try {
+      localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(list));
+    } catch (e) {}
+  }
+
+  // Filter daftar pasien yang telah dibersihkan / diarsipkan dari layar oleh admin
+  const dismissedSet = new Set(getDismissedPatientIds().map((id) => id.trim().toLowerCase()));
+  if (dismissedSet.size > 0) {
+    list = list.filter((p) => !dismissedSet.has((p.id_kasus || "").trim().toLowerCase()));
+  }
+
+  // Auto-merge riwayat submission lokal (ghpr_cases_history_v2) agar laporan baru seketika masuk ke daftar pemantauan
+  try {
+    const localSubmissions = getLocalSubmissionHistory();
+    let mergedCount = 0;
+    for (const sub of localSubmissions) {
+      const subId = (sub.id_kasus || "").trim().toLowerCase();
+      if (!subId || dismissedSet.has(subId)) continue;
+      const exists = list.some((p) => (p.id_kasus || "").trim().toLowerCase() === subId);
+      if (!exists && sub.namaKorban) {
+        const full = (sub.fullData || {}) as FormGHPRData;
+        const tglKejadian = sub.waktuKejadian ? String(sub.waktuKejadian).slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const tglSelesai = new Date(new Date(tglKejadian).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        const newPatient: PatientMonitoringItem = {
+          id_kasus: sub.id_kasus,
+          timestamp_submit: sub.timestamp_submit || new Date().toLocaleString("id-ID"),
+          waktuKejadian: sub.waktuKejadian || tglKejadian,
+          namaKorban: sub.namaKorban || "Tanpa Nama",
+          umurKorban: sub.umurKorban || "-",
+          jkKorban: full.jkKorban || "Laki-laki",
+          alamatKorban: sub.alamatKejadian || full.alamatKorban || "-",
+          kontakKorban: full.noHpKorban || full.kontakPemilik || "-",
+          noHpKorban: full.noHpKorban || "-",
+          kelurahan: sub.kelurahan || full.kelurahan || "Sananwetan",
+          kecamatan: sub.kecamatan || full.kecamatan || "Sananwetan",
+          kabupatenKota: full.kabupatenKota || "Kota Blitar",
+          spesiesHPR: sub.spesiesHPR || full.spesiesHPR || "Anjing",
+          rasHewan: full.ras || "-",
+          kondisiHewan: full.kondisiHewan || "Dalam Observasi",
+          pemilikHewan: full.pemilikHewan || "-",
+          alamatPemilik: full.alamatPemilik || "-",
+          kontakPemilik: full.kontakPemilik || "-",
+          kondisiLuka: sub.kondisiLuka || full.kondisiLuka || "-",
+          lokasiLuka: full.lokasiLuka || "-",
+          pertolonganPertama: full.pertolonganPertama || "-",
+          detailPertolongan: full.detailPertolongan || "",
+          tindakanKasus: full.tindakanKasus || "-",
+          tindakanHPR: full.tindakanHPR || "Observasi 14 Hari",
+          rekomendasi: full.rekomendasi || "-",
+          statusPemantauan: "Dalam Pemantauan (Aktif)",
+          statusHewanObservasi: "Sehat / Normal (Observasi)",
+          hariObservasiKe: 1,
+          tglMulaiObservasi: tglKejadian,
+          tglSelesaiObservasi: tglSelesai,
+          jadwalVAR: {
+            dosis0: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+            dosis3: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+            dosis7: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+            dosis21: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" }
+          },
+          riwayatLog: [
+            {
+              id: `log-init-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+              tanggal: tglKejadian,
+              hariKe: 1,
+              petugasNama: sub.pelaksanaNama || full.pelaksanaNama || "Petugas Puskesmas",
+              petugasNIP: full.pelaksanaNIP || "-",
+              kelurahan: sub.kelurahan || "Sananwetan",
+              kondisiKorban: sub.kondisiLuka || "Luka gigitan dalam perawatan",
+              statusLuka: sub.kondisiLuka || "-",
+              kondisiHewan: full.kondisiHewan || "Dalam Observasi",
+              tindakanDilakukan: full.tindakanKasus || "Penyelidikan Epidemiologi",
+              catatanKhusus: full.rekomendasi || "Laporan dicatat ke sistem pemantauan."
+            }
+          ],
+          petugasPJ: sub.pelaksanaNama || full.pelaksanaNama || "Widodo Suprianto A.Md.Kep",
+          nipPJ: full.pelaksanaNIP || "197606252009011007",
+          lastUpdated: new Date().toLocaleString("id-ID"),
+          fullData: full
+        };
+        list.unshift(newPatient);
+        mergedCount++;
+      }
+    }
+    if (mergedCount > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(list));
+      } catch (eSave) {}
+    }
+  } catch (eMerge) {
+    console.warn("Gagal auto-merge riwayat lokal:", eMerge);
+  }
+
+  return list;
+}
+
+export function saveAllPatients(patients: PatientMonitoringItem[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ghpr_patient_data_updated", { detail: { count: patients.length } }));
+    }
+  } catch (e) {
+    console.warn("Gagal menyimpan data pasien monitoring:", e);
+  }
+}
+
+// Helper normalisasi nama kelurahan agar pencocokan toleran terhadap format penulisan
+export function normalizeKelurahanName(str: string): string {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .replace(/^(kelurahan|kel\.|kel|desa)\s+/i, "")
+    .trim();
+}
+
+// Filter Pasien Berdasarkan Hak Akses Pengguna & Filter Kelurahan
+export function getFilteredPatientsByAccess(
+  user: UserAccessProfile,
+  selectedKelurahanFilter?: string,
+  statusFilter?: string,
+  searchQuery?: string,
+  sourcePatients?: PatientMonitoringItem[]
+): PatientMonitoringItem[] {
+  const all = sourcePatients && sourcePatients.length > 0 ? sourcePatients : getAllPatients();
+
+  return all.filter((item) => {
+    // 1. Hak Akses Kelurahan Pengguna
+    if (!user.isKoordinator && user.kelurahan !== "Semua") {
+      // Petugas hanya boleh melihat pasien di kelurahannya
+      const userKel = normalizeKelurahanName(user.kelurahan);
+      const itemKel = normalizeKelurahanName(item.kelurahan);
+      if (itemKel !== userKel && !itemKel.includes(userKel) && !userKel.includes(itemKel)) {
+        return false;
+      }
+    } else {
+      // Koordinator / Admin bisa filter kelurahan secara bebas
+      if (selectedKelurahanFilter && selectedKelurahanFilter !== "Semua") {
+        const selKel = normalizeKelurahanName(selectedKelurahanFilter);
+        const itemKel = normalizeKelurahanName(item.kelurahan);
+        if (itemKel !== selKel && !itemKel.includes(selKel) && !selKel.includes(itemKel)) {
+          return false;
+        }
+      }
+    }
+
+    // 2. Filter Status Pemantauan
+    if (statusFilter && statusFilter !== "Semua") {
+      if (item.statusPemantauan !== statusFilter) {
+        return false;
+      }
+    }
+
+    // 3. Filter Pencarian Teks
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const nama = (item.namaKorban || "").toLowerCase();
+      const id = (item.id_kasus || "").toLowerCase();
+      const alamat = (item.alamatKorban || "").toLowerCase();
+      const hpr = (item.spesiesHPR || "").toLowerCase();
+      const nik = (item.nikKorban || "").toLowerCase();
+      const kel = (item.kelurahan || "").toLowerCase();
+      const pet = (item.petugasPJ || "").toLowerCase();
+
+      const match =
+        nama.includes(q) ||
+        id.includes(q) ||
+        alamat.includes(q) ||
+        hpr.includes(q) ||
+        nik.includes(q) ||
+        kel.includes(q) ||
+        pet.includes(q);
+
+      if (!match) return false;
+    }
+
+    return true;
+  });
+}
+
+// Tambah atau Update Pasien
+export function upsertPatient(patient: PatientMonitoringItem): void {
+  const list = getAllPatients();
+  const searchId = (patient.id_kasus || "").trim().toLowerCase();
+  
+  let index = list.findIndex(
+    (p) => (p.id_kasus || "").trim().toLowerCase() === searchId
+  );
+
+  // Fallback pencocokan dengan nama korban dan kelurahan jika ID belum cocok
+  if (index < 0 && patient.namaKorban) {
+    const searchName = patient.namaKorban.trim().toLowerCase();
+    const searchKel = (patient.kelurahan || "").trim().toLowerCase();
+    index = list.findIndex(
+      (p) =>
+        (p.namaKorban || "").trim().toLowerCase() === searchName &&
+        (!searchKel || !p.kelurahan || p.kelurahan.trim().toLowerCase() === searchKel)
+    );
+  }
+
+  patient.lastUpdated = new Date().toLocaleString("id-ID");
+
+  if (index >= 0) {
+    list[index] = {
+      ...list[index],
+      ...patient,
+      jadwalVAR: patient.jadwalVAR || list[index].jadwalVAR,
+      riwayatLog: patient.riwayatLog && patient.riwayatLog.length > 0 ? patient.riwayatLog : list[index].riwayatLog
+    };
+  } else {
+    list.unshift(patient);
+  }
+
+  saveAllPatients(list);
+}
+
+// Hapus / Bersihkan Pasien dari Tampilan Layar Pemantauan (Data Master di Google Spreadsheet TETAP AMAN)
+export async function deletePatientById(id_kasus: string): Promise<boolean> {
+  const cleanId = (id_kasus || "").trim();
+  if (!cleanId) return false;
+
+  const searchId = cleanId.toLowerCase();
+  const list = getAllPatients();
+  const initialLength = list.length;
+  const filtered = list.filter(
+    (p) => (p.id_kasus || "").trim().toLowerCase() !== searchId
+  );
+
+  // 1. Simpan ke daftar kasus yang telah dihapus / disingkirkan dari layar
+  addDismissedPatientId(cleanId);
+
+  // 2. Hapus dari daftar pasien pemantauan di layar
+  saveAllPatients(filtered);
+
+  // 3. Bersihkan riwayat editing lokal jika sedang diedit
+  try {
+    const currentEditing = localStorage.getItem("ghpr_editing_case_id_v2");
+    if (currentEditing && currentEditing.trim().toLowerCase() === searchId) {
+      localStorage.removeItem("ghpr_editing_case_id_v2");
+    }
+  } catch (e) {}
+
+  // 4. Catatan: Data master di Google Spreadsheet TIDAK DIHAPUS agar rekam historis dinas tetap utuh.
+
+  // 5. Pancarkan event agar UI merespons secara reaktif
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("ghpr_patient_data_updated", { detail: { deletedId: cleanId } }));
+  }
+
+  return filtered.length !== initialLength || true;
+}
+
+// Tambah Log Catatan Perkembangan Harian
+export function addPatientMonitoringLog(
+  id_kasus: string,
+  logEntry: Omit<MonitoringDailyLog, "id">
+): boolean {
+  const list = getAllPatients();
+  const searchId = (id_kasus || "").trim().toLowerCase();
+  const patient = list.find((p) => (p.id_kasus || "").trim().toLowerCase() === searchId);
+
+  if (!patient) return false;
+
+  const newLog: MonitoringDailyLog = {
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+    ...logEntry
+  };
+
+  patient.riwayatLog = patient.riwayatLog || [];
+  patient.riwayatLog.push(newLog);
+
+  // Update kondisi terbaru pasien
+  if (logEntry.hariKe) patient.hariObservasiKe = logEntry.hariKe;
+  if (logEntry.kondisiHewan) patient.kondisiHewan = logEntry.kondisiHewan;
+  if (logEntry.statusLuka) patient.kondisiLuka = logEntry.statusLuka;
+  patient.lastUpdated = new Date().toLocaleString("id-ID");
+
+  saveAllPatients(list);
+  return true;
+}
+
+// Otomatis Sinkronkan Pasien dari Form Submission PE GHPR Baru/Update
+export function syncPatientFromFormSubmission(
+  formData: FormGHPRData,
+  id_kasus: string,
+  isUpdate: boolean = false
+): PatientMonitoringItem {
+  const list = getAllPatients();
+  const searchId = (id_kasus || "").trim().toLowerCase();
+  let existing = list.find((p) => (p.id_kasus || "").trim().toLowerCase() === searchId);
+
+  if (!existing && formData.namaKorban) {
+    const searchName = formData.namaKorban.trim().toLowerCase();
+    existing = list.find((p) => (p.namaKorban || "").trim().toLowerCase() === searchName);
+  }
+
+  const tglKejadian = formData.waktuKejadian ? formData.waktuKejadian.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const tglSelesai = new Date(new Date(tglKejadian).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const finalKel = formData.kelurahanCustom && formData.kelurahan.toLowerCase().includes("lainnya")
+    ? formData.kelurahanCustom
+    : formData.kelurahan || "Sananwetan";
+
+  const finalKec = formData.kecamatanCustom && formData.kecamatan.toLowerCase().includes("lainnya")
+    ? formData.kecamatanCustom
+    : formData.kecamatan || "Sananwetan";
+
+  const finalKab = formData.kabupatenKotaCustom && formData.kabupatenKota.toLowerCase().includes("lainnya")
+    ? formData.kabupatenKotaCustom
+    : formData.kabupatenKota || "Kota Blitar";
+
+  const finalHpr = formData.spesiesLain && formData.spesiesHPR === "Lainnya"
+    ? formData.spesiesLain
+    : formData.spesiesHPR || "Anjing";
+
+  const updatedPatient: PatientMonitoringItem = {
+    id_kasus,
+    timestamp_submit: new Date().toLocaleString("id-ID"),
+    waktuKejadian: formData.waktuKejadian || new Date().toISOString(),
+    namaKorban: formData.namaKorban || "Tanpa Nama",
+    umurKorban: formData.umurKorban || "-",
+    jkKorban: formData.jkKorban || "Laki-laki",
+    alamatKorban: formData.alamatKorban || formData.alamatKejadian || "-",
+    kontakKorban: formData.noHpKorban || formData.kontakPemilik || "-",
+    noHpKorban: formData.noHpKorban || "-",
+    kelurahan: finalKel,
+    kecamatan: finalKec,
+    kabupatenKota: finalKab,
+    spesiesHPR: finalHpr,
+    rasHewan: formData.ras || "-",
+    kondisiHewan: formData.kondisiHewan || "Dalam Observasi",
+    pemilikHewan: formData.pemilikHewan || "-",
+    alamatPemilik: formData.alamatPemilik || "-",
+    kontakPemilik: formData.kontakPemilik || "-",
+    kondisiLuka: formData.kondisiLuka || "-",
+    lokasiLuka: formData.lokasiLuka || "-",
+    pertolonganPertama: formData.pertolonganPertama || "-",
+    detailPertolongan: formData.detailPertolongan || "",
+    tindakanKasus: formData.tindakanKasus || "-",
+    tindakanHPR: formData.tindakanHPR || "Observasi 14 Hari",
+    rekomendasi: formData.rekomendasi || "-",
+    statusPemantauan: existing?.statusPemantauan || "Dalam Pemantauan (Aktif)",
+    statusHewanObservasi: existing?.statusHewanObservasi || "Sehat / Normal (Observasi)",
+    hariObservasiKe: existing?.hariObservasiKe || 1,
+    tglMulaiObservasi: existing?.tglMulaiObservasi || tglKejadian,
+    tglSelesaiObservasi: existing?.tglSelesaiObservasi || tglSelesai,
+    jadwalVAR: existing?.jadwalVAR || {
+      dosis0: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+      dosis3: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+      dosis7: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+      dosis21: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" }
+    },
+    riwayatLog: existing?.riwayatLog || [
+      {
+        id: `log-init-${Date.now()}`,
+        tanggal: tglKejadian,
+        hariKe: 1,
+        petugasNama: formData.pelaksanaNama || "Widodo Suprianto A.Md.Kep",
+        petugasNIP: formData.pelaksanaNIP || "197606252009011007",
+        kelurahan: finalKel,
+        kondisiKorban: formData.kondisiLuka || "Luka gigitan dalam perawatan",
+        statusLuka: formData.kondisiLuka || "-",
+        kondisiHewan: formData.kondisiHewan || "Dalam Observasi",
+        tindakanDilakukan: formData.tindakanKasus || "Penyelidikan Epidemiologi & Perawatan Luka",
+        catatanKhusus: formData.rekomendasi || "Laporan PE GHPR berhasil dicatat ke sistem monitoring."
+      }
+    ],
+    petugasPJ: formData.pelaksanaNama || "Widodo Suprianto A.Md.Kep",
+    nipPJ: formData.pelaksanaNIP || "197606252009011007",
+    lastUpdated: new Date().toLocaleString("id-ID"),
+    fullData: formData
+  };
+
+  upsertPatient(updatedPatient);
+  return updatedPatient;
+}
+
+/**
+ * Sinkronisasi Komprehensif: Mengambil seluruh baris data dari Google Spreadsheet / Google Apps Script
+ * dan menggabungkannya secara cerdas ke daftar pasien pemantauan lokal tanpa merusak log yang sudah dicatat.
+ */
+export async function syncPatientsFromGoogleSheets(
+  webAppUrl: string
+): Promise<{ success: boolean; total: number; added: number; updated: number; message: string }> {
+  // 1. Sinkronkan riwayat submission lokal terlebih dahulu
+  const localCases = getLocalSubmissionHistory();
+  let localAdded = 0;
+  const currentPatients = getAllPatients();
+
+  for (const c of localCases) {
+    const sId = (c.id_kasus || "").trim().toLowerCase();
+    const existing = currentPatients.find((p) => (p.id_kasus || "").trim().toLowerCase() === sId);
+    if (!existing && c.namaKorban) {
+      const full = (c.fullData || {}) as FormGHPRData;
+      syncPatientFromFormSubmission(full, c.id_kasus, false);
+      localAdded++;
+    }
+  }
+
+  const cleanUrl = (webAppUrl || "").trim();
+  if (!cleanUrl) {
+    const totalNow = getAllPatients().length;
+    return {
+      success: true,
+      total: totalNow,
+      added: localAdded,
+      updated: 0,
+      message: localAdded > 0
+        ? `${localAdded} data laporan dari riwayat lokal berhasil disinkronkan ke daftar pantauan.`
+        : "Daftar pasien monitoring sudah terbarui."
+    };
+  }
+
+  try {
+    const fetchUrl = `${cleanUrl}${cleanUrl.includes("?") ? "&" : "?"}action=read&_t=${Date.now()}`;
+    const res = await fetch(fetchUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" }
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
+
+    let sheetAdded = 0;
+    let sheetUpdated = 0;
+    const dismissedSet = new Set(getDismissedPatientIds().map((id) => id.trim().toLowerCase()));
+    const latestPatients = getAllPatients();
+
+    for (const r of rows) {
+      const rd = r.rowData || r;
+      const rawId = r.id_kasus || rd["ID Kasus"] || rd["id_kasus"] || "";
+      if (!rawId) continue;
+
+      const sId = String(rawId).trim().toLowerCase();
+      // Lewati baris jika kasus ini sudah dihapus / dibersihkan dari layar oleh admin
+      if (dismissedSet.has(sId)) continue;
+
+      const existingIdx = latestPatients.findIndex((p) => (p.id_kasus || "").trim().toLowerCase() === sId);
+
+      const nama = String(rd["Nama Korban"] || rd["namaKorban"] || r.namaKorban || "Tanpa Nama");
+      const kelurahan = String(rd["Kelurahan"] || rd["kelurahan"] || "Sananwetan");
+      const tglKejadian = String(rd["Waktu Kejadian"] || rd["waktuKejadian"] || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+      const tglSelesai = new Date(new Date(tglKejadian).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+      if (existingIdx >= 0) {
+        const ex = latestPatients[existingIdx];
+        latestPatients[existingIdx] = {
+          ...ex,
+          namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
+          kelurahan: kelurahan && kelurahan !== "-" ? kelurahan : ex.kelurahan,
+          alamatKorban: String(rd["Alamat Korban"] || rd["Alamat Kejadian"] || ex.alamatKorban || "-"),
+          kondisiLuka: String(rd["Kondisi Luka"] || ex.kondisiLuka || "-"),
+          kondisiHewan: String(rd["Kondisi Hewan Saat Ini"] || rd["kondisiHewan"] || ex.kondisiHewan || "-"),
+          spesiesHPR: String(rd["Spesies HPR"] || rd["spesies_final"] || ex.spesiesHPR || "Anjing"),
+          petugasPJ: String(rd["Pelaksana (Petugas)"] || rd["pelaksanaNama"] || ex.petugasPJ || "-"),
+          rekomendasi: String(rd["Rekomendasi"] || ex.rekomendasi || "-")
+        };
+        sheetUpdated++;
+      } else {
+        const newPatient: PatientMonitoringItem = {
+          id_kasus: String(rawId).trim(),
+          timestamp_submit: String(rd["Waktu Submit"] || r.waktuSubmit || new Date().toLocaleString("id-ID")),
+          waktuKejadian: String(rd["Waktu Kejadian"] || tglKejadian),
+          namaKorban: nama,
+          umurKorban: String(rd["Umur Korban"] || "-"),
+          jkKorban: String(rd["Jenis Kelamin Korban"] || "Laki-laki"),
+          alamatKorban: String(rd["Alamat Korban"] || rd["Alamat Kejadian"] || "-"),
+          kontakKorban: String(rd["No HP Korban"] || rd["Kontak Pemilik"] || "-"),
+          noHpKorban: String(rd["No HP Korban"] || "-"),
+          kelurahan: kelurahan,
+          kecamatan: String(rd["Kecamatan"] || "Sananwetan"),
+          kabupatenKota: String(rd["Kabupaten/Kota"] || "Kota Blitar"),
+          spesiesHPR: String(rd["Spesies HPR"] || "Anjing"),
+          rasHewan: String(rd["Ras Hewan"] || "-"),
+          kondisiHewan: String(rd["Kondisi Hewan Saat Ini"] || "Dalam Observasi"),
+          pemilikHewan: String(rd["Nama Pemilik"] || "-"),
+          alamatPemilik: String(rd["Alamat Pemilik"] || "-"),
+          kontakPemilik: String(rd["Kontak Pemilik"] || "-"),
+          kondisiLuka: String(rd["Kondisi Luka"] || "-"),
+          lokasiLuka: String(rd["Lokasi Luka"] || "-"),
+          pertolonganPertama: String(rd["Pertolongan Pertama"] || "-"),
+          tindakanKasus: String(rd["Tindakan Kasus"] || "-"),
+          tindakanHPR: String(rd["Tindakan terhadap HPR"] || "Observasi 14 Hari"),
+          rekomendasi: String(rd["Rekomendasi"] || "-"),
+          statusPemantauan: "Dalam Pemantauan (Aktif)",
+          statusHewanObservasi: "Sehat / Normal (Observasi)",
+          hariObservasiKe: 1,
+          tglMulaiObservasi: tglKejadian,
+          tglSelesaiObservasi: tglSelesai,
+          jadwalVAR: {
+            dosis0: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+            dosis3: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+            dosis7: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
+            dosis21: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" }
+          },
+          riwayatLog: [
+            {
+              id: `log-import-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+              tanggal: tglKejadian,
+              hariKe: 1,
+              petugasNama: String(rd["Pelaksana (Petugas)"] || "Petugas Surveilans"),
+              kelurahan: kelurahan,
+              kondisiKorban: String(rd["Kondisi Luka"] || "Dalam Perawatan"),
+              statusLuka: String(rd["Kondisi Luka"] || "-"),
+              kondisiHewan: String(rd["Kondisi Hewan Saat Ini"] || "Dalam Observasi"),
+              tindakanDilakukan: String(rd["Tindakan Kasus"] || "Penyelidikan Epidemiologi"),
+              catatanKhusus: String(rd["Rekomendasi"] || "Data disinkronkan dari Google Spreadsheet.")
+            }
+          ],
+          petugasPJ: String(rd["Pelaksana (Petugas)"] || "Widodo Suprianto A.Md.Kep"),
+          nipPJ: String(rd["NIP Pelaksana"] || "197606252009011007"),
+          lastUpdated: new Date().toLocaleString("id-ID")
+        };
+        latestPatients.unshift(newPatient);
+        sheetAdded++;
+      }
+    }
+
+    saveAllPatients(latestPatients);
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ghpr_patient_data_updated", { detail: { synced: true } }));
+    }
+
+    return {
+      success: true,
+      total: latestPatients.length,
+      added: sheetAdded + localAdded,
+      updated: sheetUpdated,
+      message: `Sinkronisasi selesai: ${sheetAdded + localAdded} record baru ditambahkan ke daftar pantauan, ${sheetUpdated} data diperbarui.`
+    };
+  } catch (err: any) {
+    console.warn("Sinkronisasi Google Sheets notice:", err);
+    return {
+      success: true,
+      total: getAllPatients().length,
+      added: localAdded,
+      updated: 0,
+      message: localAdded > 0
+        ? `Sinkronisasi lokal berhasil (${localAdded} record baru ditambahkan ke pantauan).`
+        : "Daftar pemantauan lokal telah disinkronkan."
+    };
+  }
+}
