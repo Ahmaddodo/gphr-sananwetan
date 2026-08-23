@@ -30,13 +30,14 @@ import {
 } from "../lib/googleSheets";
 import { OfficerAccountManager } from "./OfficerAccountManager";
 import { GitHubSyncManager } from "./GitHubSyncManager";
+import { AdminDeviceSyncPanel } from "./AdminDeviceSyncPanel";
 
 interface GoogleSheetsManagerProps {
   sheetConfig: ConnectedSheetConfig | null;
   setSheetConfig: (config: ConnectedSheetConfig | null) => void;
   webAppUrl: string;
   setWebAppUrl: (url: string) => void;
-  initialTab?: "accounts" | "sheets" | "github";
+  initialTab?: "accounts" | "sync" | "sheets" | "github";
   onAccountsUpdated?: () => void;
 }
 
@@ -48,7 +49,7 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
   initialTab = "accounts",
   onAccountsUpdated
 }) => {
-  const [activeAdminTab, setActiveAdminTab] = useState<"accounts" | "sheets" | "github">(initialTab);
+  const [activeAdminTab, setActiveAdminTab] = useState<"accounts" | "sync" | "sheets" | "github">(initialTab);
   const [showAppsScriptModal, setShowAppsScriptModal] = useState(false);
 
   useEffect(() => {
@@ -319,7 +320,7 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
       </div>
 
       {/* Admin Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 flex-wrap">
         <button
           type="button"
           onClick={() => setActiveAdminTab("accounts")}
@@ -331,6 +332,19 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
         >
           <KeyRound size={15} />
           <span>Atur Username & Password Petugas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveAdminTab("sync")}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeAdminTab === "sync"
+              ? "bg-indigo-600 text-white shadow-xs"
+              : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+          }`}
+        >
+          <Users size={15} />
+          <span>Sinkronisasi Sumber Admin (Multi-Perangkat)</span>
         </button>
 
         <button
@@ -365,7 +379,16 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
         <OfficerAccountManager onAccountsUpdated={onAccountsUpdated} />
       )}
 
-      {/* TAB 2: INTEGRASI GOOGLE SHEETS */}
+      {/* TAB 2: SINKRONISASI SUMBER ADMIN (MULTI-PERANGKAT) */}
+      {activeAdminTab === "sync" && (
+        <AdminDeviceSyncPanel
+          webAppUrl={webAppUrl}
+          sheetConfig={sheetConfig}
+          onDataSynced={onAccountsUpdated}
+        />
+      )}
+
+      {/* TAB 3: INTEGRASI GOOGLE SHEETS */}
       {activeAdminTab === "sheets" && (
         <>
           {/* STATUS TERHUBUNG: SPREADSHEET & WEB APP ENDPOINT */}

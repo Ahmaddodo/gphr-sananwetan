@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Lock,
   User,
@@ -10,7 +10,11 @@ import {
   Clock
 } from "lucide-react";
 import { UserAccessProfile } from "../types";
-import { authenticatePetugas } from "../lib/patientMonitoring";
+import {
+  authenticatePetugas,
+  syncOfficerProfilesFromGoogleSheets,
+  syncPatientsFromGoogleSheets
+} from "../lib/patientMonitoring";
 import { PUSKESMAS_LOGO_URL } from "./SignatureData";
 
 interface UserLoginViewProps {
@@ -28,8 +32,31 @@ export const UserLoginView: React.FC<UserLoginViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showSecurityInfo, setShowSecurityInfo] = useState<boolean>(false);
+  const [isSyncingWithCloud, setIsSyncingWithCloud] = useState<boolean>(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Otomatis sinkronisasi akun & data dari Google Sheets saat aplikasi pertama dibuka di perangkat
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCloudData = async () => {
+      try {
+        setIsSyncingWithCloud(true);
+        await Promise.allSettled([
+          syncOfficerProfilesFromGoogleSheets(),
+          syncPatientsFromGoogleSheets()
+        ]);
+      } catch (e) {
+        console.warn("Auto-sync Google Sheets saat login notice:", e);
+      } finally {
+        if (isMounted) setIsSyncingWithCloud(false);
+      }
+    };
+    fetchCloudData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
 
@@ -48,20 +75,28 @@ export const UserLoginView: React.FC<UserLoginViewProps> = ({
 
     setIsSubmitting(true);
 
-    // Otentikasi kriptografis SHA-256 + Salt
-    setTimeout(() => {
-      const result = authenticatePetugas(cleanUser, cleanPass);
+    // 1. Coba autentikasi lokal
+    let result = authenticatePetugas(cleanUser, cleanPass);
 
-      if (result.success && result.user) {
-        setIsSubmitting(false);
-        onLoginSuccess(result.user);
-      } else {
-        setIsSubmitting(false);
-        setErrorMessage(
-          result.message || "Username atau Password yang Anda masukkan tidak cocok."
-        );
-      }
-    }, 250);
+    // 2. Jika gagal di lokal, coba sinkronkan live dari Google Sheets siapa tahu admin baru saja mengubah username/password di cloud
+    if (!result.success) {
+      try {
+        await syncOfficerProfilesFromGoogleSheets();
+        result = authenticatePetugas(cleanUser, cleanPass);
+      } catch (err) {}
+    }
+
+    if (result.success && result.user) {
+      // Pastikan pasien terbaru juga ditarik agar data di dashboard selaras
+      syncPatientsFromGoogleSheets().catch(() => {});
+      setIsSubmitting(false);
+      onLoginSuccess(result.user);
+    } else {
+      setIsSubmitting(false);
+      setErrorMessage(
+        result.message || "Username atau Password yang Anda masukkan tidak cocok."
+      );
+    }
   };
 
   return (
@@ -254,12 +289,34 @@ export const UserLoginView: React.FC<UserLoginViewProps> = ({
               </div>
             </form>
 
-            {/* Bottom Actions: Security info */}
-            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-center text-xs">
+            {/* Bottom Actions: Security info & Sync Status */}
+            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs flex-wrap gap-2">
               <div className="inline-flex items-center gap-1.5 text-slate-500 text-[11px]">
                 <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
-                <span>Autentikasi Terenkripsi SHA-256</span>
+                <span>Autentikasi SHA-256</span>
               </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setIsSyncingWithCloud(true);
+                    await Promise.all([
+                      syncOfficerProfilesFromGoogleSheets(),
+                      syncPatientsFromGoogleSheets()
+                    ]);
+                  } catch (e) {
+                  } finally {
+                    setIsSyncingWithCloud(false);
+                  }
+                }}
+                disabled={isSyncingWithCloud}
+                className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer disabled:opacity-50"
+                title="Tarik data akun terbaru yang baru diubah oleh admin dari server cloud"
+              >
+                <Clock size={12} className={isSyncingWithCloud ? "animate-spin text-emerald-600" : ""} />
+                <span>{isSyncingWithCloud ? "Menyinkronkan..." : "Sinkronkan Akun"}</span>
+              </button>
             </div>
           </div>
         </div>

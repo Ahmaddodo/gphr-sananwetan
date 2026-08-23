@@ -610,6 +610,11 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify(saveAccRes)).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "saveAllPatients" || action === "syncAllPatients" || action === "bulkPatients") {
+    var bulkPatRes = simpanSemuaPasien(data.patients || data.cases || data.data || data);
+    return ContentService.createTextOutput(JSON.stringify(bulkPatRes)).setMimeType(ContentService.MimeType.JSON);
+  }
+
   var hasil = prosesDataMasuk(data, action);
   return ContentService.createTextOutput(JSON.stringify(hasil)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -773,6 +778,52 @@ function simpanDaftarPetugas(rawAccounts) {
     }
     sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
     return { status: "success", count: accounts.length, message: "Berhasil menyimpan " + accounts.length + " akun petugas ke Google Sheets." };
+  } catch (err) {
+    return { status: "error", message: err.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
+}
+
+// FUNGSI MENYIMPAN SELURUH DATA PASIEN KE SHEET 'Data Laporan GHPR'
+function simpanSemuaPasien(rawPatients) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(30000); } catch(eLock) { return { status: "error", message: "Server sibuk" }; }
+  try {
+    var ss = null;
+    if (TARGET_SPREADSHEET_ID) {
+      try { ss = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID); } catch(e) {}
+    }
+    if (!ss) {
+      try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
+    }
+    if (!ss) return { status: "error", message: "Spreadsheet tidak ditemukan" };
+
+    var sheet = ss.getSheetByName("Data Laporan GHPR") || ss.getSheetByName("Laporan PE GHPR") || ss.getSheets()[0];
+    if (!sheet) {
+      sheet = ss.insertSheet("Data Laporan GHPR");
+    }
+
+    var patients = Array.isArray(rawPatients) ? rawPatients : (rawPatients && rawPatients.patients ? rawPatients.patients : []);
+    if (!Array.isArray(patients)) patients = [];
+
+    sheet.clear();
+    sheet.appendRow(OFFICIAL_HEADERS);
+    var headerRange = sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length);
+    headerRange.setBackground("#0F5132");
+    headerRange.setFontColor("#FFFFFF");
+    headerRange.setFontWeight("bold");
+    headerRange.setHorizontalAlignment("center");
+    headerRange.setWrap(true);
+    sheet.setFrozenRows(1);
+
+    if (patients.length > 0) {
+      for (var p = 0; p < patients.length; p++) {
+        prosesDataMasuk(patients[p], "save");
+      }
+    }
+
+    return { status: "success", count: patients.length, message: "Berhasil menyelaraskan " + patients.length + " data pasien ke Google Sheets." };
   } catch (err) {
     return { status: "error", message: err.toString() };
   } finally {
@@ -1395,5 +1446,126 @@ export async function pushOfficerAccountsToAppsScript(
     }
   }
 }
+
+/**
+ * Mengirim seluruh data pasien monitoring ke Google Spreadsheet (sheet 'Data Laporan GHPR')
+ */
+export async function pushAllPatientsToAppsScript(
+  patients: any[],
+  targetUrl: string
+): Promise<{ success: boolean; message: string; count?: number }> {
+  const cleanUrl = (targetUrl || "").trim();
+  if (!cleanUrl) {
+    return { success: false, message: "URL Web App belum dikonfigurasi." };
+  }
+
+  // Format data pasien agar sesuai kolom Apps Script
+  const formattedPatients = patients.map((p) => {
+    const full = p.fullData || {};
+    return {
+      id_kasus: p.id_kasus,
+      timestamp_submit: p.timestamp_submit || new Date().toLocaleString("id-ID"),
+      waktuKejadian: p.waktuKejadian || "",
+      alamatKejadian: p.alamatKorban || full.alamatKejadian || "-",
+      kelurahan_final: p.kelurahan || full.kelurahan || "Sananwetan",
+      kecamatan_final: p.kecamatan || full.kecamatan || "Sananwetan",
+      kabupatenKota_final: p.kabupatenKota || full.kabupatenKota || "Kota Blitar",
+      provinsi: full.provinsi || "Jawa Timur",
+      sumberInfo: full.sumberInfo || "Laporan Masyarakat / Puskesmas",
+      kronologi: full.kronologi || `Kasus gigitan ${p.spesiesHPR || "HPR"} terpantau.`,
+      spesies_final: p.spesiesHPR || full.spesiesHPR || "Anjing",
+      ras: p.rasHewan || full.ras || "-",
+      jkHewan: full.jkHewan || "Jantan",
+      umurHewan: full.umurHewan || "1",
+      satuanUmur: full.satuanUmur || "Tahun",
+      metodePelihara: full.metodePelihara || "Dipelihara / Dikandangkan",
+      kondisiHewan: p.kondisiHewan || full.kondisiHewan || "Dalam Observasi",
+      riwayatVaksin: full.riwayatVaksin || "Tidak Tahu",
+      tanggalVaksin: full.tanggalVaksin || "",
+      pemilikHewan: p.pemilikHewan || full.pemilikHewan || "-",
+      alamatPemilik: p.alamatPemilik || full.alamatPemilik || "-",
+      kontakPemilik: p.kontakPemilik || full.kontakPemilik || "-",
+      namaKorban: p.namaKorban || "Tanpa Nama",
+      noHpKorban: p.noHpKorban || p.kontakKorban || "-",
+      umurKorban: p.umurKorban ? String(p.umurKorban).replace(/\D/g, "") : "-",
+      alamatKorban: p.alamatKorban || "-",
+      jkKorban: p.jkKorban || "Laki-laki",
+      kondisiLuka: p.kondisiLuka || "Kategori 2",
+      lokasiLuka: p.lokasiLuka || "-",
+      pertolonganPertama: p.pertolonganPertama || "Cuci luka air mengalir + sabun 15 menit",
+      detailPertolongan: p.detailPertolongan || "",
+      tindakanKasus: p.tindakanKasus || "Penyelidikan Epidemiologi & Perawatan Luka",
+      tindakanHPR: p.tindakanHPR || "Observasi 14 Hari",
+      rekomendasi: p.rekomendasi || "Observasi harian kondisi korban dan hewan.",
+      timKetua: full.timKetua || "dr. Triana Sulistyaningsih",
+      timAnggota: full.timAnggota || "Petugas Surveilans Rabies",
+      tanggalPelaksanaan: full.tanggalPelaksanaan || String(p.waktuKejadian || "").slice(0, 10) || new Date().toISOString().slice(0, 10),
+      pelaksanaNama: p.petugasPJ || full.pelaksanaNama || "Widodo Suprianto A.Md.Kep",
+      pelaksanaNIP: p.nipPJ || full.pelaksanaNIP || "197606252009011007"
+    };
+  });
+
+  const payload = {
+    action: "saveAllPatients",
+    patients: formattedPatients
+  };
+  const jsonStr = JSON.stringify(payload);
+
+  try {
+    await fetch(cleanUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: jsonStr
+    });
+
+    return {
+      success: true,
+      count: formattedPatients.length,
+      message: `Berhasil mengirim ${formattedPatients.length} data pasien ke Google Spreadsheet.`
+    };
+  } catch (err) {
+    try {
+      const iframeId = "gas_hidden_bulk_patients_frame";
+      let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
+      if (!iframe) {
+        iframe = document.createElement("iframe");
+        iframe.id = iframeId;
+        iframe.name = iframeId;
+        iframe.style.display = "none";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        document.body.appendChild(iframe);
+      }
+
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = cleanUrl;
+      form.target = iframeId;
+      form.style.display = "none";
+
+      const payloadInput = document.createElement("input");
+      payloadInput.type = "hidden";
+      payloadInput.name = "payload";
+      payloadInput.value = jsonStr;
+      form.appendChild(payloadInput);
+
+      document.body.appendChild(form);
+      form.submit();
+      setTimeout(() => {
+        try { form.remove(); } catch (e) {}
+      }, 3000);
+
+      return {
+        success: true,
+        count: formattedPatients.length,
+        message: `Sinkron ${formattedPatients.length} data pasien dikirim via iframe ke Google Spreadsheet.`
+      };
+    } catch (eForm) {
+      return { success: false, message: `Gagal sinkron data pasien: ${String(err)}` };
+    }
+  }
+}
+
 
 
