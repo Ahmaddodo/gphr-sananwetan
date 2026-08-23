@@ -38,6 +38,7 @@ import { UserLoginView } from "./components/UserLoginView";
 import { GoogleSheetsManager } from "./components/GoogleSheetsManager";
 import { OfflineSyncModal } from "./components/OfflineSyncModal";
 import { PWAInstallBanner } from "./components/PWAInstallBanner";
+import { GvizSyncErrorBanner } from "./components/GvizSyncErrorBanner";
 import {
   isAppOnline,
   getPendingQueueCount,
@@ -1099,6 +1100,17 @@ export default function App() {
         isOnline={isOnline}
         pendingOfflineCount={pendingOfflineCount}
         onOpenOfflineSync={() => setShowOfflineModal(true)}
+      />
+
+      {/* Global Sync Error Banner if Sheet is unshared */}
+      <GvizSyncErrorBanner
+        onRetry={() =>
+          pullAllCloudData(webAppUrl).then(() => {
+            handleRefreshPatients();
+            const refreshed = getActiveUserProfile();
+            if (refreshed) setCurrentUser(refreshed);
+          })
+        }
       />
 
       {/* Navigation Tabs: Form Input vs Daftar Pasien Dipantau vs Setting Login & Akun */}

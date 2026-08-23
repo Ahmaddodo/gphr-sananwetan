@@ -16,6 +16,7 @@ import {
   syncPatientsFromGoogleSheets
 } from "../lib/patientMonitoring";
 import { PUSKESMAS_LOGO_URL } from "./SignatureData";
+import { GvizSyncErrorBanner } from "./GvizSyncErrorBanner";
 
 interface UserLoginViewProps {
   onLoginSuccess: (user: UserAccessProfile) => void;
@@ -133,6 +134,11 @@ export const UserLoginView: React.FC<UserLoginViewProps> = ({
           <ShieldCheck size={14} className="text-emerald-400" />
           <span>Keamanan Terenkripsi</span>
         </button>
+      </div>
+
+      {/* Global Sync Error Banner if Sheet is unshared */}
+      <div className="w-full max-w-5xl mx-auto pt-3">
+        <GvizSyncErrorBanner />
       </div>
 
       {/* Main Login Card - Centered */}

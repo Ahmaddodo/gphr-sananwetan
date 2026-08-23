@@ -1,10 +1,10 @@
 import { FormGHPRData, SubmissionPayload } from "../types";
+import { getSheetId, getWebAppUrl } from "./config";
 
-export const DEFAULT_SPREADSHEET_ID = "1jRDFTZWEFTlNSVSP73LI_JGRrRlWyWsXeKrgEiAsBrg";
+export const DEFAULT_SPREADSHEET_ID = getSheetId();
 export const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit`;
 export const DEFAULT_SPREADSHEET_TITLE = "Laporan PE GHPR - UPT Puskesmas Sananwetan";
-export const DEFAULT_WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbwUedDGkOKzYhtO6aczofji7YE60GAMOlv-IOOdML0s9VkP6b4NS10QTTLbEbwgcH3S/exec";
+export const DEFAULT_WEB_APP_URL = getWebAppUrl();
 
 export interface ConnectedSheetConfig {
   spreadsheetId: string;
@@ -1308,19 +1308,70 @@ export async function deleteRecordFromAppsScript(
 }
 
 /**
- * Mengambil baris data langsung dari Google Sheets via GViz Query API (Bypass Apps Script deployment)
+ * Status error sinkronisasi Google Visualization (GViz)
+ */
+let gvizSyncError: string | null = null;
+const gvizErrorListeners = new Set<(error: string | null) => void>();
+
+export function getGvizSyncError(): string | null {
+  return gvizSyncError;
+}
+
+export function setGvizSyncError(err: string | null): void {
+  gvizSyncError = err;
+  gvizErrorListeners.forEach((listener) => {
+    try {
+      listener(err);
+    } catch (e) {}
+  });
+}
+
+export function subscribeGvizSyncError(callback: (error: string | null) => void): () => void {
+  gvizErrorListeners.add(callback);
+  callback(gvizSyncError);
+  return () => {
+    gvizErrorListeners.delete(callback);
+  };
+}
+
+/**
+ * Parsing teks respons Google Visualization API (GViz)
+ * Format respons dari Google Sheets GViz: /*O_o* / google.visualization.Query.setResponse({...});
+ */
+export function parseGvizData(text: string): any {
+  try {
+    // Sesuai spesifikasi: slice prefix 47 karakter dan akhiran 2 karakter ");"
+    const jsonString = text.substring(47).slice(0, -2);
+    return JSON.parse(jsonString);
+  } catch (err) {
+    // Fallback bila ada variasi whitespace/prefix karakter di browser
+    try {
+      const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
+      if (match && match[1]) {
+        return JSON.parse(match[1]);
+      }
+    } catch (e2) {}
+    console.error("Gagal parse GViz data:", err);
+    throw new Error("Format respons GViz Google Sheets tidak valid.");
+  }
+}
+
+/**
+ * Mengambil baris data langsung dari Google Sheets via GViz Query API (mode: cors, anti-cache &t=)
  */
 export async function fetchGoogleSheetGvizRows(
   spreadsheetId?: string,
   sheetName?: string
 ): Promise<{ success: boolean; rows: Record<string, any>[]; message: string }> {
-  try {
-    const cleanId = (spreadsheetId || getSavedSheetConfig()?.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
-    const sheetParam = sheetName ? `&sheet=${encodeURIComponent(sheetName)}` : "";
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:json${sheetParam}&headers=1&_t=${Date.now()}`;
+  const cleanId = (spreadsheetId || getSavedSheetConfig()?.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
+  const sheetParam = sheetName ? `&sheet=${encodeURIComponent(sheetName)}` : "";
+  // Pastikan tqx=out:json dan anti-cache &t=${Date.now()}
+  const gvizUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:json${sheetParam}&headers=1&t=${Date.now()}`;
 
+  try {
     const res = await fetch(gvizUrl, {
       method: "GET",
+      mode: "cors",
       headers: { Accept: "*/*" }
     });
 
@@ -1329,18 +1380,18 @@ export async function fetchGoogleSheetGvizRows(
     }
 
     const text = await res.text();
-    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
-    if (!match || !match[1]) {
-      throw new Error("Format GViz tidak cocok.");
+    if (text.includes("<html") || text.includes("accounts.google.com") || text.includes("ServiceLogin")) {
+      throw new Error("Halaman login terdeteksi. Google Sheet belum di-share publik.");
     }
 
-    const parsed = JSON.parse(match[1]);
-    if (parsed.status === "error") {
-      throw new Error(parsed.errors?.[0]?.message || "Query GViz mengembalikan error.");
+    const parsed = parseGvizData(text);
+    if (!parsed || parsed.status === "error") {
+      throw new Error(parsed?.errors?.[0]?.message || "Query GViz mengembalikan status error.");
     }
 
     const table = parsed.table;
     if (!table || !table.rows || table.rows.length === 0) {
+      setGvizSyncError(null);
       return { success: true, rows: [], message: "Tabel spreadsheet kosong." };
     }
 
@@ -1378,16 +1429,22 @@ export async function fetchGoogleSheetGvizRows(
       }
     }
 
+    // Reset error jika pembacaan berhasil
+    setGvizSyncError(null);
+
     return {
       success: true,
       rows: resultRows,
       message: `Berhasil memuat ${resultRows.length} baris langsung dari Google Sheets (${sheetName || "Sheet Utama"}).`
     };
   } catch (err: any) {
+    const errorPrefix = `Gagal sinkron: Sheet ID ${cleanId.slice(0, 5)}... belum di-share Anyone with link - Viewer. Buka Google Sheet > Share > General access > Anyone with link`;
+    setGvizSyncError(errorPrefix);
+
     return {
       success: false,
       rows: [],
-      message: `Direct GViz notice: ${err?.message || String(err)}`
+      message: errorPrefix
     };
   }
 }
@@ -1441,18 +1498,23 @@ function parseCsvText(text: string): string[][] {
 }
 
 /**
- * Mengambil baris data langsung dari Google Sheets via CSV export
+ * Mengambil baris data langsung dari Google Sheets via CSV export (mode: cors, anti-cache &t=)
  */
 export async function fetchGoogleSheetCsvRows(
   spreadsheetId?: string,
   sheetName?: string
 ): Promise<{ success: boolean; rows: Record<string, any>[]; message: string }> {
-  try {
-    const cleanId = (spreadsheetId || getSavedSheetConfig()?.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
-    const sheetParam = sheetName ? `&sheet=${encodeURIComponent(sheetName)}` : "";
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}&_t=${Date.now()}`;
+  const cleanId = (spreadsheetId || getSavedSheetConfig()?.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
+  const sheetParam = sheetName ? `&sheet=${encodeURIComponent(sheetName)}` : "";
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}&t=${Date.now()}`;
 
-    const res = await fetch(csvUrl);
+  try {
+    const res = await fetch(csvUrl, {
+      method: "GET",
+      mode: "cors",
+      headers: { Accept: "*/*" }
+    });
+
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
 
