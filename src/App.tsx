@@ -56,7 +56,8 @@ import {
   recordUserActivity,
   getLastUserActivityTimestamp,
   INACTIVITY_TIMEOUT_MS,
-  isSessionExpired
+  isSessionExpired,
+  pullAllCloudData
 } from "./lib/patientMonitoring";
 import {
   computeAppNotifications,
@@ -407,6 +408,19 @@ export default function App() {
       window.removeEventListener("ghpr-offline-queue-updated", handleNetworkChange);
     };
   }, [webAppUrl]);
+
+  useEffect(() => {
+    // Jalankan sinkronisasi cloud otomatis saat aplikasi pertama kali dimuat
+    pullAllCloudData(webAppUrl)
+      .then((res) => {
+        handleRefreshPatients();
+        const refreshedUser = getActiveUserProfile();
+        setCurrentUser(refreshedUser);
+      })
+      .catch((err) => {
+        console.warn("Startup cloud sync notice:", err);
+      });
+  }, []);
 
   const handleRefreshPatients = () => {
     setPatientsList(getAllPatients());

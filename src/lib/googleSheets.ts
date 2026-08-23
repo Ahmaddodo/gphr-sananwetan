@@ -1308,41 +1308,267 @@ export async function deleteRecordFromAppsScript(
 }
 
 /**
- * Mengambil daftar akun petugas dari Google Spreadsheet sheet 'Data_Petugas' via Apps Script
+ * Mengambil baris data langsung dari Google Sheets via GViz Query API (Bypass Apps Script deployment)
  */
-export async function fetchOfficerAccountsFromAppsScript(
-  targetUrl: string
-): Promise<{ success: boolean; data: any[]; message: string }> {
-  const cleanUrl = (targetUrl || "").trim();
-  if (!cleanUrl) {
-    return { success: false, data: [], message: "URL Web App belum dikonfigurasi." };
-  }
-
+export async function fetchGoogleSheetGvizRows(
+  spreadsheetId?: string,
+  sheetName?: string
+): Promise<{ success: boolean; rows: Record<string, any>[]; message: string }> {
   try {
-    const fetchUrl = `${cleanUrl}${cleanUrl.includes("?") ? "&" : "?"}action=getAccounts&_t=${Date.now()}`;
-    const res = await fetch(fetchUrl, {
+    const cleanId = (spreadsheetId || getSavedSheetConfig()?.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
+    const sheetParam = sheetName ? `&sheet=${encodeURIComponent(sheetName)}` : "";
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:json${sheetParam}&headers=1&_t=${Date.now()}`;
+
+    const res = await fetch(gvizUrl, {
       method: "GET",
-      headers: { Accept: "application/json" }
+      headers: { Accept: "*/*" }
     });
 
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
     }
 
-    const json = await res.json();
-    const accounts = Array.isArray(json) ? json : (json && Array.isArray(json.data) ? json.data : []);
+    const text = await res.text();
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
+    if (!match || !match[1]) {
+      throw new Error("Format GViz tidak cocok.");
+    }
+
+    const parsed = JSON.parse(match[1]);
+    if (parsed.status === "error") {
+      throw new Error(parsed.errors?.[0]?.message || "Query GViz mengembalikan error.");
+    }
+
+    const table = parsed.table;
+    if (!table || !table.rows || table.rows.length === 0) {
+      return { success: true, rows: [], message: "Tabel spreadsheet kosong." };
+    }
+
+    // Ekstrak nama kolom
+    const cols: string[] = (table.cols || []).map((col: any, idx: number) => {
+      const lbl = col?.label ? String(col.label).trim() : "";
+      return lbl || `col_${idx}`;
+    });
+
+    const resultRows: Record<string, any>[] = [];
+    for (const r of table.rows) {
+      if (!r || !r.c || !Array.isArray(r.c)) continue;
+      const rowObj: Record<string, any> = {};
+      let hasData = false;
+
+      for (let i = 0; i < cols.length; i++) {
+        const cell = r.c[i];
+        let val: any = "";
+        if (cell !== null && cell !== undefined) {
+          if (cell.v !== null && cell.v !== undefined) {
+            val = cell.v;
+          } else if (cell.f !== null && cell.f !== undefined) {
+            val = cell.f;
+          }
+        }
+        const colName = cols[i];
+        rowObj[colName] = val;
+        if (val !== "" && val !== null && val !== undefined) {
+          hasData = true;
+        }
+      }
+
+      if (hasData) {
+        resultRows.push(rowObj);
+      }
+    }
+
     return {
       success: true,
-      data: accounts,
-      message: `Berhasil memuat ${accounts.length} akun petugas dari Google Sheets.`
+      rows: resultRows,
+      message: `Berhasil memuat ${resultRows.length} baris langsung dari Google Sheets (${sheetName || "Sheet Utama"}).`
     };
   } catch (err: any) {
     return {
       success: false,
-      data: [],
-      message: `Gagal memuat akun petugas dari cloud: ${err.message || String(err)}`
+      rows: [],
+      message: `Direct GViz notice: ${err?.message || String(err)}`
     };
   }
+}
+
+/**
+ * Parsing teks CSV menjadi baris dan kolom dengan penanganan tanda kutip ganda
+ */
+function parseCsvText(text: string): string[][] {
+  const result: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        cell += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\r" || char === "\n") && !inQuotes) {
+      if (char === "\r" && nextChar === "\n") {
+        i++;
+      }
+      row.push(cell);
+      if (row.some((c) => c.trim() !== "")) {
+        result.push(row);
+      }
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  if (cell !== "" || row.length > 0) {
+    row.push(cell);
+    if (row.some((c) => c.trim() !== "")) {
+      result.push(row);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Mengambil baris data langsung dari Google Sheets via CSV export
+ */
+export async function fetchGoogleSheetCsvRows(
+  spreadsheetId?: string,
+  sheetName?: string
+): Promise<{ success: boolean; rows: Record<string, any>[]; message: string }> {
+  try {
+    const cleanId = (spreadsheetId || getSavedSheetConfig()?.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
+    const sheetParam = sheetName ? `&sheet=${encodeURIComponent(sheetName)}` : "";
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}&_t=${Date.now()}`;
+
+    const res = await fetch(csvUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+
+    const rows = parseCsvText(text);
+    if (rows.length < 2) return { success: true, rows: [], message: "CSV kosong atau hanya header." };
+
+    const headers = rows[0].map((h) => h.trim());
+    const dataRows: Record<string, any>[] = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.every((c) => !c || c.trim() === "")) continue;
+      const obj: Record<string, any> = {};
+      headers.forEach((h, idx) => {
+        obj[h] = r[idx] !== undefined ? r[idx] : "";
+      });
+      dataRows.push(obj);
+    }
+
+    return {
+      success: true,
+      rows: dataRows,
+      message: `Berhasil memuat ${dataRows.length} baris via CSV export.`
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      rows: [],
+      message: `Direct CSV notice: ${err?.message || String(err)}`
+    };
+  }
+}
+
+/**
+ * Mengambil baris data secara langsung dengan mencoba beberapa kemungkinan nama tab
+ */
+export async function fetchDirectGoogleSheetRows(
+  spreadsheetId?: string,
+  candidateSheetNames: string[] = ["Data Laporan GHPR", "Laporan PE GHPR", ""]
+): Promise<{ success: boolean; rows: Record<string, any>[]; sheetUsed: string }> {
+  const cleanId = (spreadsheetId || getSavedSheetConfig()?.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
+
+  for (const sheet of candidateSheetNames) {
+    // 1. Coba GViz JSON
+    const gvizRes = await fetchGoogleSheetGvizRows(cleanId, sheet);
+    if (gvizRes.success && gvizRes.rows.length > 0) {
+      return { success: true, rows: gvizRes.rows, sheetUsed: sheet || "Sheet1" };
+    }
+
+    // 2. Coba CSV
+    const csvRes = await fetchGoogleSheetCsvRows(cleanId, sheet);
+    if (csvRes.success && csvRes.rows.length > 0) {
+      return { success: true, rows: csvRes.rows, sheetUsed: sheet || "Sheet1" };
+    }
+  }
+
+  return { success: false, rows: [], sheetUsed: "" };
+}
+
+/**
+ * Mengambil daftar akun petugas dari Google Spreadsheet sheet 'Data_Petugas' via Apps Script atau Direct GViz/CSV
+ */
+export async function fetchOfficerAccountsFromAppsScript(
+  targetUrl?: string
+): Promise<{ success: boolean; data: any[]; message: string }> {
+  const cleanUrl = (targetUrl || "").trim();
+
+  // Strategi 1: Coba langsung dari Google Spreadsheet Tab 'Data_Petugas'
+  try {
+    const directRes = await fetchDirectGoogleSheetRows(DEFAULT_SPREADSHEET_ID, [
+      "Data_Petugas",
+      "Data Petugas",
+      "Petugas"
+    ]);
+
+    if (directRes.success && directRes.rows.length > 0) {
+      return {
+        success: true,
+        data: directRes.rows,
+        message: `Berhasil memuat ${directRes.rows.length} akun petugas langsung dari Google Sheets (tab: ${directRes.sheetUsed}).`
+      };
+    }
+  } catch (eDirect) {
+    console.warn("Direct officer fetch notice:", eDirect);
+  }
+
+  // Strategi 2: Coba melalui Apps Script Web App jika URL tersedia
+  if (cleanUrl) {
+    try {
+      const fetchUrl = `${cleanUrl}${cleanUrl.includes("?") ? "&" : "?"}action=getAccounts&_t=${Date.now()}`;
+      const res = await fetch(fetchUrl, {
+        method: "GET",
+        headers: { Accept: "application/json" }
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const accounts = Array.isArray(json) ? json : (json && Array.isArray(json.data) ? json.data : []);
+        if (accounts.length > 0) {
+          return {
+            success: true,
+            data: accounts,
+            message: `Berhasil memuat ${accounts.length} akun petugas via Web App.`
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn("Apps Script officer fetch notice:", err);
+    }
+  }
+
+  return {
+    success: false,
+    data: [],
+    message: "Belum ada akun petugas khusus di spreadsheet, menggunakan konfigurasi standar 7 petugas."
+  };
 }
 
 /**

@@ -172,15 +172,6 @@ export const AdminDeviceSyncPanel: React.FC<AdminDeviceSyncPanelProps> = ({
 
   // 2. Handler PULL: Menarik Data dari Google Sheets agar Perangkat Ini Selaras
   const handlePullAllFromCloud = async () => {
-    if (!activeUrl) {
-      setStatusMessage({
-        type: "error",
-        title: "URL Web App Belum Diatur",
-        description: "Silakan masukkan URL Web App Google Sheets di tab 'Koneksi Google Sheets & Endpoint' terlebih dahulu."
-      });
-      return;
-    }
-
     setIsPulling(true);
     setStatusMessage(null);
 

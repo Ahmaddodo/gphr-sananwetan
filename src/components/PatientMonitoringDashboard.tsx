@@ -37,7 +37,8 @@ import {
   saveActiveUserProfile,
   deletePatientById,
   canUserDeleteCases,
-  syncPatientsFromGoogleSheets
+  syncPatientsFromGoogleSheets,
+  pullAllCloudData
 } from "../lib/patientMonitoring";
 import { checkPatientNotificationBadge } from "../lib/notificationService";
 import { PatientUpdateModal } from "./PatientUpdateModal";
@@ -98,7 +99,7 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
   const handleSyncFromGoogleSheets = async () => {
     setIsSyncingSheets(true);
     try {
-      const res = await syncPatientsFromGoogleSheets(webAppUrl || "");
+      const res = await pullAllCloudData(webAppUrl || "");
       onRefreshPatients();
       setToastMessage(res.message);
       setTimeout(() => setToastMessage(""), 6000);
@@ -132,13 +133,13 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
   useEffect(() => {
     let isMounted = true;
     const runAutoSync = async () => {
-      if (webAppUrl && typeof navigator !== "undefined" && navigator.onLine) {
+      if (typeof navigator !== "undefined" && navigator.onLine) {
         try {
           const res = await syncPatientsFromGoogleSheets(webAppUrl);
           if (isMounted) {
             onRefreshPatients();
             if (res.added > 0 || res.updated > 0) {
-              setToastMessage(`Sinkronisasi Google Sheets: ${res.total} data pasien selaras dengan cloud.`);
+              setToastMessage(`Sinkronisasi Google Sheets: ${res.total} data pasien selaras dengan spreadsheet.`);
               setTimeout(() => {
                 if (isMounted) setToastMessage("");
               }, 4000);
