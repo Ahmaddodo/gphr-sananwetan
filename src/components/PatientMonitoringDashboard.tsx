@@ -135,12 +135,14 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
       if (webAppUrl && typeof navigator !== "undefined" && navigator.onLine) {
         try {
           const res = await syncPatientsFromGoogleSheets(webAppUrl);
-          if (isMounted && res.added > 0) {
+          if (isMounted) {
             onRefreshPatients();
-            setToastMessage(`Sinkronisasi otomatis: ${res.added} data pasien baru berhasil dimuat.`);
-            setTimeout(() => {
-              if (isMounted) setToastMessage("");
-            }, 5000);
+            if (res.added > 0 || res.updated > 0) {
+              setToastMessage(`Sinkronisasi Google Sheets: ${res.total} data pasien selaras dengan cloud.`);
+              setTimeout(() => {
+                if (isMounted) setToastMessage("");
+              }, 4000);
+            }
           }
         } catch (e) {
           // Silent fallback on background sync

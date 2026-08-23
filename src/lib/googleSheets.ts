@@ -328,11 +328,25 @@ export async function appendRowToGoogleSheet(
 export function getAppsScriptTemplateCode(): string {
   return `// ============================================================================
 // GOOGLE APPS SCRIPT: SISTEM PE GHPR UPT PUSKESMAS SANANWETAN
-// SINKRONISASI TEPAT DENGAN SHEET ID: 1jRDFTZWEFTlNSVSP73LI_JGRrRlWyWsXeKrgEiAsBrg
+// OTOMATIS TERIKAT KE SPREADSHEET AKTIF & TAB 'Data_Petugas' + 'Data Laporan GHPR'
 // ============================================================================
 
-// ID SPREADSHEET TARGET UTAMA
-var TARGET_SPREADSHEET_ID = "1jRDFTZWEFTlNSVSP73LI_JGRrRlWyWsXeKrgEiAsBrg";
+// ID SPREADSHEET TARGET (Opsional, otomatis menggunakan spreadsheet aktif)
+var TARGET_SPREADSHEET_ID = "";
+
+// Helper untuk mendapatkan objek Spreadsheet yang sedang aktif
+function getTargetSpreadsheet() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) return ss;
+  } catch(e) {}
+  if (TARGET_SPREADSHEET_ID && TARGET_SPREADSHEET_ID.trim() !== "") {
+    try {
+      return SpreadsheetApp.openById(TARGET_SPREADSHEET_ID.trim());
+    } catch(e2) {}
+  }
+  return null;
+}
 
 // 1. DAFTAR 36 HEADER RESMI SPREADSHEET PUSKESMAS SANANWETAN
 var OFFICIAL_HEADERS = [
@@ -622,13 +636,7 @@ function doPost(e) {
 // FUNGSI MEMBACA DAFTAR LAPORAN DARI SPREADSHEET
 function bacaDaftarLaporan(query) {
   try {
-    var ss = null;
-    if (TARGET_SPREADSHEET_ID) {
-      try { ss = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID); } catch(e) {}
-    }
-    if (!ss) {
-      try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    }
+    var ss = getTargetSpreadsheet();
     if (!ss) return { status: "error", message: "Spreadsheet tidak ditemukan", data: [] };
 
     var sheet = ss.getSheetByName("Data Laporan GHPR") || ss.getSheetByName("Laporan PE GHPR") || ss.getSheets()[0];
@@ -676,13 +684,7 @@ function bacaDaftarLaporan(query) {
 // FUNGSI MEMBACA DAFTAR PETUGAS DARI SHEET 'Data_Petugas'
 function bacaDaftarPetugas() {
   try {
-    var ss = null;
-    if (TARGET_SPREADSHEET_ID) {
-      try { ss = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID); } catch(e) {}
-    }
-    if (!ss) {
-      try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    }
+    var ss = getTargetSpreadsheet();
     if (!ss) return { status: "error", message: "Spreadsheet tidak ditemukan", data: [] };
 
     var sheet = ss.getSheetByName("Data_Petugas");
@@ -734,13 +736,7 @@ function simpanDaftarPetugas(rawAccounts) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(30000); } catch(eLock) { return { status: "error", message: "Server sibuk" }; }
   try {
-    var ss = null;
-    if (TARGET_SPREADSHEET_ID) {
-      try { ss = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID); } catch(e) {}
-    }
-    if (!ss) {
-      try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    }
+    var ss = getTargetSpreadsheet();
     if (!ss) return { status: "error", message: "Spreadsheet tidak ditemukan" };
 
     var sheet = ss.getSheetByName("Data_Petugas");
@@ -790,13 +786,7 @@ function simpanSemuaPasien(rawPatients) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(30000); } catch(eLock) { return { status: "error", message: "Server sibuk" }; }
   try {
-    var ss = null;
-    if (TARGET_SPREADSHEET_ID) {
-      try { ss = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID); } catch(e) {}
-    }
-    if (!ss) {
-      try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    }
+    var ss = getTargetSpreadsheet();
     if (!ss) return { status: "error", message: "Spreadsheet tidak ditemukan" };
 
     var sheet = ss.getSheetByName("Data Laporan GHPR") || ss.getSheetByName("Laporan PE GHPR") || ss.getSheets()[0];
@@ -841,30 +831,11 @@ function prosesDataMasuk(data, action) {
   }
 
   try {
-    var ss = null;
-
-    // 1. Prioritaskan ID Spreadsheet Resmi
-    if (TARGET_SPREADSHEET_ID && TARGET_SPREADSHEET_ID !== "") {
-      try {
-        ss = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
-      } catch (eOpen) {
-        Logger.log("openById gagal: " + eOpen);
-      }
-    }
-
-    // 2. Fallback jika script langsung terikat ke Spreadsheet (Container-bound)
-    if (!ss) {
-      try {
-        ss = SpreadsheetApp.getActiveSpreadsheet();
-      } catch (eActive) {
-        Logger.log("getActiveSpreadsheet gagal: " + eActive);
-      }
-    }
-
+    var ss = getTargetSpreadsheet();
     if (!ss) {
       return {
         status: "error",
-        message: "Spreadsheet tidak dapat dibuka. Pastikan ID Spreadsheet (" + TARGET_SPREADSHEET_ID + ") benar dan akun memiliki hak akses edit."
+        message: "Spreadsheet tidak dapat dibuka. Pastikan Script dijalankan pada Spreadsheet yang benar dan memiliki hak akses edit."
       };
     }
 

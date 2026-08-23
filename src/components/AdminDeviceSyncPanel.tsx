@@ -15,7 +15,11 @@ import {
   ArrowRight,
   ExternalLink,
   Lock,
-  UserCheck
+  UserCheck,
+  Copy,
+  Code,
+  Download,
+  Info
 } from "lucide-react";
 import {
   getOfficerProfiles,
@@ -27,7 +31,12 @@ import {
   syncOfficerProfilesFromGoogleSheets,
   syncPatientsFromGoogleSheets
 } from "../lib/patientMonitoring";
-import { ConnectedSheetConfig, DEFAULT_SPREADSHEET_URL, DEFAULT_WEB_APP_URL } from "../lib/googleSheets";
+import {
+  ConnectedSheetConfig,
+  DEFAULT_SPREADSHEET_URL,
+  DEFAULT_WEB_APP_URL,
+  getAppsScriptTemplateCode
+} from "../lib/googleSheets";
 import { getWebAppUrl } from "../lib/config";
 import { UserAccessProfile, PatientMonitoringItem } from "../types";
 
@@ -46,6 +55,9 @@ export const AdminDeviceSyncPanel: React.FC<AdminDeviceSyncPanelProps> = ({
   const [patients, setPatients] = useState<PatientMonitoringItem[]>(() => getAllPatients());
   const [isPushing, setIsPushing] = useState<boolean>(false);
   const [isPulling, setIsPulling] = useState<boolean>(false);
+  const [copiedOfficersTable, setCopiedOfficersTable] = useState<boolean>(false);
+  const [copiedScript, setCopiedScript] = useState<boolean>(false);
+  const [showScriptModal, setShowScriptModal] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error" | "info";
     title: string;
@@ -71,6 +83,51 @@ export const AdminDeviceSyncPanel: React.FC<AdminDeviceSyncPanelProps> = ({
 
   const activeUrl = (webAppUrl || getWebAppUrl() || "").trim();
 
+  // Handler Salin Data Petugas ke Clipboard (Format Langsung Paste di Excel / Google Sheets)
+  const handleCopyOfficersForSheets = () => {
+    const headers = ["id", "username", "nama", "nip", "jabatan", "kelurahan", "role", "isKoordinator", "email", "password", "lastUpdated"];
+    const nowStr = new Date().toISOString().slice(0, 19).replace("T", " ");
+    
+    const rows = officers.map((o) => [
+      o.id || `user-${o.username}`,
+      o.username || "",
+      o.nama || "",
+      `'${o.nip || ""}`,
+      o.jabatan || "",
+      o.kelurahan || "Sananwetan",
+      o.role || "Petugas Kelurahan",
+      o.isKoordinator ? "true" : "false",
+      o.email || "",
+      o.password || "",
+      nowStr
+    ]);
+
+    const tsvContent = [headers.join("\t"), ...rows.map(r => r.join("\t"))].join("\n");
+
+    try {
+      navigator.clipboard.writeText(tsvContent);
+      setCopiedOfficersTable(true);
+      setTimeout(() => setCopiedOfficersTable(false), 4000);
+      setStatusMessage({
+        type: "success",
+        title: "Tabel Data Petugas Berhasil Disalin!",
+        description: "Buka tab 'Data_Petugas' di Google Spreadsheet Anda, klik di sel A1, lalu tekan Ctrl+V (Paste). Seluruh 7 baris akun petugas langsung terisi rapi."
+      });
+    } catch (err) {
+      console.error("Gagal menyalin ke clipboard:", err);
+    }
+  };
+
+  // Handler Salin Kode Apps Script
+  const handleCopyAppsScript = () => {
+    const code = getAppsScriptTemplateCode();
+    try {
+      navigator.clipboard.writeText(code);
+      setCopiedScript(true);
+      setTimeout(() => setCopiedScript(false), 4000);
+    } catch (e) {}
+  };
+
   // 1. Handler PUSH: Admin Mengirim Data ke Google Sheets
   const handlePushAllToCloud = async () => {
     if (!activeUrl) {
@@ -91,14 +148,14 @@ export const AdminDeviceSyncPanel: React.FC<AdminDeviceSyncPanelProps> = ({
       if (res.success) {
         setStatusMessage({
           type: "success",
-          title: "Berhasil Kirim ke Cloud!",
-          description: `Data ${res.officersCount} akun petugas dan ${res.patientsCount} data pasien telah berhasil diunggah ke Google Sheets. Seluruh perangkat hp petugas kini akan menerima perubahan ini saat membuka aplikasi.`
+          title: "Perintah Kirim Cloud Terkirim!",
+          description: `Data ${res.officersCount} akun petugas dan ${res.patientsCount} data pasien telah dikirim ke Web App Google Sheets. Jika sheet belum bertambah, pastikan Apps Script telah di-Deploy ulang sebagai 'New Version'. Atau gunakan tombol 'Salin Tabel Petugas' di bawah.`
         });
       } else {
         setStatusMessage({
-          type: "error",
-          title: "Pemberitahuan Pengiriman",
-          description: res.message || "Gagal mengirim data ke Google Sheets. Periksa status URL Web App."
+          type: "info",
+          title: "Hasil Pengiriman",
+          description: res.message || "Data telah dikirimkan ke endpoint Web App."
         });
       }
       if (onDataSynced) onDataSynced();
@@ -280,28 +337,55 @@ export const AdminDeviceSyncPanel: React.FC<AdminDeviceSyncPanelProps> = ({
             ))}
           </div>
 
-          <div className="pt-1 flex items-center justify-between text-xs text-slate-500">
+          <div className="pt-1 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
             <span>PJ Utama: <b>Widodo Suprianto A.Md.Kep</b></span>
-            <button
-              type="button"
-              onClick={async () => {
-                setIsPushing(true);
-                try {
-                  const res = await pushAllPatientsToGoogleSheets(patients, activeUrl);
-                  setStatusMessage({
-                    type: res.success ? "success" : "error",
-                    title: res.success ? "Data Pasien Terkirim!" : "Gagal Kirim",
-                    description: res.message
-                  });
-                } finally {
-                  setIsPushing(false);
-                }
-              }}
-              disabled={isPushing}
-              className="text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
-            >
-              Push Pasien Saja →
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsPulling(true);
+                  try {
+                    const res = await syncPatientsFromGoogleSheets(activeUrl);
+                    refreshLocalState();
+                    setStatusMessage({
+                      type: res.success ? "success" : "info",
+                      title: "Sinkronisasi Pasien Selesai",
+                      description: res.message
+                    });
+                    if (onDataSynced) onDataSynced();
+                  } finally {
+                    setIsPulling(false);
+                  }
+                }}
+                disabled={isPulling || isPushing}
+                className="text-emerald-700 hover:text-emerald-900 font-bold cursor-pointer"
+                title="Tarik daftar pasien terbaru dari Google Spreadsheet ke perangkat ini"
+              >
+                {isPulling ? "Menarik..." : "← Tarik dari Spreadsheet"}
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsPushing(true);
+                  try {
+                    const res = await pushAllPatientsToGoogleSheets(patients, activeUrl);
+                    setStatusMessage({
+                      type: res.success ? "success" : "error",
+                      title: res.success ? "Data Pasien Terkirim!" : "Gagal Kirim",
+                      description: res.message
+                    });
+                  } finally {
+                    setIsPushing(false);
+                  }
+                }}
+                disabled={isPushing || isPulling}
+                className="text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
+                title="Kirim daftar pasien lokal ke Google Spreadsheet"
+              >
+                Push Pasien Saja →
+              </button>
+            </div>
           </div>
         </div>
 
@@ -348,70 +432,163 @@ export const AdminDeviceSyncPanel: React.FC<AdminDeviceSyncPanelProps> = ({
             ))}
           </div>
 
-          <div className="pt-1 flex items-center justify-between text-xs text-slate-500">
+          {/* OPSI CEPAT: SALIN TABEL KE CLIPBOARD */}
+          <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-100 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+                <Copy size={13} className="text-indigo-600" />
+                <span>Salin Data Petugas Siap Paste ke Sheet</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyOfficersForSheets}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+              >
+                {copiedOfficersTable ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedOfficersTable ? "Tersalin!" : "Salin Tabel Petugas"}</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-indigo-700/80 leading-relaxed">
+              Klik <b>"Salin Tabel Petugas"</b> lalu buka tab <b>Data_Petugas</b> di Google Spreadsheet, klik di sel <b>A1</b> dan tekan <b>Ctrl+V</b>. Seluruh data 7 petugas langsung terisi 100% rapi.
+            </p>
+          </div>
+
+          <div className="pt-1 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
             <span>Enkripsi: <b>SHA-256 + Salt</b></span>
-            <button
-              type="button"
-              onClick={async () => {
-                setIsPushing(true);
-                try {
-                  const res = await pushOfficerProfilesToGoogleSheets(officers, activeUrl);
-                  setStatusMessage({
-                    type: res.success ? "success" : "error",
-                    title: res.success ? "Data Petugas Terkirim!" : "Gagal Kirim",
-                    description: res.message
-                  });
-                } finally {
-                  setIsPushing(false);
-                }
-              }}
-              disabled={isPushing}
-              className="text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
-            >
-              Push Petugas Saja →
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsPulling(true);
+                  try {
+                    const res = await syncOfficerProfilesFromGoogleSheets(activeUrl);
+                    refreshLocalState();
+                    setStatusMessage({
+                      type: res.success ? "success" : "info",
+                      title: "Tarik Akun Selesai",
+                      description: res.message
+                    });
+                    if (onDataSynced) onDataSynced();
+                  } finally {
+                    setIsPulling(false);
+                  }
+                }}
+                disabled={isPulling || isPushing}
+                className="text-indigo-700 hover:text-indigo-900 font-bold cursor-pointer"
+                title="Tarik data petugas dari Google Spreadsheet ke perangkat ini"
+              >
+                {isPulling ? "Menarik..." : "← Tarik Petugas"}
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsPushing(true);
+                  try {
+                    const res = await pushOfficerProfilesToGoogleSheets(officers, activeUrl);
+                    setStatusMessage({
+                      type: res.success ? "success" : "error",
+                      title: res.success ? "Data Petugas Terkirim!" : "Gagal Kirim",
+                      description: res.message + " (Pastikan Apps Script telah di-Deploy New Version jika sheet belum terupdate otomatis)."
+                    });
+                  } finally {
+                    setIsPushing(false);
+                  }
+                }}
+                disabled={isPushing || isPulling}
+                className="text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
+                title="Kirim akun petugas ke Google Apps Script"
+              >
+                Push Petugas Saja →
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* PANDUAN PENGGUNAAN AGAR HP PETUGAS OTOMATIS SINKRON */}
-      <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/80 to-slate-50 p-5 space-y-3">
-        <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-          <Smartphone size={16} className="text-blue-600" />
-          <span>Cara Menyelaraskan Perangkat HP Petugas di Lapangan:</span>
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-700">
-          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <div className="font-bold text-blue-700 flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-[10px]">1</span>
-              <span>Lakukan di Admin</span>
-            </div>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Setelah Admin menambahkan pasien atau mengedit nama petugas, klik tombol <b>"1. Kirim Data Admin ke Google Sheets (Push)"</b> di atas.
+      {/* PENJELASAN MENGAPA GOOGLE APPS SCRIPT BUTUH DEPLOY VERSI BARU */}
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <Info size={20} className="text-amber-700 shrink-0 mt-0.5" />
+          <div className="space-y-2">
+            <h4 className="font-bold text-slate-900 text-sm">
+              Mengapa Tombol Push Belum Menambah Baris di Google Sheet?
+            </h4>
+            <p className="text-xs text-slate-700 leading-relaxed">
+              Google Apps Script bersifat terkunci (*locked version*). Jika kode Apps Script di Google Sheets belum di-deploy ulang sebagai <b>"New Version"</b>, URL Web App masih menjalankan script versi lama yang hanya tahu sheet <i>Data Laporan GHPR</i> dan belum mengenal fungsi <i>saveAccounts</i> untuk tab <i>Data_Petugas</i>.
             </p>
-          </div>
+            
+            <div className="pt-1 flex items-center gap-3 flex-wrap text-xs">
+              <button
+                type="button"
+                onClick={handleCopyOfficersForSheets}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"
+              >
+                {copiedOfficersTable ? <Check size={14} /> : <Copy size={14} />}
+                <span>Solusi 1 Detik: Salin & Tempel (Paste) ke Sheet</span>
+              </button>
 
-          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <div className="font-bold text-emerald-700 flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px]">2</span>
-              <span>Buka di HP Petugas</span>
+              <button
+                type="button"
+                onClick={() => setShowScriptModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-900 text-white font-bold cursor-pointer"
+              >
+                <Code size={14} />
+                <span>Lihat Cara Deploy Ulang Google Apps Script</span>
+              </button>
             </div>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Saat petugas membuka aplikasi di HP mereka, sistem secara otomatis menarik data akun & pasien terbaru dari Google Sheets.
-            </p>
-          </div>
-
-          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <div className="font-bold text-indigo-700 flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-800 flex items-center justify-center text-[10px]">3</span>
-              <span>Login & Pantau</span>
-            </div>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Petugas login menggunakan username & password yang telah disetel oleh Admin. Jumlah dan nama pasien yang tampil di HP akan 100% selaras dengan Admin.
-            </p>
           </div>
         </div>
       </div>
+
+      {/* MODAL PANDUAN DEPLOY APPS SCRIPT */}
+      {showScriptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Code size={18} className="text-blue-600" />
+                <span>Cara Memperbarui Google Apps Script (Deploy New Version)</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowScriptModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold px-2 py-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <ol className="list-decimal list-inside text-xs text-slate-700 space-y-2.5 leading-relaxed">
+              <li>Buka Google Spreadsheet $\rightarrow$ menu <b>Extensions (Ekstensi)</b> $\rightarrow$ <b>Apps Script</b>.</li>
+              <li>Salin kode skrip lengkap di bawah ini dan tempelkan menggantikan isi <code>Code.gs</code> yang lama.</li>
+              <li>Klik tombol <b>Save</b> (ikon disket).</li>
+              <li>
+                <b>PENTING:</b> Klik tombol biru <b>Deploy</b> (di kanan atas) $\rightarrow$ pilih <b>Manage Deployments</b> $\rightarrow$ klik <b>ikon pensil (Edit)</b> $\rightarrow$ di bagian Version ganti menjadi <b>New Version</b> $\rightarrow$ klik <b>Deploy</b>.
+              </li>
+            </ol>
+
+            <div className="pt-2 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleCopyAppsScript}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+              >
+                {copiedScript ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedScript ? "Kode Skrip Tersalin!" : "Salin Kode Apps Script Lengkap"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowScriptModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

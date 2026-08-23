@@ -214,136 +214,19 @@ export function canUserDeleteCases(user?: UserAccessProfile | null): boolean {
   return user.username.toLowerCase().trim() === "admin";
 }
 
-// Seed Data Pemantauan Pasien Awal
-const INITIAL_SEED_PATIENTS: PatientMonitoringItem[] = [
-  {
-    id_kasus: "GHPR-20260814-BN1",
-    timestamp_submit: "14/08/2026 09:30:15",
-    waktuKejadian: "2026-08-14T08:15",
-    namaKorban: "Siti Rahayu",
-    nikKorban: "3572015504950002",
-    umurKorban: "28",
-    jkKorban: "Perempuan",
-    alamatKorban: "Jl. Sudanco Supriyadi RT 02 RW 03",
-    kontakKorban: "081234567890",
-    noHpKorban: "081234567890",
-    kelurahan: "Bendogerit",
-    kecamatan: "Sananwetan",
-    kabupatenKota: "Kota Blitar",
-    spesiesHPR: "Anjing",
-    rasHewan: "Campuran Lokal",
-    kondisiHewan: "Sehat / Normal (Dalam Observasi)",
-    pemilikHewan: "Bpk. Santoso",
-    alamatPemilik: "Jl. Sudanco Supriyadi No. 24",
-    kontakPemilik: "081399887766",
-    kondisiLuka: "Kategori 2",
-    lokasiLuka: "Betis Kaki Kanan",
-    pertolonganPertama: "Cuci luka air mengalir + sabun 15 menit, antiseptik povidone",
-    detailPertolongan: "Diberikan VAR dosis 1 di UPT Puskesmas Sananwetan",
-    tindakanKasus: "Diberikan VAR / SAR & Terapi Antibiotik Profilaksis",
-    tindakanHPR: "Karantina / Observasi 14 Hari di Rumah Pemilik",
-    rekomendasi: "Pantau kesehatan hewan 14 hari, jadwalkan VAR dosis ke-2 korban.",
-    statusPemantauan: "Dalam Pemantauan (Aktif)",
-    statusHewanObservasi: "Sehat / Normal (Observasi)",
-    hariObservasiKe: 2,
-    tglMulaiObservasi: "2026-08-14",
-    tglSelesaiObservasi: "2026-08-28",
-    jadwalVAR: {
-      dosis0: { tanggal: "2026-08-14", status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan", keterangan: "Diberikan 2 dosis deltoid kanan & kiri" },
-      dosis3: { tanggal: "2026-08-17", status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan", keterangan: "Jadwal VAR hari ke-3" },
-      dosis7: { tanggal: "2026-08-21", status: "Belum Diberikan", lokasiPemberian: "Puskesmas Sananwetan", keterangan: "Jadwal VAR hari ke-7" },
-      dosis21: { tanggal: "2026-09-04", status: "Belum Diberikan", lokasiPemberian: "Puskesmas Sananwetan", keterangan: "Jadwal VAR hari ke-21 jika hewan mati/positif" }
-    },
-    riwayatLog: [
-      {
-        id: "log-1",
-        tanggal: "2026-08-14",
-        hariKe: 1,
-        petugasNama: "Widodo, S.Kep., Ns.",
-        petugasNIP: "198501012010011001",
-        kelurahan: "Bendogerit",
-        kondisiKorban: "Luka bersih, nyeri ringan, tidak demam.",
-        statusLuka: "Luka bersih terawat, tidak ada pus/infeksi.",
-        kondisiHewan: "Anjing terikat di pekarangan, nafsu makan baik, tidak agresif.",
-        suhuTubuh: "36.6 °C",
-        tindakanDilakukan: "Kunjungan rumah PE, pencucian luka ulang, pemberian VAR Dosis 0.",
-        catatanKhusus: "Edukasi pemilik untuk tidak melepas anjing selama masa observasi 14 hari."
-      },
-      {
-        id: "log-2",
-        tanggal: "2026-08-15",
-        hariKe: 2,
-        petugasNama: "Widodo, S.Kep., Ns.",
-        petugasNIP: "198501012010011001",
-        kelurahan: "Bendogerit",
-        kondisiKorban: "Kondisi umum baik, aktif, nafsu makan normal.",
-        statusLuka: "Luka mulai mengering, tidak bengkak.",
-        kondisiHewan: "Hewan aktif, merespon panggilan pemilik, tidak takut air/cahaya.",
-        suhuTubuh: "36.5 °C",
-        tindakanDilakukan: "Monitoring berkala via pesan singkat dan konfirmasi kader kesehatan.",
-        catatanKhusus: "Pengingat jadwal suntik VAR dosis kedua pada tanggal 17 Agustus 2026."
-      }
-    ],
-    petugasPJ: "Widodo, S.Kep., Ns.",
-    nipPJ: "198501012010011001",
-    lastUpdated: "15/08/2026 10:15"
-  },
-  {
-    id_kasus: "GHPR-20260812-SW2",
-    timestamp_submit: "12/08/2026 14:20:00",
-    waktuKejadian: "2026-08-12T11:30",
-    namaKorban: "Budi Santoso",
-    nikKorban: "3572011208880001",
-    umurKorban: "36",
-    jkKorban: "Laki-laki",
-    alamatKorban: "Jl. Kalimantan No. 45",
-    kontakKorban: "085678912345",
-    noHpKorban: "085678912345",
-    kelurahan: "Sananwetan",
-    kecamatan: "Sananwetan",
-    kabupatenKota: "Kota Blitar",
-    spesiesHPR: "Kucing",
-    rasHewan: "Domestik",
-    kondisiHewan: "Sehat / Normal (Dalam Observasi)",
-    pemilikHewan: "Ibu Hartini",
-    alamatPemilik: "Jl. Kalimantan No. 47",
-    kontakPemilik: "085712345678",
-    kondisiLuka: "Kategori 1",
-    lokasiLuka: "Punggung Tangan Kiri",
-    pertolonganPertama: "Cuci luka sabun air mengalir 15 menit",
-    tindakanKasus: "Perawatan luka, edukasi pemantauan",
-    tindakanHPR: "Observasi kandang mandiri 14 hari",
-    rekomendasi: "Observasi kucing, bila ada perubahan perilaku segera lapor.",
-    statusPemantauan: "Dalam Pemantauan (Aktif)",
-    statusHewanObservasi: "Sehat / Normal (Observasi)",
-    hariObservasiKe: 4,
-    tglMulaiObservasi: "2026-08-12",
-    tglSelesaiObservasi: "2026-08-26",
-    jadwalVAR: {
-      dosis0: { tanggal: "2026-08-12", status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan" },
-      dosis3: { tanggal: "2026-08-15", status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan" },
-      dosis7: { tanggal: "2026-08-19", status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" }
-    },
-    riwayatLog: [
-      {
-        id: "log-sw-1",
-        tanggal: "2026-08-12",
-        hariKe: 1,
-        petugasNama: "Ahmad Syaifudin, A.Md.Kep",
-        petugasNIP: "198803152011011002",
-        kelurahan: "Sananwetan",
-        kondisiKorban: "Luka gigitan tangan, sudah dibersihkan.",
-        statusLuka: "Luka bersih, tidak ada perdarahan aktif.",
-        kondisiHewan: "Kucing dikandangkan oleh pemilik.",
-        tindakanDilakukan: "Edukasi cuci luka & pemberian VAR dosis 0.",
-        catatanKhusus: "Pasien kooperatif."
-      }
-    ],
-    petugasPJ: "Ahmad Syaifudin, A.Md.Kep",
-    nipPJ: "198803152011011002",
-    lastUpdated: "15/08/2026 09:00"
-  }
-];
+// Seed Data Pemantauan Pasien Awal (Kosong agar 100% mengikuti data riil dari Google Spreadsheet)
+const INITIAL_SEED_PATIENTS: PatientMonitoringItem[] = [];
+
+// Daftar ID Kasus Demo/Dummy lama untuk dibersihkan secara otomatis agar tidak mengotori data riil
+const DUMMY_DEMO_CASE_IDS = new Set([
+  "ghpr-20260814-bn1",
+  "ghpr-20260812-sw2",
+  "ghpr-20260810-gd1",
+  "ghpr-20260728-kt1",
+  "ghpr-20260813-kl1",
+  "ghpr-20260811-pl1",
+  "ghpr-20260809-rb1"
+]);
 
 export const STORAGE_KEY_OFFICER_PROFILES = "ghpr_officer_user_profiles_v2";
 export const STORAGE_KEY_LAST_ACTIVITY = "ghpr_last_user_activity_ts_v1";
@@ -737,18 +620,14 @@ export function getAllPatients(): PatientMonitoringItem[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        list = parsed;
+        // Otomatis bersihkan data dummy demo lama agar tidak bercampur dengan data riil dari Google Sheets
+        list = parsed.filter(
+          (p) => !DUMMY_DEMO_CASE_IDS.has((p.id_kasus || "").trim().toLowerCase())
+        );
       }
     }
   } catch (e) {
     console.warn("Gagal membaca data pasien monitoring:", e);
-  }
-
-  if (list.length === 0) {
-    list = [...INITIAL_SEED_PATIENTS];
-    try {
-      localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(list));
-    } catch (e) {}
   }
 
   // Filter daftar pasien yang telah dibersihkan / diarsipkan dari layar oleh admin
@@ -759,7 +638,9 @@ export function getAllPatients(): PatientMonitoringItem[] {
 
   // Auto-merge riwayat submission lokal (ghpr_cases_history_v2) agar laporan baru seketika masuk ke daftar pemantauan
   try {
-    const localSubmissions = getLocalSubmissionHistory();
+    const localSubmissions = getLocalSubmissionHistory().filter(
+      (sub) => !DUMMY_DEMO_CASE_IDS.has((sub.id_kasus || "").trim().toLowerCase())
+    );
     let mergedCount = 0;
     for (const sub of localSubmissions) {
       const subId = (sub.id_kasus || "").trim().toLowerCase();
@@ -1275,10 +1156,10 @@ export async function syncPatientsFromGoogleSheets(
         }
       }
 
-      // Pertahankan kasus lokal yang baru saja diinput secara offline namun belum ada di cloud
+      // Pertahankan kasus lokal yang baru saja diinput secara offline namun belum ada di cloud (kecuali data dummy demo)
       for (const p of latestPatients) {
         const pIdLower = (p.id_kasus || "").trim().toLowerCase();
-        if (!rowIdSet.has(pIdLower) && !dismissedSet.has(pIdLower)) {
+        if (!rowIdSet.has(pIdLower) && !dismissedSet.has(pIdLower) && !DUMMY_DEMO_CASE_IDS.has(pIdLower)) {
           // Hanya pertahankan jika ada di riwayat pengiriman lokal pengguna
           const isInLocalSubmissions = localCases.some(
             (lc) => (lc.id_kasus || "").trim().toLowerCase() === pIdLower
