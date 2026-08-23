@@ -29,7 +29,7 @@ import {
   MonitoringDailyLog,
   SubmissionPayload
 } from "../types";
-import { addPatientMonitoringLog, upsertPatient } from "../lib/patientMonitoring";
+import { addPatientMonitoringLog, upsertPatient, normalizeDateToIso } from "../lib/patientMonitoring";
 import { sendToAppsScript, DEFAULT_WEB_APP_URL } from "../lib/googleSheets";
 import { addToOfflineQueue, isAppOnline } from "../lib/offlineSyncService";
 import { DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP } from "./SignatureData";
@@ -123,13 +123,12 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
   const handleAutoCalculateVarDates = () => {
     if (!patient) return;
-    const baseDateStr = patient.waktuKejadian ? patient.waktuKejadian.slice(0, 10) : (patient.tglMulaiObservasi || new Date().toISOString().slice(0, 10));
-    const baseTime = new Date(baseDateStr).getTime();
+    const baseDateStr = normalizeDateToIso(patient.waktuKejadian || patient.tglMulaiObservasi);
     setJadwalVAR({
       dosis0: { tanggal: baseDateStr, status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan" },
-      dosis3: { tanggal: new Date(baseTime + 3 * 86400000).toISOString().slice(0, 10), status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" },
-      dosis7: { tanggal: new Date(baseTime + 7 * 86400000).toISOString().slice(0, 10), status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" },
-      dosis21: { tanggal: new Date(baseTime + 21 * 86400000).toISOString().slice(0, 10), status: "Belum Diberikan", lokasiPemberian: "Puskesmas Sananwetan" }
+      dosis3: { tanggal: normalizeDateToIso(baseDateStr, 3), status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" },
+      dosis7: { tanggal: normalizeDateToIso(baseDateStr, 7), status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" },
+      dosis21: { tanggal: normalizeDateToIso(baseDateStr, 21), status: "Belum Diberikan", lokasiPemberian: "Puskesmas Sananwetan" }
     });
   };
 

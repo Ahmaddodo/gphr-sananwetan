@@ -62,6 +62,75 @@ export function restoreDismissedPatientId(id_kasus: string): void {
   } catch (e) {}
 }
 
+/**
+ * Mengonversi berbagai variasi format tanggal (DD/MM/YYYY, ISO, Date(Y,M,D), dsb.)
+ * ke format YYYY-MM-DD yang aman dan valid tanpa melempar 'Invalid time value'
+ */
+export function normalizeDateToIso(inputDate: any, fallbackDaysOffset = 0): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const now = new Date();
+
+  if (!inputDate) {
+    const target = new Date(now.getTime() + fallbackDaysOffset * 86400000);
+    return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+  }
+
+  const str = String(inputDate).trim();
+  if (!str) {
+    const target = new Date(now.getTime() + fallbackDaysOffset * 86400000);
+    return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+  }
+
+  // Cek jika format YYYY-MM-DD
+  const ymdMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (ymdMatch) {
+    const y = parseInt(ymdMatch[1], 10);
+    const m = parseInt(ymdMatch[2], 10);
+    const d = parseInt(ymdMatch[3], 10);
+    const dateObj = new Date(y, m - 1, d);
+    if (!isNaN(dateObj.getTime())) {
+      const target = new Date(dateObj.getTime() + fallbackDaysOffset * 86400000);
+      return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+    }
+  }
+
+  // Cek jika format Indonesia DD/MM/YYYY atau DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmyMatch) {
+    const d = parseInt(dmyMatch[1], 10);
+    const m = parseInt(dmyMatch[2], 10);
+    const y = parseInt(dmyMatch[3], 10);
+    const dateObj = new Date(y, m - 1, d);
+    if (!isNaN(dateObj.getTime())) {
+      const target = new Date(dateObj.getTime() + fallbackDaysOffset * 86400000);
+      return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+    }
+  }
+
+  // Cek jika format GViz Date(yyyy, m, d)
+  const gvizMatch = str.match(/Date\((\d+),(\d+),(\d+)/i);
+  if (gvizMatch) {
+    const y = parseInt(gvizMatch[1], 10);
+    const m = parseInt(gvizMatch[2], 10);
+    const d = parseInt(gvizMatch[3], 10);
+    const dateObj = new Date(y, m, d);
+    if (!isNaN(dateObj.getTime())) {
+      const target = new Date(dateObj.getTime() + fallbackDaysOffset * 86400000);
+      return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+    }
+  }
+
+  // Fallback standar JS Date parse
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const target = new Date(parsed.getTime() + fallbackDaysOffset * 86400000);
+    return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+  }
+
+  const target = new Date(now.getTime() + fallbackDaysOffset * 86400000);
+  return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+}
+
 export const KELURAHAN_LIST: KelurahanWilayah[] = [
   "Sananwetan",
   "Gedog",
@@ -94,7 +163,7 @@ export const PREDEFINED_USER_PROFILES: UserAccessProfile[] = [
     nama: "Widodo Suprianto A.Md.Kep",
     nip: "197606252009011007",
     role: "Petugas Surveilans Utama / Penanggung Jawab Form",
-    kelurahan: "Bendogerit",
+    kelurahan: "Semua",
     jabatan: "Perawat Koordinator Surveilans Epidemiologi",
     username: "widodo",
     password: hashPassword("password123", "widodo"),
@@ -617,6 +686,71 @@ export function logoutPetugas(): void {
   saveActiveUserProfile(null);
 }
 
+// Helper cerdas membaca nilai kolom dari objek baris spreadsheet dengan toleransi variasi penamaan header
+export function getFieldFromRow(row: Record<string, any>, candidateKeys: string[], fallback = ""): string {
+  if (!row || typeof row !== "object") return fallback;
+
+  // 1. Direct exact key match
+  for (const k of candidateKeys) {
+    if (row[k] !== undefined && row[k] !== null) {
+      const val = String(row[k]).trim();
+      if (val !== "") return val;
+    }
+  }
+
+  const rowKeys = Object.keys(row);
+
+  // 2. Normalized key match (case-insensitive, hapus spasi & tanda baca)
+  for (const cand of candidateKeys) {
+    const candNorm = cand.toLowerCase().replace(/[^a-z0-9]/g, "");
+    for (const rk of rowKeys) {
+      const rkNorm = rk.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (rkNorm === candNorm && row[rk] !== undefined && row[rk] !== null) {
+        const val = String(row[rk]).trim();
+        if (val !== "") return val;
+      }
+    }
+  }
+
+  // 3. Substring / alias search
+  for (const cand of candidateKeys) {
+    const candLower = cand.toLowerCase();
+    for (const rk of rowKeys) {
+      const rkLower = rk.toLowerCase();
+      // Khusus pencarian nama korban/pasien (hindari nama pemilik / pelaksana / petugas)
+      if (candLower.includes("nama") && candLower.includes("korban")) {
+        if (
+          rkLower.includes("nama") &&
+          !rkLower.includes("pemilik") &&
+          !rkLower.includes("petugas") &&
+          !rkLower.includes("pelaksana") &&
+          !rkLower.includes("hewan")
+        ) {
+          const val = String(row[rk] ?? "").trim();
+          if (val !== "") return val;
+        }
+      }
+      // Khusus kelurahan
+      if (candLower.includes("kelurahan") && (rkLower.includes("kelurahan") || rkLower.includes("desa") || rkLower === "wilayah")) {
+        const val = String(row[rk] ?? "").trim();
+        if (val !== "") return val;
+      }
+      // Khusus ID kasus
+      if (candLower.includes("id_kasus") && (rkLower.includes("id") || rkLower.includes("kode") || rkLower.includes("register") || rkLower === "no")) {
+        const val = String(row[rk] ?? "").trim();
+        if (val !== "") return val;
+      }
+      // Khusus Waktu/Tanggal Kejadian
+      if (candLower.includes("kejadian") && (rkLower.includes("kejadian") || rkLower.includes("gigitan") || rkLower.includes("tanggal") || rkLower.includes("waktu"))) {
+        const val = String(row[rk] ?? "").trim();
+        if (val !== "") return val;
+      }
+    }
+  }
+
+  return fallback;
+}
+
 // Helper Mengambil Seluruh Pasien Terpantau
 export function getAllPatients(): PatientMonitoringItem[] {
   let list: PatientMonitoringItem[] = [];
@@ -641,91 +775,24 @@ export function getAllPatients(): PatientMonitoringItem[] {
     list = list.filter((p) => !dismissedSet.has((p.id_kasus || "").trim().toLowerCase()));
   }
 
-  // Auto-merge riwayat submission lokal (ghpr_cases_history_v2) agar laporan baru seketika masuk ke daftar pemantauan
-  try {
-    const localSubmissions = getLocalSubmissionHistory().filter(
-      (sub) => !DUMMY_DEMO_CASE_IDS.has((sub.id_kasus || "").trim().toLowerCase())
-    );
-    let mergedCount = 0;
-    for (const sub of localSubmissions) {
-      const subId = (sub.id_kasus || "").trim().toLowerCase();
-      if (!subId || dismissedSet.has(subId)) continue;
-      const exists = list.some((p) => (p.id_kasus || "").trim().toLowerCase() === subId);
-      if (!exists && sub.namaKorban) {
-        const full = (sub.fullData || {}) as FormGHPRData;
-        const tglKejadian = sub.waktuKejadian ? String(sub.waktuKejadian).slice(0, 10) : new Date().toISOString().slice(0, 10);
-        const tglSelesai = new Date(new Date(tglKejadian).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-        const newPatient: PatientMonitoringItem = {
-          id_kasus: sub.id_kasus,
-          timestamp_submit: sub.timestamp_submit || new Date().toLocaleString("id-ID"),
-          waktuKejadian: sub.waktuKejadian || tglKejadian,
-          namaKorban: sub.namaKorban || "Tanpa Nama",
-          umurKorban: sub.umurKorban || "-",
-          jkKorban: full.jkKorban || "Laki-laki",
-          alamatKorban: sub.alamatKejadian || full.alamatKorban || "-",
-          kontakKorban: full.noHpKorban || full.kontakPemilik || "-",
-          noHpKorban: full.noHpKorban || "-",
-          kelurahan: sub.kelurahan || full.kelurahan || "Sananwetan",
-          kecamatan: sub.kecamatan || full.kecamatan || "Sananwetan",
-          kabupatenKota: full.kabupatenKota || "Kota Blitar",
-          spesiesHPR: sub.spesiesHPR || full.spesiesHPR || "Anjing",
-          rasHewan: full.ras || "-",
-          kondisiHewan: full.kondisiHewan || "Dalam Observasi",
-          pemilikHewan: full.pemilikHewan || "-",
-          alamatPemilik: full.alamatPemilik || "-",
-          kontakPemilik: full.kontakPemilik || "-",
-          kondisiLuka: sub.kondisiLuka || full.kondisiLuka || "-",
-          lokasiLuka: full.lokasiLuka || "-",
-          pertolonganPertama: full.pertolonganPertama || "-",
-          detailPertolongan: full.detailPertolongan || "",
-          tindakanKasus: full.tindakanKasus || "-",
-          tindakanHPR: full.tindakanHPR || "Observasi 14 Hari",
-          rekomendasi: full.rekomendasi || "-",
-          statusPemantauan: "Dalam Pemantauan (Aktif)",
-          statusHewanObservasi: "Sehat / Normal (Observasi)",
-          hariObservasiKe: 1,
-          tglMulaiObservasi: tglKejadian,
-          tglSelesaiObservasi: tglSelesai,
-          jadwalVAR: {
-            dosis0: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
-            dosis3: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
-            dosis7: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
-            dosis21: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" }
-          },
-          riwayatLog: [
-            {
-              id: `log-init-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-              tanggal: tglKejadian,
-              hariKe: 1,
-              petugasNama: sub.pelaksanaNama || full.pelaksanaNama || "Petugas Puskesmas",
-              petugasNIP: full.pelaksanaNIP || "-",
-              kelurahan: sub.kelurahan || "Sananwetan",
-              kondisiKorban: sub.kondisiLuka || "Luka gigitan dalam perawatan",
-              statusLuka: sub.kondisiLuka || "-",
-              kondisiHewan: full.kondisiHewan || "Dalam Observasi",
-              tindakanDilakukan: full.tindakanKasus || "Penyelidikan Epidemiologi",
-              catatanKhusus: full.rekomendasi || "Laporan dicatat ke sistem pemantauan."
-            }
-          ],
-          petugasPJ: sub.pelaksanaNama || full.pelaksanaNama || "Widodo Suprianto A.Md.Kep",
-          nipPJ: full.pelaksanaNIP || "197606252009011007",
-          lastUpdated: new Date().toLocaleString("id-ID"),
-          fullData: full
-        };
-        list.unshift(newPatient);
-        mergedCount++;
-      }
-    }
-    if (mergedCount > 0) {
-      try {
-        localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(list));
-      } catch (eSave) {}
-    }
-  } catch (eMerge) {
-    console.warn("Gagal auto-merge riwayat lokal:", eMerge);
+  // Deduplikasi ketat agar tidak ada pasien ganda berdasarkan ID Kasus ATAU Nama Korban
+  const uniqueList: PatientMonitoringItem[] = [];
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+
+  for (const p of list) {
+    const idClean = (p.id_kasus || "").trim().toLowerCase();
+    const nameClean = (p.namaKorban || "").trim().toLowerCase();
+
+    if (idClean && seenIds.has(idClean)) continue;
+    if (nameClean && nameClean !== "tanpa nama" && seenNames.has(nameClean)) continue;
+
+    if (idClean) seenIds.add(idClean);
+    if (nameClean && nameClean !== "tanpa nama") seenNames.add(nameClean);
+    uniqueList.push(p);
   }
 
-  return list;
+  return uniqueList;
 }
 
 export function saveAllPatients(patients: PatientMonitoringItem[]): void {
@@ -928,8 +995,8 @@ export function syncPatientFromFormSubmission(
     existing = list.find((p) => (p.namaKorban || "").trim().toLowerCase() === searchName);
   }
 
-  const tglKejadian = formData.waktuKejadian ? formData.waktuKejadian.slice(0, 10) : new Date().toISOString().slice(0, 10);
-  const tglSelesai = new Date(new Date(tglKejadian).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const tglKejadian = normalizeDateToIso(formData.waktuKejadian);
+  const tglSelesai = normalizeDateToIso(tglKejadian, 14);
 
   const finalKel = formData.kelurahanCustom && formData.kelurahan.toLowerCase().includes("lainnya")
     ? formData.kelurahanCustom
@@ -1087,137 +1154,174 @@ export async function syncPatientsFromGoogleSheets(
     if (rows.length > 0) {
       const syncedPatients: PatientMonitoringItem[] = [];
       const rowIdSet = new Set<string>();
+      const rowNameSet = new Set<string>();
 
-      for (const r of rows) {
+      for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+        const r = rows[rIdx];
         const rd = r.rowData || r;
-        // Cari ID Kasus dari berbagai kemungkinan nama kolom
-        const rawId =
-          r.id_kasus ||
-          rd["ID Kasus"] ||
-          rd["id_kasus"] ||
-          rd["Id Kasus"] ||
-          rd["ID"] ||
-          rd["id"] ||
-          rd["col_0"] ||
-          "";
 
-        if (!rawId) continue;
+        // Ekstraksi multi-kolom cerdas & toleran menggunakan getFieldFromRow
+        const rawId = getFieldFromRow(rd, [
+          "id_kasus",
+          "ID Kasus",
+          "Id Kasus",
+          "ID",
+          "id",
+          "No Kasus",
+          "No. Kasus",
+          "Kode Kasus",
+          "col_0"
+        ], r.id_kasus || "");
 
-        const sId = String(rawId).trim();
+        const nama = getFieldFromRow(rd, [
+          "Nama Korban",
+          "namaKorban",
+          "Nama Pasien",
+          "Nama Lengkap Korban",
+          "Nama Korban/Pasien",
+          "Nama Korban / Pasien",
+          "Nama Penderita",
+          "Nama",
+          "col_21"
+        ], r.namaKorban || "Tanpa Nama").trim();
+
+        // Jika baris benar-benar kosong (tidak ada nama dan tidak ada ID), lewati
+        if ((!nama || nama === "Tanpa Nama") && !rawId) continue;
+
+        const rawTgl = getFieldFromRow(rd, [
+          "Waktu Kejadian",
+          "waktuKejadian",
+          "Tanggal Gigitan",
+          "Tanggal Kejadian",
+          "Tanggal",
+          "Waktu Submit",
+          "Timestamp"
+        ], "");
+
+        const tglKejadian = normalizeDateToIso(rawTgl);
+        const tglSelesai = normalizeDateToIso(tglKejadian, 14);
+
+        // Jika ID kasus di baris spreadsheet kosong, buat ID stabil berdasarkan tanggal dan nama (misal Sulastri)
+        let sId = rawId ? String(rawId).trim() : "";
+        if (!sId) {
+          const cleanNameCode = (nama && nama !== "Tanpa Nama")
+            ? nama.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()
+            : `ROW${rIdx + 1}`;
+          sId = `GHPR-${tglKejadian.replace(/-/g, "")}-${cleanNameCode}`;
+        }
+
         const sIdLower = sId.toLowerCase();
+        const sNamaLower = nama.toLowerCase();
+
         if (dismissedSet.has(sIdLower)) continue;
 
         rowIdSet.add(sIdLower);
+        if (sNamaLower && sNamaLower !== "tanpa nama") {
+          rowNameSet.add(sNamaLower);
+        }
 
-        const existingIdx = latestPatients.findIndex((p) => (p.id_kasus || "").trim().toLowerCase() === sIdLower);
-        
-        // Pemetaan cerdas multi-kolom
-        const nama = String(
-          rd["Nama Korban"] ||
-          rd["namaKorban"] ||
-          rd["Nama Pasien"] ||
-          rd["Nama"] ||
-          r.namaKorban ||
-          "Tanpa Nama"
-        ).trim();
+        const kelurahan = getFieldFromRow(rd, [
+          "Kelurahan",
+          "kelurahan",
+          "Desa",
+          "Wilayah",
+          "Kelurahan/Desa"
+        ], "Sananwetan").trim();
 
-        const kelurahan = String(
-          rd["Kelurahan"] ||
-          rd["kelurahan"] ||
-          rd["Wilayah"] ||
-          "Sananwetan"
-        ).trim();
+        const alamat = getFieldFromRow(rd, [
+          "Alamat Korban",
+          "Alamat Kejadian",
+          "alamatKorban",
+          "alamatKejadian",
+          "Alamat"
+        ], "-");
 
-        const tglKejadian =
-          String(
-            rd["Waktu Kejadian"] ||
-            rd["waktuKejadian"] ||
-            rd["Tanggal Gigitan"] ||
-            rd["Tanggal"] ||
-            ""
-          ).slice(0, 10) || new Date().toISOString().slice(0, 10);
+        const kondisiLuka = getFieldFromRow(rd, [
+          "Kondisi Luka",
+          "kondisiLuka",
+          "Derajat Luka",
+          "Status Luka"
+        ], "-");
 
-        const tglSelesai = new Date(new Date(tglKejadian).getTime() + 14 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .slice(0, 10);
+        const kondisiHewan = getFieldFromRow(rd, [
+          "Kondisi Hewan Saat Ini",
+          "kondisiHewan",
+          "Kondisi Hewan",
+          "Status Hewan"
+        ], "Dalam Observasi");
 
-        const alamat = String(
-          rd["Alamat Korban"] ||
-          rd["Alamat Kejadian"] ||
-          rd["alamatKorban"] ||
-          rd["alamatKejadian"] ||
-          "-"
-        );
+        const spesiesHPR = getFieldFromRow(rd, [
+          "Spesies HPR",
+          "spesies_final",
+          "spesiesHPR",
+          "Jenis Hewan",
+          "Hewan"
+        ], "Anjing");
 
-        const kondisiLuka = String(
-          rd["Kondisi Luka"] ||
-          rd["kondisiLuka"] ||
-          rd["Derajat Luka"] ||
-          "-"
-        );
+        const petugasPJ = getFieldFromRow(rd, [
+          "Pelaksana (Petugas)",
+          "pelaksanaNama",
+          "Petugas PJ",
+          "Petugas",
+          "Pelaksana"
+        ], "Widodo Suprianto A.Md.Kep");
 
-        const kondisiHewan = String(
-          rd["Kondisi Hewan Saat Ini"] ||
-          rd["kondisiHewan"] ||
-          rd["Kondisi Hewan"] ||
-          "Dalam Observasi"
-        );
+        const nipPJ = getFieldFromRow(rd, [
+          "NIP Pelaksana",
+          "pelaksanaNIP",
+          "NIP",
+          "nip"
+        ], "197606252009011007");
 
-        const spesiesHPR = String(
-          rd["Spesies HPR"] ||
-          rd["spesies_final"] ||
-          rd["spesiesHPR"] ||
-          rd["Jenis Hewan"] ||
-          "Anjing"
-        );
+        const rekomendasi = getFieldFromRow(rd, [
+          "Rekomendasi",
+          "rekomendasi",
+          "Tindakan Kasus",
+          "Catatan"
+        ], "-");
 
-        const petugasPJ = String(
-          rd["Pelaksana (Petugas)"] ||
-          rd["pelaksanaNama"] ||
-          rd["Petugas PJ"] ||
-          rd["Petugas"] ||
-          "Widodo Suprianto A.Md.Kep"
-        );
+        const noHp = getFieldFromRow(rd, [
+          "No HP Korban",
+          "noHpKorban",
+          "kontakKorban",
+          "Kontak",
+          "No HP",
+          "Telepon"
+        ], "-");
 
-        const nipPJ = String(
-          rd["NIP Pelaksana"] ||
-          rd["pelaksanaNIP"] ||
-          rd["NIP"] ||
-          "197606252009011007"
-        );
+        const umur = getFieldFromRow(rd, [
+          "Umur Korban",
+          "umurKorban",
+          "Umur",
+          "Usia"
+        ], "-");
 
-        const rekomendasi = String(
-          rd["Rekomendasi"] ||
-          rd["rekomendasi"] ||
-          "-"
-        );
+        const jk = getFieldFromRow(rd, [
+          "Jenis Kelamin Korban",
+          "jkKorban",
+          "Jenis Kelamin",
+          "JK"
+        ], "Laki-laki");
 
-        const noHp = String(
-          rd["No HP Korban"] ||
-          rd["noHpKorban"] ||
-          rd["kontakKorban"] ||
-          rd["Kontak"] ||
-          "-"
-        );
+        // Cari apakah pasien sudah pernah tercatat sebelumnya (berdasarkan ID atau Nama Korban)
+        const existingIdx = latestPatients.findIndex((p) => {
+          const matchId = (p.id_kasus || "").trim().toLowerCase() === sIdLower;
+          const matchNama = sNamaLower && sNamaLower !== "tanpa nama" && (p.namaKorban || "").trim().toLowerCase() === sNamaLower;
+          return matchId || matchNama;
+        });
 
-        const umur = String(
-          rd["Umur Korban"] ||
-          rd["umurKorban"] ||
-          rd["Umur"] ||
-          "-"
-        );
-
-        const jk = String(
-          rd["Jenis Kelamin Korban"] ||
-          rd["jkKorban"] ||
-          rd["Jenis Kelamin"] ||
-          "Laki-laki"
-        );
+        // Cek apakah sudah ada di syncedPatients yang sedang disusun agar tidak ganda
+        const alreadyInSyncedIdx = syncedPatients.findIndex((sp) => {
+          const matchId = (sp.id_kasus || "").trim().toLowerCase() === sIdLower;
+          const matchNama = sNamaLower && sNamaLower !== "tanpa nama" && (sp.namaKorban || "").trim().toLowerCase() === sNamaLower;
+          return matchId || matchNama;
+        });
 
         if (existingIdx >= 0) {
           const ex = latestPatients[existingIdx];
           const merged: PatientMonitoringItem = {
             ...ex,
+            id_kasus: sId,
             namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
             kelurahan: kelurahan && kelurahan !== "-" ? kelurahan : ex.kelurahan,
             alamatKorban: alamat !== "-" ? alamat : ex.alamatKorban,
@@ -1228,16 +1332,18 @@ export async function syncPatientsFromGoogleSheets(
             nipPJ: nipPJ !== "-" ? nipPJ : ex.nipPJ,
             rekomendasi: rekomendasi !== "-" ? rekomendasi : ex.rekomendasi
           };
-          syncedPatients.push(merged);
-          sheetUpdated++;
+
+          if (alreadyInSyncedIdx >= 0) {
+            syncedPatients[alreadyInSyncedIdx] = merged;
+          } else {
+            syncedPatients.push(merged);
+            sheetUpdated++;
+          }
         } else {
           const newPatient: PatientMonitoringItem = {
             id_kasus: sId,
             timestamp_submit: String(
-              rd["Waktu Submit"] ||
-              rd["timestamp_submit"] ||
-              r.waktuSubmit ||
-              new Date().toLocaleString("id-ID")
+              getFieldFromRow(rd, ["Waktu Submit", "timestamp_submit", "Timestamp"], r.waktuSubmit || new Date().toLocaleString("id-ID"))
             ),
             waktuKejadian: tglKejadian,
             namaKorban: nama,
@@ -1247,19 +1353,19 @@ export async function syncPatientsFromGoogleSheets(
             kontakKorban: noHp,
             noHpKorban: noHp,
             kelurahan: kelurahan,
-            kecamatan: String(rd["Kecamatan"] || rd["kecamatan"] || "Sananwetan"),
-            kabupatenKota: String(rd["Kabupaten/Kota"] || rd["kabupatenKota"] || "Kota Blitar"),
+            kecamatan: String(getFieldFromRow(rd, ["Kecamatan", "kecamatan"], "Sananwetan")),
+            kabupatenKota: String(getFieldFromRow(rd, ["Kabupaten/Kota", "kabupatenKota"], "Kota Blitar")),
             spesiesHPR: spesiesHPR,
-            rasHewan: String(rd["Ras Hewan"] || rd["rasHewan"] || "-"),
+            rasHewan: String(getFieldFromRow(rd, ["Ras Hewan", "rasHewan"], "-")),
             kondisiHewan: kondisiHewan,
-            pemilikHewan: String(rd["Nama Pemilik"] || rd["pemilikHewan"] || "-"),
-            alamatPemilik: String(rd["Alamat Pemilik"] || rd["alamatPemilik"] || "-"),
-            kontakPemilik: String(rd["Kontak Pemilik"] || rd["kontakPemilik"] || "-"),
+            pemilikHewan: String(getFieldFromRow(rd, ["Nama Pemilik", "pemilikHewan"], "-")),
+            alamatPemilik: String(getFieldFromRow(rd, ["Alamat Pemilik", "alamatPemilik"], "-")),
+            kontakPemilik: String(getFieldFromRow(rd, ["Kontak Pemilik", "kontakPemilik"], "-")),
             kondisiLuka: kondisiLuka,
-            lokasiLuka: String(rd["Lokasi Luka"] || rd["lokasiLuka"] || "-"),
-            pertolonganPertama: String(rd["Pertolongan Pertama"] || rd["pertolonganPertama"] || "-"),
-            tindakanKasus: String(rd["Tindakan Kasus"] || rd["tindakanKasus"] || "-"),
-            tindakanHPR: String(rd["Tindakan terhadap HPR"] || rd["tindakanHPR"] || "Observasi 14 Hari"),
+            lokasiLuka: String(getFieldFromRow(rd, ["Lokasi Luka", "lokasiLuka"], "-")),
+            pertolonganPertama: String(getFieldFromRow(rd, ["Pertolongan Pertama", "pertolonganPertama"], "-")),
+            tindakanKasus: String(getFieldFromRow(rd, ["Tindakan Kasus", "tindakanKasus"], "-")),
+            tindakanHPR: String(getFieldFromRow(rd, ["Tindakan terhadap HPR", "tindakanHPR"], "Observasi 14 Hari")),
             rekomendasi: rekomendasi,
             statusPemantauan: "Dalam Pemantauan (Aktif)",
             statusHewanObservasi: "Sehat / Normal (Observasi)",
@@ -1290,19 +1396,36 @@ export async function syncPatientsFromGoogleSheets(
             nipPJ: nipPJ,
             lastUpdated: new Date().toLocaleString("id-ID")
           };
-          syncedPatients.push(newPatient);
-          sheetAdded++;
+
+          if (alreadyInSyncedIdx >= 0) {
+            syncedPatients[alreadyInSyncedIdx] = newPatient;
+          } else {
+            syncedPatients.push(newPatient);
+            sheetAdded++;
+          }
         }
       }
 
-      // Pertahankan kasus lokal yang baru saja diinput secara offline namun belum ada di cloud (kecuali data dummy demo)
+      // Pertahankan kasus lokal yang belum ada di spreadsheet HANYA jika benar-benar baru & belum ada di Google Sheets (baik by ID maupun by Nama)
       for (const p of latestPatients) {
         const pIdLower = (p.id_kasus || "").trim().toLowerCase();
-        if (!rowIdSet.has(pIdLower) && !dismissedSet.has(pIdLower) && !DUMMY_DEMO_CASE_IDS.has(pIdLower)) {
-          const isInLocalSubmissions = localCases.some(
-            (lc) => (lc.id_kasus || "").trim().toLowerCase() === pIdLower
-          );
-          if (isInLocalSubmissions) {
+        const pNamaLower = (p.namaKorban || "").trim().toLowerCase();
+
+        const matchInSheet = rowIdSet.has(pIdLower) || (pNamaLower && pNamaLower !== "tanpa nama" && rowNameSet.has(pNamaLower));
+        const alreadyInSynced = syncedPatients.some((sp) => {
+          const matchId = (sp.id_kasus || "").trim().toLowerCase() === pIdLower;
+          const matchNama = pNamaLower && pNamaLower !== "tanpa nama" && (sp.namaKorban || "").trim().toLowerCase() === pNamaLower;
+          return matchId || matchNama;
+        });
+
+        if (!matchInSheet && !alreadyInSynced && !dismissedSet.has(pIdLower) && !DUMMY_DEMO_CASE_IDS.has(pIdLower)) {
+          // Cek apakah kasus ini ada di antrian offline yang belum terkirim
+          const isPendingOffline = localCases.some((lc) => {
+            const lcIdLower = (lc.id_kasus || "").trim().toLowerCase();
+            const lcNamaLower = (lc.namaKorban || "").trim().toLowerCase();
+            return lcIdLower === pIdLower || (pNamaLower && lcNamaLower === pNamaLower);
+          });
+          if (isPendingOffline) {
             syncedPatients.push(p);
           }
         }

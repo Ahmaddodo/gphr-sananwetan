@@ -112,6 +112,9 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
     }
   };
 
+  const onRefreshPatientsRef = React.useRef(onRefreshPatients);
+  onRefreshPatientsRef.current = onRefreshPatients;
+
   // Handler auto-open saat ada notifikasi yang diklik
   useEffect(() => {
     if (initialTargetPatientId && patientsList.length > 0) {
@@ -127,9 +130,9 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
         }
       }
     }
-  }, [initialTargetPatientId, initialTargetAction, patientsList, onClearTargetPatient]);
+  }, [initialTargetPatientId, initialTargetAction, patientsList]);
 
-  // Handler auto-sync saat dashboard dimuat
+  // Handler auto-sync saat dashboard dimuat (hanya 1x saat webAppUrl berubah)
   useEffect(() => {
     let isMounted = true;
     const runAutoSync = async () => {
@@ -137,7 +140,7 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
         try {
           const res = await syncPatientsFromGoogleSheets(webAppUrl);
           if (isMounted) {
-            onRefreshPatients();
+            onRefreshPatientsRef.current();
             if (res.added > 0 || res.updated > 0) {
               setToastMessage(`Sinkronisasi Google Sheets: ${res.total} data pasien selaras dengan spreadsheet.`);
               setTimeout(() => {
@@ -154,7 +157,7 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
     return () => {
       isMounted = false;
     };
-  }, [webAppUrl, onRefreshPatients]);
+  }, [webAppUrl]);
 
   // Hak akses admin untuk input pasien baru & menu admin (hanya role/username admin)
   const isAdminUser = (currentUser?.username || "").toLowerCase() === "admin" || currentUser?.role === "admin";

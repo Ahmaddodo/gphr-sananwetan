@@ -1339,21 +1339,61 @@ export function subscribeGvizSyncError(callback: (error: string | null) => void)
  * Format respons dari Google Sheets GViz: /*O_o* / google.visualization.Query.setResponse({...});
  */
 export function parseGvizData(text: string): any {
+  if (!text || typeof text !== "string") {
+    throw new Error("Respons GViz kosong.");
+  }
+  
+  // Metode 1: Cari setResponse(...)
+  const startIdx = text.indexOf("setResponse(");
+  if (startIdx !== -1) {
+    const jsonStart = startIdx + "setResponse(".length;
+    const lastParen = text.lastIndexOf(")");
+    if (lastParen > jsonStart) {
+      const jsonSnippet = text.slice(jsonStart, lastParen).trim();
+      return JSON.parse(jsonSnippet);
+    }
+  }
+
+  // Metode 2: Sesuai spesifikasi slice offset standard
   try {
-    // Sesuai spesifikasi: slice prefix 47 karakter dan akhiran 2 karakter ");"
     const jsonString = text.substring(47).slice(0, -2);
     return JSON.parse(jsonString);
-  } catch (err) {
-    // Fallback bila ada variasi whitespace/prefix karakter di browser
-    try {
-      const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
-      if (match && match[1]) {
-        return JSON.parse(match[1]);
-      }
-    } catch (e2) {}
-    console.error("Gagal parse GViz data:", err);
-    throw new Error("Format respons GViz Google Sheets tidak valid.");
+  } catch (e1) {
+    // Metode 3: Regex fallback
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
+    if (match && match[1]) {
+      return JSON.parse(match[1].trim());
+    }
+    throw new Error("Format respons GViz Google Sheets tidak valid atau spreadsheet belum di-share publik.");
   }
+}
+
+function parseGvizCellValue(cell: any): any {
+  if (!cell) return "";
+  // Jika tipe date GViz: "Date(year, month, day, ...)"
+  if (typeof cell.v === "string" && cell.v.startsWith("Date(")) {
+    if (cell.f) return cell.f;
+    const match = cell.v.match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/i);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10); // 0-indexed
+      const day = parseInt(match[3], 10);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      if (match[4] !== undefined) {
+        const hour = parseInt(match[4], 10);
+        const min = match[5] ? parseInt(match[5], 10) : 0;
+        return `${year}-${pad(month + 1)}-${pad(day)} ${pad(hour)}:${pad(min)}`;
+      }
+      return `${year}-${pad(month + 1)}-${pad(day)}`;
+    }
+  }
+
+  // Jika ada formatted text dan cell.v kosong / null
+  if (cell.f !== null && cell.f !== undefined && (cell.v === null || cell.v === undefined)) {
+    return cell.f;
+  }
+
+  return cell.v !== null && cell.v !== undefined ? cell.v : (cell.f || "");
 }
 
 /**
@@ -1395,28 +1435,40 @@ export async function fetchGoogleSheetGvizRows(
       return { success: true, rows: [], message: "Tabel spreadsheet kosong." };
     }
 
-    // Ekstrak nama kolom
-    const cols: string[] = (table.cols || []).map((col: any, idx: number) => {
+    // Ekstrak nama kolom dari cols
+    let cols: string[] = (table.cols || []).map((col: any, idx: number) => {
       const lbl = col?.label ? String(col.label).trim() : "";
       return lbl || `col_${idx}`;
     });
 
+    let rawRows = table.rows;
+
+    // Jika semua col bernilai col_0, col_1, dsb. dan baris pertama berisi teks judul header
+    const isColLabelsEmpty = cols.every((c) => c.startsWith("col_"));
+    if (isColLabelsEmpty && rawRows.length > 0) {
+      const firstRow = rawRows[0];
+      if (firstRow && Array.isArray(firstRow.c)) {
+        const potentialHeaders = firstRow.c.map((cell: any, idx: number) => {
+          const val = cell?.v !== null && cell?.v !== undefined ? String(cell.v).trim() : "";
+          return val || `col_${idx}`;
+        });
+        // Jika baris pertama memang nama kolom
+        if (potentialHeaders.some((h: string) => !h.startsWith("col_"))) {
+          cols = potentialHeaders;
+          rawRows = rawRows.slice(1);
+        }
+      }
+    }
+
     const resultRows: Record<string, any>[] = [];
-    for (const r of table.rows) {
+    for (const r of rawRows) {
       if (!r || !r.c || !Array.isArray(r.c)) continue;
       const rowObj: Record<string, any> = {};
       let hasData = false;
 
       for (let i = 0; i < cols.length; i++) {
         const cell = r.c[i];
-        let val: any = "";
-        if (cell !== null && cell !== undefined) {
-          if (cell.v !== null && cell.v !== undefined) {
-            val = cell.v;
-          } else if (cell.f !== null && cell.f !== undefined) {
-            val = cell.f;
-          }
-        }
+        const val = parseGvizCellValue(cell);
         const colName = cols[i];
         rowObj[colName] = val;
         if (val !== "" && val !== null && val !== undefined) {
@@ -1553,7 +1605,7 @@ export async function fetchGoogleSheetCsvRows(
  */
 export async function fetchDirectGoogleSheetRows(
   spreadsheetId?: string,
-  candidateSheetNames: string[] = ["Data Laporan GHPR", "Laporan PE GHPR", ""]
+  candidateSheetNames: string[] = ["Data Laporan GHPR", "Laporan PE GHPR", "Sheet1", "Sheet 1", "Form Responses 1", ""]
 ): Promise<{ success: boolean; rows: Record<string, any>[]; sheetUsed: string }> {
   const cleanId = (spreadsheetId || getSavedSheetConfig()?.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
 

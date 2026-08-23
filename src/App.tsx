@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -423,9 +423,9 @@ export default function App() {
       });
   }, []);
 
-  const handleRefreshPatients = () => {
+  const handleRefreshPatients = useCallback(() => {
     setPatientsList(getAllPatients());
-  };
+  }, []);
 
   // Sistem Notifikasi Pemantauan Pasien & Jatuh Tempo VAR
   const monitoringNotifications = useMemo(() => {
