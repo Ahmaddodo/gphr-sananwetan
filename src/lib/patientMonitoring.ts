@@ -4,7 +4,8 @@ import {
   KelurahanWilayah,
   MonitoringDailyLog,
   FormGHPRData,
-  SubmissionPayload
+  SubmissionPayload,
+  StatusPemantauanPasien
 } from "../types";
 import { hashPassword, verifyPassword } from "./cryptoAuth";
 import {
@@ -775,20 +776,16 @@ export function getAllPatients(): PatientMonitoringItem[] {
     list = list.filter((p) => !dismissedSet.has((p.id_kasus || "").trim().toLowerCase()));
   }
 
-  // Deduplikasi ketat agar tidak ada pasien ganda berdasarkan ID Kasus ATAU Nama Korban
+  // Deduplikasi ketat berdasarkan ID Kasus (unique identifier kasus)
   const uniqueList: PatientMonitoringItem[] = [];
   const seenIds = new Set<string>();
-  const seenNames = new Set<string>();
 
   for (const p of list) {
     const idClean = (p.id_kasus || "").trim().toLowerCase();
-    const nameClean = (p.namaKorban || "").trim().toLowerCase();
-
-    if (idClean && seenIds.has(idClean)) continue;
-    if (nameClean && nameClean !== "tanpa nama" && seenNames.has(nameClean)) continue;
-
-    if (idClean) seenIds.add(idClean);
-    if (nameClean && nameClean !== "tanpa nama") seenNames.add(nameClean);
+    if (idClean) {
+      if (seenIds.has(idClean)) continue;
+      seenIds.add(idClean);
+    }
     uniqueList.push(p);
   }
 
@@ -1160,54 +1157,196 @@ export async function syncPatientsFromGoogleSheets(
         const r = rows[rIdx];
         const rd = r.rowData || r;
 
-        // Ekstraksi multi-kolom cerdas & toleran menggunakan getFieldFromRow
-        const rawId = getFieldFromRow(rd, [
-          "id_kasus",
-          "ID Kasus",
-          "Id Kasus",
-          "ID",
-          "id",
-          "No Kasus",
-          "No. Kasus",
-          "Kode Kasus",
-          "col_0"
-        ], r.id_kasus || "");
+        // Deteksi apakah baris ini mengalami pergeseran kolom (misal format legacy 12 kolom uji coba / sheet belum terformat)
+        const col0Val = String(rd["id_kasus"] || rd["col_0"] || "").trim();
+        const col1Val = String(rd["Waktu Submit"] || rd["timestamp_submit"] || rd["col_1"] || "").trim();
+        const col2Val = String(rd["Waktu Kejadian"] || rd["waktuKejadian"] || rd["col_2"] || "").trim();
 
-        const nama = getFieldFromRow(rd, [
-          "Nama Korban",
-          "namaKorban",
-          "Nama Pasien",
-          "Nama Lengkap Korban",
-          "Nama Korban/Pasien",
-          "Nama Korban / Pasien",
-          "Nama Penderita",
-          "Nama",
-          "col_21"
-        ], r.namaKorban || "Tanpa Nama").trim();
+        const isCol0Date = /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(col0Val) || /^\d{4}[\/\-]\d{2}[\/\-]\d{2}/.test(col0Val);
+        const isCol1Id = /^(TEST|GHPR|ID|KASUS)/i.test(col1Val) || (col1Val.length > 5 && !col1Val.includes(" ") && !col1Val.includes("/"));
+        const isShiftedRow = isCol0Date && isCol1Id;
 
-        // Jika baris benar-benar kosong (tidak ada nama dan tidak ada ID), lewati
-        if ((!nama || nama === "Tanpa Nama") && !rawId) continue;
+        let sId = "";
+        let waktuSubmit = "";
+        let tglKejadian = "";
+        let tglSelesai = "";
+        let nama = "";
+        let umur = "-";
+        let jk = "Laki-laki";
+        let alamat = "-";
+        let noHp = "-";
+        let kelurahan = "Sananwetan";
+        let spesiesHPR = "Anjing";
+        let kondisiLuka = "Kategori 2";
+        let kondisiHewan = "Dalam Observasi";
+        let statusPemantauan = "Dalam Pemantauan (Aktif)";
+        let petugasPJ = "Widodo Suprianto A.Md.Kep";
+        let nipPJ = "197606252009011007";
+        let rekomendasi = "Observasi harian kondisi korban dan hewan.";
+        let rawId = "";
 
-        const rawTgl = getFieldFromRow(rd, [
-          "Waktu Kejadian",
-          "waktuKejadian",
-          "Tanggal Gigitan",
-          "Tanggal Kejadian",
-          "Tanggal",
-          "Waktu Submit",
-          "Timestamp"
-        ], "");
+        if (isShiftedRow) {
+          // Format shifted 12-kolom: [0: Waktu, 1: ID, 2: Nama, 3: AlamatKejadian, 4: Umur, 5: JK, 6: AlamatKorban, 7: NoHP, 8: Kelurahan, 9: Spesies, 10: Luka, 11: Status]
+          rawId = col1Val;
+          sId = col1Val;
+          waktuSubmit = col0Val;
+          tglKejadian = normalizeDateToIso(col0Val);
+          tglSelesai = normalizeDateToIso(tglKejadian, 14);
+          nama = col2Val || "Uji Coba Sistem";
+          umur = String(rd["kelurahan"] || rd["col_4"] || "30 Tahun").trim();
+          jk = String(rd["Kelurahan"] || rd["col_5"] || "Laki-laki").trim();
+          alamat = String(rd["Kecamatan"] || rd["col_6"] || "Kota Blitar").trim();
+          noHp = String(rd["Kabupaten/Kota"] || rd["col_7"] || "-").trim();
+          kelurahan = String(rd["Provinsi"] || rd["col_8"] || "Sananwetan").trim();
+          spesiesHPR = String(rd["Sumber Informasi"] || rd["col_9"] || "Anjing").trim();
+          kondisiLuka = String(rd["Kronologi Kejadian"] || rd["col_10"] || "Kategori 2").trim();
+          statusPemantauan = String(rd["spesiesHPR"] || rd["col_11"] || "Dalam Pemantauan (Aktif)").trim();
+        } else {
+          // Ekstraksi multi-kolom cerdas & toleran menggunakan getFieldFromRow
+          rawId = getFieldFromRow(rd, [
+            "id_kasus",
+            "ID Kasus",
+            "Id Kasus",
+            "ID",
+            "id",
+            "No Kasus",
+            "No. Kasus",
+            "Kode Kasus",
+            "col_0"
+          ], r.id_kasus || "");
 
-        const tglKejadian = normalizeDateToIso(rawTgl);
-        const tglSelesai = normalizeDateToIso(tglKejadian, 14);
+          nama = getFieldFromRow(rd, [
+            "Nama Korban",
+            "namaKorban",
+            "Nama Pasien",
+            "Nama Lengkap Korban",
+            "Nama Korban/Pasien",
+            "Nama Korban / Pasien",
+            "Nama Penderita",
+            "Nama",
+            "col_27",
+            "col_21"
+          ], r.namaKorban || "Tanpa Nama").trim();
 
-        // Jika ID kasus di baris spreadsheet kosong, buat ID stabil berdasarkan tanggal dan nama (misal Sulastri)
-        let sId = rawId ? String(rawId).trim() : "";
-        if (!sId) {
-          const cleanNameCode = (nama && nama !== "Tanpa Nama")
-            ? nama.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()
-            : `ROW${rIdx + 1}`;
-          sId = `GHPR-${tglKejadian.replace(/-/g, "")}-${cleanNameCode}`;
+          // Jika baris benar-benar kosong (tidak ada nama dan tidak ada ID), lewati
+          if ((!nama || nama === "Tanpa Nama") && !rawId) continue;
+
+          const rawTgl = getFieldFromRow(rd, [
+            "Waktu Kejadian",
+            "waktuKejadian",
+            "Tanggal Gigitan",
+            "Tanggal Kejadian",
+            "Tanggal",
+            "Waktu Submit",
+            "Timestamp"
+          ], "");
+
+          tglKejadian = normalizeDateToIso(rawTgl);
+          tglSelesai = normalizeDateToIso(tglKejadian, 14);
+
+          // Jika ID kasus di baris spreadsheet kosong, buat ID stabil berdasarkan tanggal dan nama (misal Sulastri)
+          sId = rawId ? String(rawId).trim() : "";
+          if (!sId) {
+            const cleanNameCode = (nama && nama !== "Tanpa Nama")
+              ? nama.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()
+              : `ROW${rIdx + 1}`;
+            sId = `GHPR-${tglKejadian.replace(/-/g, "")}-${cleanNameCode}`;
+          }
+
+          waktuSubmit = String(
+            getFieldFromRow(rd, ["Waktu Submit", "timestamp_submit", "Timestamp"], r.waktuSubmit || new Date().toLocaleString("id-ID"))
+          );
+
+          kelurahan = getFieldFromRow(rd, [
+            "Kelurahan",
+            "kelurahan",
+            "Desa",
+            "Wilayah",
+            "Kelurahan/Desa",
+            "kelurahan_final"
+          ], "Sananwetan").trim();
+
+          alamat = getFieldFromRow(rd, [
+            "Alamat Korban",
+            "Alamat Kejadian",
+            "alamatKorban",
+            "alamatKejadian",
+            "Alamat"
+          ], "-");
+
+          kondisiLuka = getFieldFromRow(rd, [
+            "Kondisi Luka",
+            "kondisiLuka",
+            "kondisi Luka",
+            "Derajat Luka",
+            "Status Luka"
+          ], "-");
+
+          kondisiHewan = getFieldFromRow(rd, [
+            "Kondisi Hewan Saat Ini",
+            "kondisiHewan",
+            "Kondisi Hewan",
+            "Status Hewan"
+          ], "Dalam Observasi");
+
+          spesiesHPR = getFieldFromRow(rd, [
+            "Spesies HPR",
+            "spesies_final",
+            "spesiesHPR",
+            "Jenis Hewan",
+            "Hewan"
+          ], "Anjing");
+
+          petugasPJ = getFieldFromRow(rd, [
+            "Pelaksana (Petugas)",
+            "pelaksanaNama",
+            "Petugas PJ",
+            "Petugas",
+            "Pelaksana"
+          ], "Widodo Suprianto A.Md.Kep");
+
+          nipPJ = getFieldFromRow(rd, [
+            "NIP Pelaksana",
+            "pelaksanaNIP",
+            "NIP",
+            "nip"
+          ], "197606252009011007");
+
+          rekomendasi = getFieldFromRow(rd, [
+            "Rekomendasi",
+            "rekomendasi",
+            "Tindakan Kasus",
+            "Catatan"
+          ], "-");
+
+          noHp = getFieldFromRow(rd, [
+            "No HP Korban",
+            "noHpKorban",
+            "kontakKorban",
+            "Kontak",
+            "No HP",
+            "Telepon"
+          ], "-");
+
+          umur = getFieldFromRow(rd, [
+            "Umur Korban",
+            "umurKorban",
+            "Umur",
+            "Usia"
+          ], "-");
+
+          jk = getFieldFromRow(rd, [
+            "Jenis Kelamin Korban",
+            "jkKorban",
+            "Jenis Kelamin",
+            "JK"
+          ], "Laki-laki");
+
+          statusPemantauan = getFieldFromRow(rd, [
+            "Status Pemantauan",
+            "statusPemantauan",
+            "Status"
+          ], "Dalam Pemantauan (Aktif)");
         }
 
         const sIdLower = sId.toLowerCase();
@@ -1220,100 +1359,17 @@ export async function syncPatientsFromGoogleSheets(
           rowNameSet.add(sNamaLower);
         }
 
-        const kelurahan = getFieldFromRow(rd, [
-          "Kelurahan",
-          "kelurahan",
-          "Desa",
-          "Wilayah",
-          "Kelurahan/Desa"
-        ], "Sananwetan").trim();
-
-        const alamat = getFieldFromRow(rd, [
-          "Alamat Korban",
-          "Alamat Kejadian",
-          "alamatKorban",
-          "alamatKejadian",
-          "Alamat"
-        ], "-");
-
-        const kondisiLuka = getFieldFromRow(rd, [
-          "Kondisi Luka",
-          "kondisiLuka",
-          "Derajat Luka",
-          "Status Luka"
-        ], "-");
-
-        const kondisiHewan = getFieldFromRow(rd, [
-          "Kondisi Hewan Saat Ini",
-          "kondisiHewan",
-          "Kondisi Hewan",
-          "Status Hewan"
-        ], "Dalam Observasi");
-
-        const spesiesHPR = getFieldFromRow(rd, [
-          "Spesies HPR",
-          "spesies_final",
-          "spesiesHPR",
-          "Jenis Hewan",
-          "Hewan"
-        ], "Anjing");
-
-        const petugasPJ = getFieldFromRow(rd, [
-          "Pelaksana (Petugas)",
-          "pelaksanaNama",
-          "Petugas PJ",
-          "Petugas",
-          "Pelaksana"
-        ], "Widodo Suprianto A.Md.Kep");
-
-        const nipPJ = getFieldFromRow(rd, [
-          "NIP Pelaksana",
-          "pelaksanaNIP",
-          "NIP",
-          "nip"
-        ], "197606252009011007");
-
-        const rekomendasi = getFieldFromRow(rd, [
-          "Rekomendasi",
-          "rekomendasi",
-          "Tindakan Kasus",
-          "Catatan"
-        ], "-");
-
-        const noHp = getFieldFromRow(rd, [
-          "No HP Korban",
-          "noHpKorban",
-          "kontakKorban",
-          "Kontak",
-          "No HP",
-          "Telepon"
-        ], "-");
-
-        const umur = getFieldFromRow(rd, [
-          "Umur Korban",
-          "umurKorban",
-          "Umur",
-          "Usia"
-        ], "-");
-
-        const jk = getFieldFromRow(rd, [
-          "Jenis Kelamin Korban",
-          "jkKorban",
-          "Jenis Kelamin",
-          "JK"
-        ], "Laki-laki");
-
-        // Cari apakah pasien sudah pernah tercatat sebelumnya (berdasarkan ID atau Nama Korban)
+        // Cari apakah pasien sudah pernah tercatat sebelumnya (berdasarkan ID Kasus yang pasti, atau jika ID kosong dicocokkan nama)
         const existingIdx = latestPatients.findIndex((p) => {
           const matchId = (p.id_kasus || "").trim().toLowerCase() === sIdLower;
-          const matchNama = sNamaLower && sNamaLower !== "tanpa nama" && (p.namaKorban || "").trim().toLowerCase() === sNamaLower;
+          const matchNama = !rawId && sNamaLower && sNamaLower !== "tanpa nama" && (p.namaKorban || "").trim().toLowerCase() === sNamaLower;
           return matchId || matchNama;
         });
 
         // Cek apakah sudah ada di syncedPatients yang sedang disusun agar tidak ganda
         const alreadyInSyncedIdx = syncedPatients.findIndex((sp) => {
           const matchId = (sp.id_kasus || "").trim().toLowerCase() === sIdLower;
-          const matchNama = sNamaLower && sNamaLower !== "tanpa nama" && (sp.namaKorban || "").trim().toLowerCase() === sNamaLower;
+          const matchNama = !rawId && sNamaLower && sNamaLower !== "tanpa nama" && (sp.namaKorban || "").trim().toLowerCase() === sNamaLower;
           return matchId || matchNama;
         });
 
@@ -1342,9 +1398,7 @@ export async function syncPatientsFromGoogleSheets(
         } else {
           const newPatient: PatientMonitoringItem = {
             id_kasus: sId,
-            timestamp_submit: String(
-              getFieldFromRow(rd, ["Waktu Submit", "timestamp_submit", "Timestamp"], r.waktuSubmit || new Date().toLocaleString("id-ID"))
-            ),
+            timestamp_submit: waktuSubmit || new Date().toLocaleString("id-ID"),
             waktuKejadian: tglKejadian,
             namaKorban: nama,
             umurKorban: umur,
@@ -1367,7 +1421,7 @@ export async function syncPatientsFromGoogleSheets(
             tindakanKasus: String(getFieldFromRow(rd, ["Tindakan Kasus", "tindakanKasus"], "-")),
             tindakanHPR: String(getFieldFromRow(rd, ["Tindakan terhadap HPR", "tindakanHPR"], "Observasi 14 Hari")),
             rekomendasi: rekomendasi,
-            statusPemantauan: "Dalam Pemantauan (Aktif)",
+            statusPemantauan: (statusPemantauan as StatusPemantauanPasien) || "Dalam Pemantauan (Aktif)",
             statusHewanObservasi: "Sehat / Normal (Observasi)",
             hariObservasiKe: 1,
             tglMulaiObservasi: tglKejadian,

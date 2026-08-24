@@ -153,7 +153,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const base = process.env.BASE_URL || './';
+  const base = process.env.BASE_URL || '/ghpr-sananwetan/';
   return {
     base,
     plugins: [
@@ -166,67 +166,32 @@ export default defineConfig(() => {
           'favicon.svg',
           'favicon.png',
           'apple-touch-icon.png',
-          'logo.png',
-          'logo.svg',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
           'icon-192.png',
           'icon-512.png',
           'maskable-icon-512.png'
         ],
         manifest: {
-          id: 'ghpr-sananwetan-app',
-          start_url: './',
-          scope: './',
-          name: 'Form GHPR Sananwetan',
-          short_name: 'GHPR',
-          description: 'Sistem Informasi Penyelidikan Epidemiologi & Pemantauan Kasus Gigitan Hewan Penular Rabies UPT Puskesmas Sananwetan',
-          theme_color: '#0284c7',
+          name: 'GHPR UPT Puskesmas Sananwetan',
+          short_name: 'GHPR Sananwetan',
+          description: 'pe ghpr upt puskesmas sananwetan',
+          theme_color: '#16a34a',
           background_color: '#ffffff',
           display: 'standalone',
-          display_override: ['standalone', 'window-controls-overlay', 'minimal-ui', 'browser'],
-          orientation: 'portrait',
-          categories: ['medical', 'health', 'productivity'],
+          scope: base,
+          start_url: base,
           icons: [
             {
-              src: 'icon-192.png',
+              src: 'pwa-192x192.png',
               sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any'
+              type: 'image/png'
             },
             {
-              src: 'logo.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: 'icon-512.png',
+              src: 'pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: 'logo.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: 'maskable-icon-512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable'
-            },
-            {
-              src: 'icon-512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable'
-            },
-            {
-              src: 'logo.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable'
+              purpose: 'any maskable'
             }
           ]
         },
@@ -348,19 +313,19 @@ export default defineConfig(() => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Form GHPR Sananwetan - UPT Puskesmas Sananwetan</title>
     <meta name="description" content="Form Penyelidikan Epidemiologi & Pemantauan Kasus Gigitan Hewan Penular Rabies UPT Puskesmas Sananwetan Kota Blitar" />
-    <meta name="theme-color" content="#0284c7" />
+    <meta name="theme-color" content="#16a34a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="GHPR" />
+    <meta name="apple-mobile-web-app-title" content="GHPR Sananwetan" />
     <meta name="application-name" content="GHPR Sananwetan" />
-    <meta name="msapplication-TileColor" content="#0284c7" />
-    <meta name="msapplication-navbutton-color" content="#0284c7" />
+    <meta name="msapplication-TileColor" content="#16a34a" />
+    <meta name="msapplication-navbutton-color" content="#16a34a" />
     <meta name="format-detection" content="telephone=no" />
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="manifest" href="/ghpr-sananwetan/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/ghpr-sananwetan/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/ghpr-sananwetan/pwa-192x192.png" />
+    <link rel="apple-touch-icon" href="/ghpr-sananwetan/pwa-192x192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Dancing+Script:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -505,8 +470,6 @@ Aplikasi Penyelidikan Epidemiologi Kasus Gigitan Hewan Penular Rabies (GHPR) dan
   setOrAddFile("vite.config.ts", standardViteConfig);
   setOrAddFile(".gitignore", standardGitignore);
   setOrAddFile("README.md", standardReadme);
-  setOrAddFile("public/manifest.json", standardManifestJson);
-  setOrAddFile("public/manifest.webmanifest", standardManifestJson);
 
   // =========================================================================
   // 1. INJEKSI PENGATURAN TERBARU KE src/lib/googleSheets.ts

@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const base = process.env.BASE_URL || './';
+  const base = process.env.BASE_URL || '/ghpr-sananwetan/';
   return {
     base,
     plugins: [
@@ -18,63 +18,32 @@ export default defineConfig(() => {
           'favicon.svg',
           'favicon.png',
           'apple-touch-icon.png',
-          'logo.png',
-          'logo.svg',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
           'icon-192.png',
           'icon-512.png',
           'maskable-icon-512.png'
         ],
         manifest: {
-          id: 'ghpr-sananwetan-app',
-          name: 'Form GHPR Sananwetan',
-          short_name: 'GHPR',
-          description: 'Sistem Informasi Penyelidikan Epidemiologi & Pemantauan Kasus Gigitan Hewan Penular Rabies UPT Puskesmas Sananwetan Kota Blitar',
-          theme_color: '#0284c7',
+          name: 'GHPR UPT Puskesmas Sananwetan',
+          short_name: 'GHPR Sananwetan',
+          description: 'pe ghpr upt puskesmas sananwetan',
+          theme_color: '#16a34a',
           background_color: '#ffffff',
           display: 'standalone',
-          display_override: ['standalone', 'window-controls-overlay', 'minimal-ui', 'browser'],
-          orientation: 'portrait',
-          start_url: './',
-          scope: './',
-          categories: ['medical', 'health', 'productivity'],
-          lang: 'id',
-          dir: 'ltr',
+          scope: base,
+          start_url: base,
           icons: [
             {
-              src: 'icon-192.png',
+              src: 'pwa-192x192.png',
               sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any'
+              type: 'image/png'
             },
             {
-              src: 'logo.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: 'icon-512.png',
+              src: 'pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: 'logo.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: 'maskable-icon-512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable'
-            },
-            {
-              src: 'icon-512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable'
+              purpose: 'any maskable'
             }
           ]
         },
