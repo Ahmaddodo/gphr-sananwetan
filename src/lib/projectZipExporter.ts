@@ -535,14 +535,12 @@ Aplikasi Penyelidikan Epidemiologi Kasus Gigitan Hewan Penular Rabies (GHPR) dan
         );
       }
 
-      // Update INITIAL_SEED_PATIENTS
-      if (latestPatients && latestPatients.length > 0) {
-        const patientsJson = JSON.stringify(latestPatients, null, 2);
-        pmContent = pmContent.replace(
-          /const INITIAL_SEED_PATIENTS:\s*PatientMonitoringItem\[\]\s*=\s*\[[\s\S]*?\];/m,
-          `const INITIAL_SEED_PATIENTS: PatientMonitoringItem[] = ${patientsJson};`
-        );
-      }
+      // Pastikan INITIAL_SEED_PATIENTS selalu kosong [] pada codebase yang di-export / di-push ke GitHub
+      // agar tidak ada data hantu/dummy/lama yang tertanam keras di repositori GitHub
+      pmContent = pmContent.replace(
+        /const INITIAL_SEED_PATIENTS:\s*PatientMonitoringItem\[\]\s*=\s*\[[\s\S]*?\];/m,
+        `const INITIAL_SEED_PATIENTS: PatientMonitoringItem[] = [];`
+      );
 
       files[pmIndex].content = pmContent;
     }

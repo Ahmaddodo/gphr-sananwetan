@@ -20,6 +20,7 @@ import {
   fetchDirectGoogleSheetRows,
   getSavedSheetConfig
 } from "./googleSheets";
+import { getOfflineQueue } from "./offlineSyncService";
 import { getWebAppUrl } from "./config";
 
 export const STORAGE_KEY_PATIENTS = "ghpr_patient_monitoring_data_v2";
@@ -1080,20 +1081,8 @@ export function syncPatientFromFormSubmission(
 export async function syncPatientsFromGoogleSheets(
   webAppUrl?: string
 ): Promise<{ success: boolean; total: number; added: number; updated: number; message: string }> {
-  // 1. Sinkronkan riwayat submission lokal terlebih dahulu
-  const localCases = getLocalSubmissionHistory();
+  const offlineQueue = getOfflineQueue().filter((q) => q.status === "pending" || q.status === "failed");
   let localAdded = 0;
-  const currentPatients = getAllPatients();
-
-  for (const c of localCases) {
-    const sId = (c.id_kasus || "").trim().toLowerCase();
-    const existing = currentPatients.find((p) => (p.id_kasus || "").trim().toLowerCase() === sId);
-    if (!existing && c.namaKorban) {
-      const full = (c.fullData || {}) as FormGHPRData;
-      syncPatientFromFormSubmission(full, c.id_kasus, false);
-      localAdded++;
-    }
-  }
 
   const cleanUrl = (webAppUrl || getWebAppUrl() || "").trim();
   const sheetConfig = getSavedSheetConfig();
@@ -1460,27 +1449,22 @@ export async function syncPatientsFromGoogleSheets(
         }
       }
 
-      // Pertahankan kasus lokal yang belum ada di spreadsheet HANYA jika benar-benar baru & belum ada di Google Sheets (baik by ID maupun by Nama)
-      for (const p of latestPatients) {
-        const pIdLower = (p.id_kasus || "").trim().toLowerCase();
-        const pNamaLower = (p.namaKorban || "").trim().toLowerCase();
-
-        const matchInSheet = rowIdSet.has(pIdLower) || (pNamaLower && pNamaLower !== "tanpa nama" && rowNameSet.has(pNamaLower));
-        const alreadyInSynced = syncedPatients.some((sp) => {
-          const matchId = (sp.id_kasus || "").trim().toLowerCase() === pIdLower;
-          const matchNama = pNamaLower && pNamaLower !== "tanpa nama" && (sp.namaKorban || "").trim().toLowerCase() === pNamaLower;
-          return matchId || matchNama;
-        });
-
-        if (!matchInSheet && !alreadyInSynced && !dismissedSet.has(pIdLower) && !DUMMY_DEMO_CASE_IDS.has(pIdLower)) {
-          // Cek apakah kasus ini ada di antrian offline yang belum terkirim
-          const isPendingOffline = localCases.some((lc) => {
-            const lcIdLower = (lc.id_kasus || "").trim().toLowerCase();
-            const lcNamaLower = (lc.namaKorban || "").trim().toLowerCase();
-            return lcIdLower === pIdLower || (pNamaLower && lcNamaLower === pNamaLower);
+      // Pertahankan HANYA formulir yang benar-benar pending dalam antrean offline (belum terkirim ke spreadsheet)
+      for (const item of offlineQueue) {
+        if (item.type === "new_case" && item.payload) {
+          const payloadId = (item.payload.id_kasus || item.caseId || "").trim().toLowerCase();
+          const payloadNama = (item.payload.namaKorban || item.patientName || "").trim().toLowerCase();
+          const isAlreadyInSheet = (payloadId && rowIdSet.has(payloadId)) || (payloadNama && rowNameSet.has(payloadNama));
+          const isAlreadyInSynced = syncedPatients.some((sp) => {
+            const spId = (sp.id_kasus || "").trim().toLowerCase();
+            const spNama = (sp.namaKorban || "").trim().toLowerCase();
+            return (payloadId && spId === payloadId) || (payloadNama && spNama === payloadNama);
           });
-          if (isPendingOffline) {
-            syncedPatients.push(p);
+
+          if (!isAlreadyInSheet && !isAlreadyInSynced) {
+            const offlinePatient = syncPatientFromFormSubmission(item.payload as FormGHPRData, item.payload.id_kasus || item.caseId, false);
+            syncedPatients.push(offlinePatient);
+            localAdded++;
           }
         }
       }
@@ -1499,14 +1483,17 @@ export async function syncPatientsFromGoogleSheets(
         message: `Sinkronisasi selesai: ${syncedPatients.length} pasien pemantauan selaras dengan ${sourceNote || "Google Sheets"} (${sheetAdded} baru, ${sheetUpdated} diperbarui).`
       };
     } else {
-      // Jika spreadsheet masih kosong atau belum ada data, simpan state saat ini
-      saveAllPatients(latestPatients);
+      // Jika spreadsheet masih kosong atau tidak ada data yang terbaca
+      const validPatients = latestPatients.filter(
+        (p) => !DUMMY_DEMO_CASE_IDS.has((p.id_kasus || "").trim().toLowerCase()) && !dismissedSet.has((p.id_kasus || "").trim().toLowerCase())
+      );
+      saveAllPatients(validPatients);
       return {
         success: true,
-        total: latestPatients.length,
+        total: validPatients.length,
         added: localAdded,
         updated: 0,
-        message: `Daftar pemantauan lokal siap (${latestPatients.length} kasus).`
+        message: `Daftar pemantauan lokal siap (${validPatients.length} kasus).`
       };
     }
   } catch (err: any) {
