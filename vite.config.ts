@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const base = process.env.BASE_URL || '/ghpr-sananwetan/';
+  const base = process.env.BASE_URL || './';
   return {
     base,
     plugins: [
@@ -88,16 +88,7 @@ export default defineConfig(() => {
       })
     ],
     build: {
-      chunkSizeWarningLimit: 3000,
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            icons: ['lucide-react'],
-            pdf: ['jspdf', 'html2canvas']
-          }
-        }
-      }
+      chunkSizeWarningLimit: 3000
     },
     resolve: {
       alias: {
