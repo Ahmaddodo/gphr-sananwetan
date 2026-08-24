@@ -5,6 +5,16 @@ import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import { initializeAppSyncAndBustStaleCache } from './lib/cacheSyncService';
 
+// Tangani kemungkinan chunk loading error jika terjadi update versi di latar belakang
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (e) => {
+    if (e?.message && /loading chunk|failed to fetch dynamically imported module/i.test(e.message)) {
+      console.warn('Chunk loading error terdeteksi, memuat ulang...', e);
+      window.location.reload();
+    }
+  });
+}
+
 // Jalankan sinkronisasi awal data & pembersihan cache usang saat aplikasi dibuka secara aman
 try {
   initializeAppSyncAndBustStaleCache();
