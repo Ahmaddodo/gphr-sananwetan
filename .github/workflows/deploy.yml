@@ -33,6 +33,7 @@ jobs:
         run: npm run build
         env:
           VITE_WEB_APP_URL: ${{ secrets.VITE_WEB_APP_URL }}
+          BASE_URL: /ghpr-sananwetan/
 
       - name: Deploy to gh-pages branch (Branch Fallback)
         uses: peaceiris/actions-gh-pages@v4

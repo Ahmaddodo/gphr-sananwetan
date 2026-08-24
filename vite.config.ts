@@ -53,7 +53,6 @@ export default defineConfig(() => {
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
-          navigateFallback: 'index.html',
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/script\.google\.com\/macros\/s\/.*/i,

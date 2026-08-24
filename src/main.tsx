@@ -5,35 +5,48 @@ import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import { initializeAppSyncAndBustStaleCache } from './lib/cacheSyncService';
 
-// Jalankan sinkronisasi awal data & pembersihan cache usang saat aplikasi dibuka
-initializeAppSyncAndBustStaleCache();
+// Jalankan sinkronisasi awal data & pembersihan cache usang saat aplikasi dibuka secara aman
+try {
+  initializeAppSyncAndBustStaleCache();
+} catch (err) {
+  console.warn("Inisialisasi cache sync tertunda:", err);
+}
 
 // Registrasi Service Worker PWA otomatis dengan refresh instan saat versi baru terdeteksi
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  const updateSW = registerSW({
-    immediate: true,
-    onNeedRefresh() {
-      console.log('Update versi baru aplikasi GHPR terdeteksi, memuat versi terbaru secara otomatis...');
-      // Langsung aktivasi SW baru tanpa menunggu tab ditutup
-      updateSW(true);
-    },
-    onOfflineReady() {
-      console.log('Aplikasi Form GHPR siap digunakan secara offline.');
-    },
-  });
+  try {
+    const updateSW = registerSW({
+      immediate: true,
+      onNeedRefresh() {
+        console.log('Update versi baru aplikasi GHPR terdeteksi, memuat versi terbaru secara otomatis...');
+        try {
+          updateSW(true);
+        } catch (e) {}
+      },
+      onOfflineReady() {
+        console.log('Aplikasi Form GHPR siap digunakan secara offline.');
+      },
+    });
 
-  // Pengecekan versi baru secara berkala (tiap 30 menit) & saat tab kembali aktif
-  setInterval(() => {
-    if (navigator.onLine) {
-      updateSW(false);
-    }
-  }, 30 * 60 * 1000);
+    // Pengecekan versi baru secara berkala (tiap 30 menit) & saat tab kembali aktif
+    setInterval(() => {
+      if (navigator.onLine) {
+        try {
+          updateSW(false);
+        } catch (e) {}
+      }
+    }, 30 * 60 * 1000);
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && navigator.onLine) {
-      updateSW(false);
-    }
-  });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        try {
+          updateSW(false);
+        } catch (e) {}
+      }
+    });
+  } catch (swErr) {
+    console.warn("PWA Service Worker registration skipped:", swErr);
+  }
 }
 
 interface ErrorBoundaryProps {
