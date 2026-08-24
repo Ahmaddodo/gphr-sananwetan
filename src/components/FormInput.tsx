@@ -27,14 +27,14 @@ export const FormInput: React.FC<FormInputProps> = ({
   required,
   options,
   helpText,
-  showAsterisk = false,
+  showAsterisk = true,
 }) => {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
         <span>{label}</span>
         {required && showAsterisk && (
-          <span className="text-rose-500 font-bold ml-0.5 text-sm leading-none">*</span>
+          <span className="text-rose-500 font-bold ml-0.5 text-sm leading-none" title="Wajib diisi">*</span>
         )}
       </label>
       {options ? (

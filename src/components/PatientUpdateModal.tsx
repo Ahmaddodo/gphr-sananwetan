@@ -3,6 +3,7 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Clock,
   Calendar,
   User,
@@ -91,6 +92,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>("");
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>("");
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (patient) {
@@ -109,6 +111,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       setLogHariKe(patient.hariObservasiKe || 1);
       setSaveSuccessMsg("");
       setSaveErrorMsg("");
+      setValidationErrors({});
     }
   }, [patient]);
 
@@ -149,9 +152,25 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const handleSaveAllUpdates = async () => {
     if (!patient || isSaving) return;
 
-    setIsSaving(true);
     setSaveSuccessMsg("");
     setSaveErrorMsg("");
+
+    const errors: Record<string, string> = {};
+    if (!statusPemantauan) errors.statusPemantauan = "Wajib dipilih";
+    if (!statusHewan) errors.statusHewan = "Wajib dipilih";
+    if (!kondisiLuka || !kondisiLuka.trim()) errors.kondisiLuka = "Wajib pilih kondisi luka korban";
+    if (!kondisiHewanText || !kondisiHewanText.trim()) errors.kondisiHewanText = "Wajib isi catatan kondisi hewan";
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      setSaveErrorMsg("Mohon lengkapi isian bertanda bintang (*) sebelum menyimpan update pemantauan.");
+      const contentEl = document.getElementById("patient-update-modal-scroll");
+      if (contentEl) contentEl.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setValidationErrors({});
+    setIsSaving(true);
 
     let updatedLogs = [...(patient.riwayatLog || [])];
 
@@ -368,11 +387,18 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div id="patient-update-modal-scroll" className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
           {saveSuccessMsg && (
             <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3.5 text-xs text-emerald-800 flex items-center gap-2 font-bold animate-in fade-in">
               <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
               <span>{saveSuccessMsg}</span>
+            </div>
+          )}
+
+          {saveErrorMsg && (
+            <div className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-xs text-rose-800 flex items-center gap-2 font-bold animate-in fade-in">
+              <AlertTriangle size={18} className="text-rose-600 shrink-0" />
+              <span>{saveErrorMsg}</span>
             </div>
           )}
 
@@ -408,13 +434,21 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
               {/* Status Pemantauan Pasien */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Status Pemantauan Korban:
+                  <span>Status Pemantauan Korban:</span>
+                  <span className="text-rose-500 font-bold ml-1 text-sm leading-none" title="Wajib diisi">*</span>
                 </label>
                 <select
                   id="select-status-pemantauan"
                   value={statusPemantauan}
-                  onChange={(e) => setStatusPemantauan(e.target.value as StatusPemantauanPasien)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  onChange={(e) => {
+                    setStatusPemantauan(e.target.value as StatusPemantauanPasien);
+                    if (validationErrors.statusPemantauan) {
+                      setValidationErrors((prev) => ({ ...prev, statusPemantauan: "" }));
+                    }
+                  }}
+                  className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                    validationErrors.statusPemantauan ? "border-rose-400 bg-rose-50/40" : "border-slate-300"
+                  }`}
                 >
                   <option value="Dalam Pemantauan (Aktif)">Dalam Pemantauan (Aktif)</option>
                   <option value="Selesai Observasi (14 Hari)">Selesai Observasi (14 Hari - Sembuh & Aman)</option>
@@ -422,18 +456,31 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                   <option value="Dirujuk / Perawatan Lanjut">Dirujuk / Perawatan Lanjut</option>
                   <option value="Meninggal Dunia (Kasus Rabies)">Meninggal Dunia (Kasus Rabies)</option>
                 </select>
+                {validationErrors.statusPemantauan && (
+                  <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1 mt-1">
+                    <AlertTriangle size={12} /> {validationErrors.statusPemantauan}
+                  </span>
+                )}
               </div>
 
               {/* Status Hewan Observasi */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Status Hewan HPR (Observasi 14 Hari):
+                  <span>Status Hewan HPR (Observasi 14 Hari):</span>
+                  <span className="text-rose-500 font-bold ml-1 text-sm leading-none" title="Wajib diisi">*</span>
                 </label>
                 <select
                   id="select-status-hewan"
                   value={statusHewan}
-                  onChange={(e) => setStatusHewan(e.target.value as StatusHewanObservasi)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  onChange={(e) => {
+                    setStatusHewan(e.target.value as StatusHewanObservasi);
+                    if (validationErrors.statusHewan) {
+                      setValidationErrors((prev) => ({ ...prev, statusHewan: "" }));
+                    }
+                  }}
+                  className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                    validationErrors.statusHewan ? "border-rose-400 bg-rose-50/40" : "border-slate-300"
+                  }`}
                 >
                   <option value="Sehat / Normal (Observasi)">Sehat / Normal (Dalam Observasi)</option>
                   <option value="Mati dalam 14 Hari">Mati dalam 14 Hari (Waspada Rabies)</option>
@@ -441,6 +488,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                   <option value="Positif Rabies (FAT Lab)">Positif Rabies (Hasil Uji Lab FAT)</option>
                   <option value="Hewan Dieliminasi">Hewan Dieliminasi</option>
                 </select>
+                {validationErrors.statusHewan && (
+                  <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1 mt-1">
+                    <AlertTriangle size={12} /> {validationErrors.statusHewan}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -471,14 +523,22 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Kondisi Luka Korban Saat Ini:
+                  <span>Kondisi Luka Korban Saat Ini:</span>
+                  <span className="text-rose-500 font-bold ml-1 text-sm leading-none" title="Wajib diisi">*</span>
                 </label>
                 <div className="space-y-1.5">
                   <select
                     id="select-kondisi-luka-modal"
                     value={kondisiLuka}
-                    onChange={(e) => setKondisiLuka(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    onChange={(e) => {
+                      setKondisiLuka(e.target.value);
+                      if (validationErrors.kondisiLuka) {
+                        setValidationErrors((prev) => ({ ...prev, kondisiLuka: "" }));
+                      }
+                    }}
+                    className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                      validationErrors.kondisiLuka ? "border-rose-400 bg-rose-50/40" : "border-slate-300"
+                    }`}
                   >
                     <option value="">-- Pilih Kondisi Luka --</option>
                     <option value="Kategori 1">Kategori 1 (Menyentuh/Menjilat Kulit Utuh / Luka Sangat Ringan)</option>
@@ -486,6 +546,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                     <option value="Kategori 3">Kategori 3 (Luka Robek Dalam / Multiple / Mukosa / Berdarah Aktif)</option>
                     <option value="Kategori 4">Kategori 4 (Gigitan Risiko Sangat Tinggi / Leher, Muka, Jari)</option>
                   </select>
+                  {validationErrors.kondisiLuka && (
+                    <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
+                      <AlertTriangle size={12} /> {validationErrors.kondisiLuka}
+                    </span>
+                  )}
                   {/* Quick Select Chips */}
                   <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
                     {[
@@ -497,7 +562,12 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                       <button
                         key={opt}
                         type="button"
-                        onClick={() => setKondisiLuka(opt)}
+                        onClick={() => {
+                          setKondisiLuka(opt);
+                          if (validationErrors.kondisiLuka) {
+                            setValidationErrors((prev) => ({ ...prev, kondisiLuka: "" }));
+                          }
+                        }}
                         className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition cursor-pointer ${
                           kondisiLuka === opt || kondisiLuka.startsWith(opt)
                             ? "bg-blue-600 text-white border-blue-600 shadow-xs"
@@ -513,16 +583,29 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Catatan Kondisi Hewan:
+                  <span>Catatan Kondisi Hewan:</span>
+                  <span className="text-rose-500 font-bold ml-1 text-sm leading-none" title="Wajib diisi">*</span>
                 </label>
                 <div className="space-y-1.5">
                   <input
                     type="text"
                     value={kondisiHewanText}
-                    onChange={(e) => setKondisiHewanText(e.target.value)}
+                    onChange={(e) => {
+                      setKondisiHewanText(e.target.value);
+                      if (validationErrors.kondisiHewanText) {
+                        setValidationErrors((prev) => ({ ...prev, kondisiHewanText: "" }));
+                      }
+                    }}
                     placeholder="Contoh: Anjing sehat diikat, makan normal"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className={`w-full rounded-xl border bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                      validationErrors.kondisiHewanText ? "border-rose-400 bg-rose-50/40" : "border-slate-300"
+                    }`}
                   />
+                  {validationErrors.kondisiHewanText && (
+                    <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
+                      <AlertTriangle size={12} /> {validationErrors.kondisiHewanText}
+                    </span>
+                  )}
                   {/* Quick Select Chips Hewan */}
                   <div className="flex flex-wrap gap-1 items-center pt-0.5">
                     <span className="text-[10px] text-slate-400 font-semibold mr-0.5">Pilihan:</span>
@@ -535,7 +618,12 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                       <button
                         key={opt}
                         type="button"
-                        onClick={() => setKondisiHewanText(opt)}
+                        onClick={() => {
+                          setKondisiHewanText(opt);
+                          if (validationErrors.kondisiHewanText) {
+                            setValidationErrors((prev) => ({ ...prev, kondisiHewanText: "" }));
+                          }
+                        }}
                         className={`text-[10px] px-2 py-0.5 rounded-md border font-medium transition cursor-pointer ${
                           kondisiHewanText.toLowerCase() === opt.toLowerCase()
                             ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"

@@ -45,7 +45,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
   isEditing = false,
   editingCaseId = null,
 }) => {
-  const showAsterisk = Boolean(isEditing || editingCaseId);
+  const showAsterisk = true;
   const [officerProfiles, setOfficerProfiles] = useState<UserAccessProfile[]>(() => getOfficerProfiles());
   const [activeUser, setActiveUser] = useState<UserAccessProfile | null>(() => getActiveUserProfile());
 

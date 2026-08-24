@@ -760,58 +760,64 @@ export default function App() {
   };
 
   const validateStep = (currentStep: number): boolean => {
-    // Aturan Khusus: Pada form input pasien baru (!editingCaseId), semua kolom diperbolehkan kosong dan tetap bisa lanjut/submit
-    if (!editingCaseId) {
-      setErrors({});
-      return true;
-    }
-
     const errs: FormErrors = {};
 
     if (currentStep === 1) {
-      if (!formData.waktuKejadian) errs.waktuKejadian = "Wajib isi";
-      if (!formData.alamatKejadian) errs.alamatKejadian = "Wajib isi";
+      if (!formData.waktuKejadian?.trim()) errs.waktuKejadian = "Wajib diisi";
+      if (!formData.sumberInfo?.trim()) errs.sumberInfo = "Wajib diisi";
+      if (!formData.alamatKejadian?.trim()) errs.alamatKejadian = "Wajib diisi";
+      
       const kel = getFinalKelurahan();
-      if (!formData.kelurahan) errs.kelurahan = "Wajib isi";
-      else if (isOther(formData.kelurahan) && !kel) errs.kelurahanCustom = "Wajib isi manual";
+      if (!formData.kelurahan?.trim()) {
+        errs.kelurahan = "Wajib diisi";
+      } else if (isOther(formData.kelurahan) && !kel) {
+        errs.kelurahanCustom = "Wajib ketik kelurahan manual";
+      }
 
-      if (!formData.kecamatan) errs.kecamatan = "Wajib isi";
-      else if (isOther(formData.kecamatan) && !getFinalKecamatan()) errs.kecamatanCustom = "Wajib isi kecamatan manual";
+      const kec = getFinalKecamatan();
+      if (!formData.kecamatan?.trim()) {
+        errs.kecamatan = "Wajib diisi";
+      } else if (isOther(formData.kecamatan) && !kec) {
+        errs.kecamatanCustom = "Wajib ketik kecamatan manual";
+      }
 
-      if (!formData.kabupatenKota) errs.kabupatenKota = "Wajib isi";
-      else if (isOther(formData.kabupatenKota) && !getFinalKabKota()) errs.kabupatenKotaCustom = "Wajib isi kab/kota manual";
+      const kab = getFinalKabKota();
+      if (!formData.kabupatenKota?.trim()) {
+        errs.kabupatenKota = "Wajib diisi";
+      } else if (isOther(formData.kabupatenKota) && !kab) {
+        errs.kabupatenKotaCustom = "Wajib ketik kab/kota manual";
+      }
 
-      if (!formData.provinsi) errs.provinsi = "Wajib isi";
-      if (!formData.sumberInfo) errs.sumberInfo = "Wajib isi";
-      if (!formData.kronologi) errs.kronologi = "Wajib isi";
+      if (!formData.provinsi?.trim()) errs.provinsi = "Wajib diisi";
+      if (!formData.kronologi?.trim()) errs.kronologi = "Wajib diisi kronologi";
     }
 
     if (currentStep === 2) {
-      if (!formData.spesiesHPR) errs.spesiesHPR = "Wajib isi";
-      if (formData.spesiesHPR === "Lainnya" && !formData.spesiesLain) errs.spesiesLain = "Sebutkan spesies";
-      if (!formData.jkHewan) errs.jkHewan = "Wajib isi";
-      if (!formData.metodePelihara) errs.metodePelihara = "Wajib isi";
-      if (!formData.kondisiHewan) errs.kondisiHewan = "Wajib isi";
-      if (!formData.riwayatVaksin) errs.riwayatVaksin = "Wajib isi";
-      if (formData.riwayatVaksin === "Ya" && !formData.tanggalVaksin) errs.tanggalVaksin = "Wajib isi tanggal vaksin";
+      if (!formData.spesiesHPR?.trim()) errs.spesiesHPR = "Wajib pilih spesies";
+      if (formData.spesiesHPR === "Lainnya" && !formData.spesiesLain?.trim()) errs.spesiesLain = "Wajib sebutkan spesies";
+      if (!formData.jkHewan?.trim()) errs.jkHewan = "Wajib pilih jenis kelamin";
+      if (!formData.metodePelihara?.trim()) errs.metodePelihara = "Wajib pilih metode pemeliharaan";
+      if (!formData.kondisiHewan?.trim()) errs.kondisiHewan = "Wajib pilih kondisi hewan";
+      if (!formData.riwayatVaksin?.trim()) errs.riwayatVaksin = "Wajib pilih riwayat vaksin";
+      if (formData.riwayatVaksin === "Ya" && !formData.tanggalVaksin?.trim()) errs.tanggalVaksin = "Wajib isi tanggal vaksin";
     }
 
     if (currentStep === 3) {
-      if (!formData.namaKorban) errs.namaKorban = "Wajib isi";
-      if (!formData.umurKorban) errs.umurKorban = "Wajib isi";
-      if (!formData.alamatKorban) errs.alamatKorban = "Wajib isi";
-      if (!formData.jkKorban) errs.jkKorban = "Wajib isi";
-      if (!formData.kondisiLuka) errs.kondisiLuka = "Wajib isi";
-      if (!formData.tindakanHPR) errs.tindakanHPR = "Wajib isi";
-      if (!formData.tindakanKasus) errs.tindakanKasus = "Wajib isi";
+      if (!formData.namaKorban?.trim()) errs.namaKorban = "Wajib isi nama korban";
+      if (!formData.umurKorban?.toString().trim()) errs.umurKorban = "Wajib isi umur korban";
+      if (!formData.alamatKorban?.trim()) errs.alamatKorban = "Wajib isi alamat korban";
+      if (!formData.jkKorban?.trim()) errs.jkKorban = "Wajib pilih jenis kelamin korban";
+      if (!formData.kondisiLuka?.trim()) errs.kondisiLuka = "Wajib pilih kondisi luka";
+      if (!formData.tindakanHPR?.trim()) errs.tindakanHPR = "Wajib isi tindakan terhadap HPR";
+      if (!formData.tindakanKasus?.trim()) errs.tindakanKasus = "Wajib isi tindakan terhadap kasus";
     }
 
     if (currentStep === 4) {
-      if (!formData.rekomendasi) errs.rekomendasi = "Wajib isi";
-      if (!formData.timKetua) errs.timKetua = "Wajib isi";
-      if (!formData.tanggalPelaksanaan) errs.tanggalPelaksanaan = "Wajib isi";
-      if (!formData.pelaksanaNama) errs.pelaksanaNama = "Wajib isi";
-      if (!formData.pelaksanaNIP) errs.pelaksanaNIP = "Wajib isi";
+      if (!formData.rekomendasi?.trim()) errs.rekomendasi = "Wajib isi rekomendasi tindak lanjut";
+      if (!formData.timKetua?.trim()) errs.timKetua = "Wajib isi ketua tim";
+      if (!formData.tanggalPelaksanaan?.trim()) errs.tanggalPelaksanaan = "Wajib isi tanggal pelaksanaan";
+      if (!formData.pelaksanaNama?.trim()) errs.pelaksanaNama = "Wajib isi nama pelaksana";
+      if (!formData.pelaksanaNIP?.trim()) errs.pelaksanaNIP = "Wajib isi NIP pelaksana";
     }
 
     setErrors(errs);
@@ -866,21 +872,20 @@ export default function App() {
 
   const handleSubmit = async () => {
     setSubmitError("");
-    if (editingCaseId) {
-      let isValid = true;
-      for (let s = 1; s <= 4; s++) {
-        if (!validateStep(s)) {
-          isValid = false;
-          setStep(s);
-          setSubmitError(
-            `Mohon lengkapi isian bertanda bintang (*) pada Langkah ${s} (${stepsList[s - 1].title}) sebelum menyimpan.`
-          );
-          window.scrollTo({ top: 0, behavior: "smooth" });
-          break;
-        }
+    
+    let isValid = true;
+    for (let s = 1; s <= 4; s++) {
+      if (!validateStep(s)) {
+        isValid = false;
+        setStep(s);
+        setSubmitError(
+          `Mohon lengkapi isian bertanda bintang (*) pada Langkah ${s} (${stepsList[s - 1].title}) sebelum menyimpan.`
+        );
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        break;
       }
-      if (!isValid) return;
     }
+    if (!isValid) return;
 
     const targetUrl = webAppUrl ? webAppUrl.trim() : "";
     if (!targetUrl) {
@@ -1319,8 +1324,10 @@ export default function App() {
                     {React.createElement(currentStepItem.icon, { size: 18, className: "text-blue-600 shrink-0" })}
                     Langkah {step}: {currentStepItem.title}
                   </h2>
-                  <p className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                    {editingCaseId ? "Lengkapi bidang berkode (*) sebelum melanjutkan" : "Input Pasien Baru GHPR - Silakan lengkapi data"}
+                  <p className="text-[11px] sm:text-xs font-semibold text-slate-500 tracking-wide mt-0.5">
+                    {editingCaseId
+                      ? "Mode Edit Kasus — Lengkapi seluruh isian bertanda bintang (*) sebelum menyimpan pembaruan."
+                      : "Formulir Surveilans PE GHPR — Lengkapi isian bertanda bintang (*)."}
                   </p>
                 </div>
                 <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1">
