@@ -17,7 +17,8 @@ import {
   Loader2,
   KeyRound,
   Users,
-  Github
+  Github,
+  FilePlus
 } from "lucide-react";
 import {
   ConnectedSheetConfig,
@@ -31,14 +32,16 @@ import {
 import { OfficerAccountManager } from "./OfficerAccountManager";
 import { GitHubSyncManager } from "./GitHubSyncManager";
 import { AdminDeviceSyncPanel } from "./AdminDeviceSyncPanel";
+import { AdminFlexiblePatientForm } from "./AdminFlexiblePatientForm";
 
 interface GoogleSheetsManagerProps {
   sheetConfig: ConnectedSheetConfig | null;
   setSheetConfig: (config: ConnectedSheetConfig | null) => void;
   webAppUrl: string;
   setWebAppUrl: (url: string) => void;
-  initialTab?: "accounts" | "sync" | "sheets" | "github";
+  initialTab?: "accounts" | "sync" | "sheets" | "github" | "flexible_form";
   onAccountsUpdated?: () => void;
+  onSwitchToMonitoring?: () => void;
 }
 
 export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
@@ -47,9 +50,10 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
   webAppUrl,
   setWebAppUrl,
   initialTab = "accounts",
-  onAccountsUpdated
+  onAccountsUpdated,
+  onSwitchToMonitoring
 }) => {
-  const [activeAdminTab, setActiveAdminTab] = useState<"accounts" | "sync" | "sheets" | "github">(initialTab);
+  const [activeAdminTab, setActiveAdminTab] = useState<"accounts" | "sync" | "sheets" | "github" | "flexible_form">(initialTab);
   const [showAppsScriptModal, setShowAppsScriptModal] = useState(false);
 
   useEffect(() => {
@@ -323,6 +327,22 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 flex-wrap">
         <button
           type="button"
+          onClick={() => setActiveAdminTab("flexible_form")}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeAdminTab === "flexible_form"
+              ? "bg-emerald-600 text-white shadow-xs"
+              : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200"
+          }`}
+        >
+          <FilePlus size={15} />
+          <span>Input Pasien Baru (Salinan Form Bebas)</span>
+          <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded">
+            Tanpa Bintang *
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveAdminTab("accounts")}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeAdminTab === "accounts"
@@ -352,7 +372,7 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
           onClick={() => setActiveAdminTab("sheets")}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeAdminTab === "sheets"
-              ? "bg-emerald-600 text-white shadow-xs"
+              ? "bg-teal-700 text-white shadow-xs"
               : "bg-slate-100 hover:bg-slate-200 text-slate-700"
           }`}
         >
@@ -373,6 +393,14 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
           <span>Sinkronisasi Repositori GitHub</span>
         </button>
       </div>
+
+      {/* TAB 0: SALINAN FORMULIR PE GHPR (INPUT PASIEN BARU FLEKSIBEL - TANPA BINTANG) */}
+      {activeAdminTab === "flexible_form" && (
+        <AdminFlexiblePatientForm
+          webAppUrl={webAppUrl}
+          onSwitchToMonitoring={onSwitchToMonitoring}
+        />
+      )}
 
       {/* TAB 1: MANAJEMEN AKUN PETUGAS */}
       {activeAdminTab === "accounts" && (

@@ -24,6 +24,7 @@ interface FormStepsProps {
   isAdminMode?: boolean;
   isEditing?: boolean;
   editingCaseId?: string | null;
+  showAsterisk?: boolean;
 }
 
 export const FormSteps: React.FC<FormStepsProps> = ({
@@ -44,8 +45,8 @@ export const FormSteps: React.FC<FormStepsProps> = ({
   isAdminMode = false,
   isEditing = false,
   editingCaseId = null,
+  showAsterisk = true,
 }) => {
-  const showAsterisk = true;
   const [officerProfiles, setOfficerProfiles] = useState<UserAccessProfile[]>(() => getOfficerProfiles());
   const [activeUser, setActiveUser] = useState<UserAccessProfile | null>(() => getActiveUserProfile());
 

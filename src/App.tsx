@@ -266,7 +266,7 @@ export default function App() {
     return "monitoring";
   });
 
-  const [adminSettingsSubTab, setAdminSettingsSubTab] = useState<"accounts" | "sheets" | "github">("accounts");
+  const [adminSettingsSubTab, setAdminSettingsSubTab] = useState<"accounts" | "sync" | "sheets" | "github" | "flexible_form">("flexible_form");
   const [sheetConfig, setSheetConfig] = useState<ConnectedSheetConfig>(() => getSavedSheetConfig());
 
   const [currentUser, setCurrentUser] = useState<UserAccessProfile | null>(() => {
@@ -502,8 +502,8 @@ export default function App() {
       setTimeout(() => setResetSuccessMessage(""), 4000);
       return;
     }
-    confirmResetForm();
-    handleSwitchTab("form");
+    setAdminSettingsSubTab("flexible_form");
+    handleSwitchTab("settings");
   };
 
   const handleOpenPatientFullFormEdit = (patient: PatientMonitoringItem) => {
@@ -1293,6 +1293,7 @@ export default function App() {
                 const refreshed = getActiveUserProfile();
                 setCurrentUser(refreshed);
               }}
+              onSwitchToMonitoring={() => handleSwitchTab("monitoring")}
             />
           </div>
         </main>
