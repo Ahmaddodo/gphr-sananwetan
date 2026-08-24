@@ -14,15 +14,26 @@
     <meta name="msapplication-TileColor" content="#16a34a" />
     <meta name="msapplication-navbutton-color" content="#16a34a" />
     <meta name="format-detection" content="telephone=no" />
-    <link rel="manifest" href="/ghpr-sananwetan/manifest.webmanifest" />
-    <link rel="icon" type="image/svg+xml" href="/ghpr-sananwetan/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/ghpr-sananwetan/pwa-192x192.png" />
-    <link rel="apple-touch-icon" href="/ghpr-sananwetan/pwa-192x192.png" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./pwa-192x192.png" />
+    <link rel="apple-touch-icon" href="./pwa-192x192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Dancing+Script:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script type="module" crossorigin src="/ghpr-sananwetan/assets/index-BThod5Vg.js"></script>
+    <script>
+      (function(l) {
+        if (l.search[1] === '/' ) {
+          var decoded = l.search.slice(1).split('&').map(function(s) { 
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null,
+              l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location))
+    </script>
+    <script type="module" crossorigin src="/ghpr-sananwetan/assets/index-CXTAZCVP.js"></script>
     <link rel="modulepreload" crossorigin href="/ghpr-sananwetan/assets/icons-DPFF70qq.js">
     <link rel="modulepreload" crossorigin href="/ghpr-sananwetan/assets/vendor--odDRqdZ.js">
     <link rel="modulepreload" crossorigin href="/ghpr-sananwetan/assets/pdf-C4slK8D_.js">
