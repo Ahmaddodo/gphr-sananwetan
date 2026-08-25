@@ -278,12 +278,27 @@ export default function App() {
   // Mode Form Fleksibel (Revisi tanpa tanda bintang *, seluruh isian boleh dikosongi untuk input pasien baru)
   const [isFlexibleMode, setIsFlexibleMode] = useState<boolean>(() => {
     try {
+      const stored = localStorage.getItem("ghpr_form_flexible_mode");
+      if (stored !== null) return stored === "true";
+      const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      if (params && (params.get("flexible") === "1" || params.get("mode") === "flexible" || params.get("user") === "admin")) return true;
       const user = getActiveUserProfile();
-      return !!(user && (user.username.toLowerCase() === "admin" || user.role === "admin" || user.isKoordinator));
+      if (user && (user.username.toLowerCase() === "admin" || user.role === "admin" || user.isKoordinator)) return true;
+      return true; // Default aktif untuk mempermudah perekaman pasien baru tanpa terhalang bintang merah
     } catch {
-      return false;
+      return true;
     }
   });
+
+  const toggleFlexibleMode = (val?: boolean) => {
+    const nextVal = typeof val === "boolean" ? val : !isFlexibleMode;
+    setIsFlexibleMode(nextVal);
+    try {
+      localStorage.setItem("ghpr_form_flexible_mode", String(nextVal));
+    } catch (e) {}
+    setErrors({});
+    setSubmitError("");
+  };
 
   // Notifikasi Sesi Berakhir Otomatis (Inactivity Timeout 1 Jam)
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string>(() => {
@@ -1350,8 +1365,8 @@ export default function App() {
             <div className={`${
               isAdminMode ? "lg:col-span-8" : "w-full"
             } flex flex-col space-y-4`}>
-              {/* Banner Mode Form Input Pasien Baru (Revisi Bebas Bintang) untuk Akses Admin */}
-              {(currentUser.username.toLowerCase() === "admin" || currentUser.role === "admin" || currentUser.isKoordinator) && !editingCaseId && (
+              {/* Banner Mode Form Input Pasien Baru (Revisi Bebas Bintang) untuk Akses Admin / Publik */}
+              {!editingCaseId && (
                 <div className="rounded-2xl border border-emerald-300/80 bg-linear-to-r from-emerald-900 via-teal-900 to-slate-900 p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
@@ -1363,7 +1378,7 @@ export default function App() {
                           Salinan Formulir PE GHPR (Input Pasien Baru)
                         </span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-slate-950">
-                          Akses Admin
+                          {currentUser ? "Akses " + (currentUser.nama || currentUser.username) : "Akses Form Publik"}
                         </span>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           isFlexibleMode
@@ -1384,11 +1399,7 @@ export default function App() {
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsFlexibleMode(!isFlexibleMode);
-                        setErrors({});
-                        setSubmitError("");
-                      }}
+                      onClick={() => toggleFlexibleMode()}
                       className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
                         isFlexibleMode
                           ? "bg-emerald-600 hover:bg-emerald-700 text-white"

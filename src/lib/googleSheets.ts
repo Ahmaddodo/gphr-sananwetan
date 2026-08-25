@@ -176,43 +176,55 @@ export const SHEET_HEADERS = [
 ];
 
 export function mapPayloadToRowValues(payload: SubmissionPayload): (string | number)[] {
+  const pAny = payload as any;
+  const kel = payload.kelurahan_final || payload.kelurahan || "Sananwetan";
+  const kec = payload.kecamatan_final || payload.kecamatan || "Sananwetan";
+  const kab = payload.kabupatenKota_final || payload.kabupatenKota || "Kota Blitar";
+  const spesies = payload.spesies_final || payload.spesiesHPR || "Anjing";
+  const namaKorban = payload.namaKorban || pAny.namaPasien || "-";
+  const noHpKorban = payload.noHpKorban || pAny.noHpPasien || pAny.kontakKorban || "-";
+  const umurKorban = payload.umurKorban ? `${payload.umurKorban} Tahun` : "-";
+  const umurHewan = payload.umurHewan ? `${payload.umurHewan} ${payload.satuanUmur || "Tahun"}`.trim() : "-";
+  const waktuKejadian = payload.waktuKejadian || "-";
+  const tglPelaksanaan = payload.tanggalPelaksanaan || new Date().toISOString().slice(0, 10);
+
   return [
     payload.id_kasus || "",
     payload.timestamp_submit || new Date().toISOString(),
-    payload.waktuKejadian || "",
-    payload.alamatKejadian || "",
-    payload.kelurahan_final || payload.kelurahan || "",
-    payload.kecamatan_final || payload.kecamatan || "",
-    payload.kabupatenKota_final || payload.kabupatenKota || "",
+    waktuKejadian,
+    payload.alamatKejadian || "-",
+    kel,
+    kec,
+    kab,
     payload.provinsi || "Jawa Timur",
-    payload.sumberInfo || "",
-    payload.kronologi || "",
-    payload.spesies_final || payload.spesiesHPR || "",
+    payload.sumberInfo || "-",
+    payload.kronologi || "-",
+    spesies,
     payload.ras || "-",
-    payload.jkHewan || "",
-    `${payload.umurHewan || "0"} ${payload.satuanUmur || "Tahun"}`.trim(),
-    payload.metodePelihara || "",
-    payload.kondisiHewan || "",
-    payload.riwayatVaksin || "",
+    payload.jkHewan || "-",
+    umurHewan,
+    payload.metodePelihara || "-",
+    payload.kondisiHewan || "-",
+    payload.riwayatVaksin || "-",
     payload.tanggalVaksin || "-",
-    payload.pemilikHewan || "",
-    payload.alamatPemilik || "",
-    payload.kontakPemilik || "",
-    payload.namaKorban || "",
-    payload.noHpKorban || payload.kontakPemilik || "",
-    payload.umurKorban || "",
-    payload.alamatKorban || "",
-    payload.jkKorban || "",
-    payload.kondisiLuka || "",
-    payload.lokasiLuka || "",
-    payload.pertolonganPertama || "",
-    payload.tindakanKasus || "",
-    payload.rekomendasi || "",
-    payload.timKetua || "",
-    payload.timAnggota || "",
-    payload.tanggalPelaksanaan || "",
-    payload.pelaksanaNama || "",
-    payload.pelaksanaNIP || ""
+    payload.pemilikHewan || "-",
+    payload.alamatPemilik || "-",
+    payload.kontakPemilik || "-",
+    namaKorban,
+    noHpKorban,
+    umurKorban,
+    payload.alamatKorban || "-",
+    payload.jkKorban || "-",
+    payload.kondisiLuka || "Kategori 1",
+    payload.lokasiLuka || "-",
+    payload.pertolonganPertama || "-",
+    payload.tindakanKasus || "-",
+    payload.rekomendasi || "-",
+    payload.timKetua || "-",
+    payload.timAnggota || "-",
+    tglPelaksanaan,
+    payload.pelaksanaNama || "-",
+    payload.pelaksanaNIP || "-"
   ];
 }
 
@@ -1001,17 +1013,15 @@ function prosesDataMasuk(data, action) {
     if (!data || typeof data !== "object") data = {};
     data.id_kasus = data.id_kasus || ("GHPR-" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd-HHmmss"));
     data.timestamp_submit = data.timestamp_submit || Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
-    data.kelurahan_final = data.kelurahan_final || data.kelurahanCustom || data.kelurahan || "-";
-    data.kecamatan_final = data.kecamatan_final || data.kecamatanCustom || data.kecamatan || "-";
+    data.kelurahan_final = data.kelurahan_final || data.kelurahanCustom || data.kelurahan || "Sananwetan";
+    data.kecamatan_final = data.kecamatan_final || data.kecamatanCustom || data.kecamatan || "Sananwetan";
     data.kabupatenKota_final = data.kabupatenKota_final || data.kabupatenKotaCustom || data.kabupatenKota || "Kota Blitar";
     data.provinsi = data.provinsi || "Jawa Timur";
-    data.spesies_final = data.spesies_final || (data.spesiesHPR === "Lainnya" ? data.spesiesLain : data.spesiesHPR) || data.spesiesHPR || "-";
+    data.spesies_final = data.spesies_final || (data.spesiesHPR === "Lainnya" ? data.spesiesLain : data.spesiesHPR) || data.spesiesHPR || "Anjing";
     data.umurHewan_formatted = data.umurHewan ? (data.umurHewan + " " + (data.satuanUmur || "Tahun")) : "-";
     data.umurKorban_formatted = data.umurKorban ? (data.umurKorban + " Tahun") : "-";
 
-    var newRow = [];
-
-    // JIKA SHEET MASIH KOSONG: Buat 35 Header Resmi
+    // JIKA SHEET MASIH KOSONG: Buat 36 Header Resmi
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(OFFICIAL_HEADERS);
       var headerRange = sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length);
@@ -1023,71 +1033,189 @@ function prosesDataMasuk(data, action) {
       sheet.setFrozenRows(1);
     }
 
-    var numCols = sheet.getLastColumn();
+    // Pastikan seluruh 36 header resmi ada di baris 1
+    var numCols = Math.max(sheet.getLastColumn(), OFFICIAL_HEADERS.length);
+    if (sheet.getMaxColumns() < numCols) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), numCols - sheet.getMaxColumns());
+    }
+
     var existingHeaders = sheet.getRange(1, 1, 1, numCols).getValues()[0];
+    var needHeaderRepair = false;
 
-    for (var colIdx = 0; colIdx < existingHeaders.length; colIdx++) {
-      var rawHeaderText = String(existingHeaders[colIdx] || "");
-      // Bersihkan nomor awalan seperti '1. ', '2) ', tanda baca, dan spasi berlebih
-      var headerText = rawHeaderText.replace(/^\s*\d+[\.\)\-]\s*/, "").replace(/[:\*]/g, "").toLowerCase().trim();
-      var targetFieldKey = FIELD_MAP[headerText] || FIELD_MAP[rawHeaderText.toLowerCase().trim()];
+    // Periksa apakah ada header resmi yang masih kosong di baris 1
+    for (var hIdx = 0; hIdx < OFFICIAL_HEADERS.length; hIdx++) {
+      if (!existingHeaders[hIdx] || String(existingHeaders[hIdx]).trim() === "") {
+        existingHeaders[hIdx] = OFFICIAL_HEADERS[hIdx];
+        needHeaderRepair = true;
+      }
+    }
 
-      var val = "";
-      if (targetFieldKey && data[targetFieldKey] !== undefined && data[targetFieldKey] !== null && data[targetFieldKey] !== "") {
-        val = String(data[targetFieldKey]);
-      } else if (data[rawHeaderText] !== undefined && data[rawHeaderText] !== null && data[rawHeaderText] !== "") {
-        val = String(data[rawHeaderText]);
-      } else if (data[headerText] !== undefined && data[headerText] !== null && data[headerText] !== "") {
-        val = String(data[headerText]);
-      } else {
-        // Pencarian pintar berdasarkan kata kunci header
-        if (headerText.indexOf("kasus") !== -1 || headerText === "id" || headerText === "no") val = data.id_kasus;
-        else if (headerText.indexOf("submit") !== -1 || headerText.indexOf("timestamp") !== -1) val = data.timestamp_submit;
-        else if ((headerText.indexOf("kejadian") !== -1 || headerText.indexOf("gigitan") !== -1) && (headerText.indexOf("waktu") !== -1 || headerText.indexOf("tgl") !== -1 || headerText.indexOf("tanggal") !== -1)) val = data.waktuKejadian;
-        else if (headerText.indexOf("alamat kejadian") !== -1 || headerText.indexOf("lokasi kejadian") !== -1 || headerText.indexOf("tempat kejadian") !== -1) val = data.alamatKejadian;
-        else if (headerText.indexOf("kelurahan") !== -1 || headerText.indexOf("desa") !== -1 || headerText.indexOf("wilayah") !== -1) val = data.kelurahan_final || data.kelurahan;
-        else if (headerText.indexOf("kecamatan") !== -1) val = data.kecamatan_final || data.kecamatan;
-        else if (headerText.indexOf("kabupaten") !== -1 || headerText.indexOf("kota") !== -1) val = data.kabupatenKota_final || data.kabupatenKota;
-        else if (headerText.indexOf("provinsi") !== -1) val = data.provinsi;
-        else if (headerText.indexOf("sumber") !== -1) val = data.sumberInfo;
-        else if (headerText.indexOf("kronologi") !== -1 || headerText.indexOf("uraian") !== -1) val = data.kronologi;
-        else if (headerText.indexOf("spesies") !== -1 || headerText.indexOf("jenis hewan") !== -1 || headerText.indexOf("hewan penggigit") !== -1) val = data.spesies_final || data.spesiesHPR;
-        else if (headerText.indexOf("ras") !== -1) val = data.ras;
-        else if (headerText.indexOf("kelamin hewan") !== -1 || headerText.indexOf("jk hewan") !== -1) val = data.jkHewan;
-        else if (headerText.indexOf("umur hewan") !== -1 || headerText.indexOf("usia hewan") !== -1) val = data.umurHewan_formatted || data.umurHewan;
-        else if (headerText.indexOf("pelihara") !== -1) val = data.metodePelihara;
-        else if (headerText.indexOf("kondisi hewan") !== -1 || headerText.indexOf("keadaan hewan") !== -1 || headerText.indexOf("status hewan") !== -1) val = data.kondisiHewan;
-        else if (headerText.indexOf("riwayat vaksin") !== -1 || (headerText.indexOf("vaksinasi") !== -1 && headerText.indexOf("tgl") === -1 && headerText.indexOf("tanggal") === -1)) val = data.riwayatVaksin;
-        else if (headerText.indexOf("tanggal vaksin") !== -1 || headerText.indexOf("tgl vaksin") !== -1) val = data.tanggalVaksin;
-        else if (headerText.indexOf("nama pemilik") !== -1 || (headerText.indexOf("pemilik") !== -1 && headerText.indexOf("alamat") === -1 && headerText.indexOf("kontak") === -1 && headerText.indexOf("hp") === -1)) val = data.pemilikHewan;
-        else if (headerText.indexOf("alamat pemilik") !== -1) val = data.alamatPemilik;
-        else if ((headerText.indexOf("pemilik") !== -1 && (headerText.indexOf("kontak") !== -1 || headerText.indexOf("hp") !== -1 || headerText.indexOf("telepon") !== -1))) val = data.kontakPemilik;
-        else if (headerText.indexOf("nama korban") !== -1 || headerText.indexOf("nama pasien") !== -1 || headerText.indexOf("nama lengkap") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && headerText.indexOf("alamat") === -1 && headerText.indexOf("umur") === -1 && headerText.indexOf("usia") === -1 && headerText.indexOf("kelamin") === -1 && headerText.indexOf("jk") === -1 && headerText.indexOf("hp") === -1 && headerText.indexOf("kontak") === -1 && headerText.indexOf("telepon") === -1)) val = data.namaKorban;
-        else if (headerText.indexOf("hp korban") !== -1 || headerText.indexOf("hp pasien") !== -1 || headerText.indexOf("no hp korban") !== -1 || headerText.indexOf("no hp pasien") !== -1 || headerText.indexOf("kontak korban") !== -1 || headerText.indexOf("kontak pasien") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && (headerText.indexOf("hp") !== -1 || headerText.indexOf("kontak") !== -1 || headerText.indexOf("telepon") !== -1 || headerText.indexOf("wa") !== -1))) val = data.noHpKorban || data.kontakKorban;
-        else if (headerText.indexOf("umur korban") !== -1 || headerText.indexOf("usia korban") !== -1 || headerText.indexOf("umur pasien") !== -1 || headerText.indexOf("usia pasien") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && (headerText.indexOf("umur") !== -1 || headerText.indexOf("usia") !== -1))) val = data.umurKorban_formatted || data.umurKorban;
-        else if (headerText.indexOf("alamat korban") !== -1 || headerText.indexOf("alamat pasien") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && headerText.indexOf("alamat") !== -1)) val = data.alamatKorban;
-        else if (headerText.indexOf("kelamin korban") !== -1 || headerText.indexOf("jk korban") !== -1 || headerText.indexOf("kelamin pasien") !== -1 || headerText.indexOf("jk pasien") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && (headerText.indexOf("kelamin") !== -1 || headerText.indexOf("jk") !== -1))) val = data.jkKorban;
-        else if (headerText.indexOf("luka") !== -1 && headerText.indexOf("lokasi") === -1 && headerText.indexOf("letak") === -1 && headerText.indexOf("bagian") === -1 && headerText.indexOf("area") === -1) val = data.kondisiLuka;
-        else if (headerText.indexOf("lokasi luka") !== -1 || headerText.indexOf("letak luka") !== -1 || headerText.indexOf("bagian tubuh") !== -1 || headerText.indexOf("area luka") !== -1) val = data.lokasiLuka;
-        else if (headerText.indexOf("pertolongan") !== -1 || headerText.indexOf("cuci luka") !== -1 || headerText.indexOf("p3k") !== -1) val = data.pertolonganPertama;
-        else if (headerText.indexOf("tindakan kasus") !== -1 || headerText.indexOf("tindakan terhadap korban") !== -1 || headerText.indexOf("tindakan korban") !== -1 || headerText.indexOf("tindakan pasien") !== -1 || headerText.indexOf("tindakan medis") !== -1 || headerText === "tindakan") val = data.tindakanKasus;
-        else if (headerText.indexOf("tindakan terhadap hpr") !== -1 || headerText.indexOf("tindakan hpr") !== -1 || headerText.indexOf("observasi hpr") !== -1) val = data.tindakanHPR;
-        else if (headerText.indexOf("rekomendasi") !== -1 || headerText.indexOf("tindak lanjut") !== -1) val = data.rekomendasi;
-        else if (headerText.indexOf("ketua tim") !== -1) val = data.timKetua;
-        else if (headerText.indexOf("anggota") !== -1) val = data.timAnggota;
-        else if (headerText.indexOf("tanggal pelaksana") !== -1 || headerText.indexOf("tgl pelaksana") !== -1 || headerText.indexOf("tanggal pe") !== -1) val = data.tanggalPelaksanaan;
-        else if (headerText.indexOf("pelaksana") !== -1 && headerText.indexOf("nip") === -1) val = data.pelaksanaNama;
-        else if (headerText.indexOf("nip") !== -1) val = data.pelaksanaNIP;
-        else if (colIdx < OFFICIAL_HEADERS.length) {
-          var posHeader = OFFICIAL_HEADERS[colIdx].toLowerCase();
-          var posKey = FIELD_MAP[posHeader];
-          if (posKey && data[posKey] !== undefined && data[posKey] !== null && data[posKey] !== "") {
-            val = String(data[posKey]);
-          }
+    if (needHeaderRepair) {
+      sheet.getRange(1, 1, 1, existingHeaders.length).setValues([existingHeaders]);
+      var repairedHeaderRange = sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length);
+      repairedHeaderRange.setBackground("#0F5132");
+      repairedHeaderRange.setFontColor("#FFFFFF");
+      repairedHeaderRange.setFontWeight("bold");
+      repairedHeaderRange.setHorizontalAlignment("center");
+      repairedHeaderRange.setWrap(true);
+      sheet.setFrozenRows(1);
+    }
+
+    var newRow = [];
+
+    // FUNGSI PEMETAAN KOLOM DETERMINISTIK (Mencegah salah kolom atau tertukar)
+    function ambilNilaiKolomTepat(rawHeaderText, colIdx, d) {
+      if (!d) return "-";
+      var h = String(rawHeaderText || "").replace(/^\\s*\\d+[\\.\\)\\-]\\s*/, "").replace(/[:\\*]/g, "").toLowerCase().trim();
+      
+      // 1. Cek direct match dengan kamus FIELD_MAP
+      var fieldKey = FIELD_MAP[h] || FIELD_MAP[String(rawHeaderText).toLowerCase().trim()];
+      if (fieldKey && d[fieldKey] !== undefined && d[fieldKey] !== null && String(d[fieldKey]).trim() !== "") {
+        return String(d[fieldKey]).trim();
+      }
+      
+      // 2. Cek property langsung di objek payload
+      if (d[rawHeaderText] !== undefined && d[rawHeaderText] !== null && String(d[rawHeaderText]).trim() !== "") {
+        return String(d[rawHeaderText]).trim();
+      }
+      if (d[h] !== undefined && d[h] !== null && String(d[h]).trim() !== "") {
+        return String(d[h]).trim();
+      }
+
+      // 3. Pencocokan Ketat & Spesifik Berdasarkan Nama Header Resmi
+      if (h === "id kasus" || h === "id_kasus" || h === "no kasus" || h === "kode kasus" || (colIdx === 0 && (h === "id" || h === "no"))) {
+        return d.id_kasus || "-";
+      }
+      if (h === "waktu submit" || h === "timestamp submit" || h === "timestamp" || h === "waktu kirim") {
+        return d.timestamp_submit || "-";
+      }
+      if (h === "waktu kejadian" || h === "tanggal kejadian" || h === "tgl kejadian" || h === "waktu gigitan" || h === "tanggal gigitan") {
+        return d.waktuKejadian || "-";
+      }
+      if (h === "alamat kejadian" || h === "lokasi kejadian" || h === "tempat kejadian" || h === "tkp") {
+        return d.alamatKejadian || "-";
+      }
+      if (h === "kelurahan" || h === "desa" || h === "kelurahan/desa" || h === "desa/kelurahan" || h === "kelurahan kejadian") {
+        return d.kelurahan_final || d.kelurahan || "Sananwetan";
+      }
+      if (h === "kecamatan" || h === "kecamatan kejadian") {
+        return d.kecamatan_final || d.kecamatan || "Sananwetan";
+      }
+      if (h === "kabupaten/kota" || h === "kabupaten kota" || h === "kota/kabupaten" || h === "kabupaten" || h === "kota") {
+        return d.kabupatenKota_final || d.kabupatenKota || "Kota Blitar";
+      }
+      if (h === "provinsi") {
+        return d.provinsi || "Jawa Timur";
+      }
+      if (h === "sumber informasi" || h === "sumber info" || h === "sumber laporan" || h === "sumber") {
+        return d.sumberInfo || d.sumberLaporan || "-";
+      }
+      if (h === "kronologi kejadian" || h === "kronologi" || h === "kronologis" || h === "uraian kejadian") {
+        return d.kronologi || "-";
+      }
+      if (h === "spesies hpr" || h === "spesies" || h === "jenis hewan" || h === "hewan penggigit" || h === "hewan") {
+        return d.spesies_final || d.spesiesHPR || "Anjing";
+      }
+      if (h === "ras hewan" || h === "ras") {
+        return d.ras || "-";
+      }
+      if (h === "jenis kelamin hewan" || h === "jk hewan" || h === "kelamin hewan") {
+        return d.jkHewan || "-";
+      }
+      if (h === "umur hewan" || h === "usia hewan") {
+        return d.umurHewan_formatted || (d.umurHewan ? (d.umurHewan + " " + (d.satuanUmur || "Tahun")) : "-");
+      }
+      if (h === "metode pemeliharaan" || h === "cara pemeliharaan" || h === "pemeliharaan" || h === "metode pelihara") {
+        return d.metodePelihara || "-";
+      }
+      if (h === "kondisi hewan saat ini" || h === "kondisi hewan" || h === "keadaan hewan" || h === "status hewan") {
+        return d.kondisiHewan || "-";
+      }
+      if (h === "riwayat vaksinasi" || h === "riwayat vaksin" || h === "status vaksinasi") {
+        return d.riwayatVaksin || "-";
+      }
+      if (h === "tanggal vaksinasi" || h === "tanggal vaksin" || h === "tgl vaksinasi") {
+        return d.tanggalVaksin || "-";
+      }
+      if (h === "nama pemilik" || h === "nama pemilik hewan" || h === "pemilik hewan" || h === "pemilik") {
+        return d.pemilikHewan || "-";
+      }
+      if (h === "alamat pemilik" || h === "alamat pemilik hewan") {
+        return d.alamatPemilik || "-";
+      }
+      if (h === "kontak pemilik" || h === "no hp pemilik" || h === "telepon pemilik" || h === "hp pemilik") {
+        return d.kontakPemilik || "-";
+      }
+      if (h === "nama korban" || h === "nama pasien" || h === "nama lengkap" || h === "nama lengkap korban" || h === "korban" || h === "pasien") {
+        return d.namaKorban || d.namaPasien || "-";
+      }
+      if (h === "no hp korban" || h === "hp korban" || h === "kontak korban" || h === "no hp pasien" || h === "hp pasien" || h === "kontak pasien" || h === "telepon korban" || h === "nomor hp korban") {
+        return d.noHpKorban || d.noHpPasien || d.kontakKorban || "-";
+      }
+      if (h === "umur korban" || h === "usia korban" || h === "umur pasien" || h === "usia pasien" || h === "umur") {
+        return d.umurKorban_formatted || (d.umurKorban ? (d.umurKorban + " Tahun") : "-");
+      }
+      if (h === "alamat korban" || h === "alamat pasien" || h === "alamat domisili korban" || h === "alamat domisili" || h === "alamat") {
+        return d.alamatKorban || d.alamatPasien || "-";
+      }
+      if (h === "jenis kelamin korban" || h === "jk korban" || h === "jenis kelamin pasien" || h === "jk pasien" || h === "kelamin korban" || h === "jenis kelamin") {
+        return d.jkKorban || d.jkPasien || "-";
+      }
+      if (h === "kondisi luka" || h === "kondisi luka korban" || h === "kategori luka" || h === "derajat luka" || h === "luka") {
+        return d.kondisiLuka || "Kategori 1";
+      }
+      if (h === "lokasi luka" || h === "letak luka" || h === "bagian tubuh digigit" || h === "bagian tubuh" || h === "area luka") {
+        return d.lokasiLuka || "-";
+      }
+      if (h === "pertolongan pertama" || h === "cuci luka" || h === "pencucian luka" || h === "p3k") {
+        return d.pertolonganPertama || d.detailPertolongan || "-";
+      }
+      if (h === "tindakan kasus" || h === "tindakan terhadap kasus" || h === "tindakan terhadap korban" || h === "tindakan korban" || h === "tindakan medis" || h === "pemberian var") {
+        return d.tindakanKasus || "-";
+      }
+      if (h === "rekomendasi" || h === "rekomendasi tindak lanjut" || h === "tindak lanjut") {
+        return d.rekomendasi || "-";
+      }
+      if (h === "ketua tim pe" || h === "ketua tim" || h === "ketua") {
+        return d.timKetua || "-";
+      }
+      if (h === "anggota tim pe" || h === "anggota tim" || h === "anggota" || h === "tim pe") {
+        return d.timAnggota || "-";
+      }
+      if (h === "tanggal pelaksanaan" || h === "tgl pelaksanaan" || h === "tanggal pe" || h === "tgl pe") {
+        return d.tanggalPelaksanaan || Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd");
+      }
+      if (h === "pelaksana (petugas)" || h === "pelaksana" || h === "nama pelaksana" || h === "nama petugas" || h === "petugas pe" || h === "petugas") {
+        return d.pelaksanaNama || "-";
+      }
+      if (h === "nip pelaksana" || h === "nip" || h === "nip petugas") {
+        return d.pelaksanaNIP || "-";
+      }
+
+      // 4. Positional fallback from rowValues array jika dikirim dari aplikasi frontend
+      if (d.rowValues && Array.isArray(d.rowValues) && colIdx < d.rowValues.length) {
+        var rowVal = d.rowValues[colIdx];
+        if (rowVal !== undefined && rowVal !== null && String(rowVal).trim() !== "") {
+          return String(rowVal).trim();
         }
       }
 
-      newRow.push(val !== undefined && val !== null && val !== "" ? val : "-");
+      // 5. Positional fallback dari OFFICIAL_HEADERS index
+      if (colIdx < OFFICIAL_HEADERS.length) {
+        var officialColHeader = OFFICIAL_HEADERS[colIdx].toLowerCase();
+        var posKey = FIELD_MAP[officialColHeader];
+        if (posKey && d[posKey] !== undefined && d[posKey] !== null && String(d[posKey]).trim() !== "") {
+          return String(d[posKey]).trim();
+        }
+      }
+
+      return "-";
+    }
+
+    for (var colIdx = 0; colIdx < existingHeaders.length; colIdx++) {
+      var rawHeaderText = String(existingHeaders[colIdx] || "");
+      var calculatedVal = ambilNilaiKolomTepat(rawHeaderText, colIdx, data);
+      newRow.push(calculatedVal !== undefined && calculatedVal !== null && String(calculatedVal).trim() !== "" ? String(calculatedVal).trim() : "-");
     }
 
     // Pastikan sheet memiliki jumlah kolom yang memadai
@@ -1271,10 +1399,60 @@ export async function sendToAppsScript(
   const waktuKejadianVal = (payload.waktuKejadian || payload["Waktu Kejadian"] || new Date().toISOString().slice(0, 16)).trim();
   const tglPelaksanaanVal = (payload.tanggalPelaksanaan || payload["Tanggal Pelaksanaan"] || new Date().toISOString().slice(0, 10)).trim();
 
+  const orderedRowValues = mapPayloadToRowValues({
+    id_kasus: payload.id_kasus || "",
+    timestamp_submit: payload.timestamp_submit || new Date().toISOString(),
+    waktuKejadian: waktuKejadianVal,
+    alamatKejadian: payload.alamatKejadian || "",
+    kelurahan: kelurahanVal,
+    kelurahan_final: kelurahanVal,
+    kecamatan: kecamatanVal,
+    kecamatan_final: kecamatanVal,
+    kabupatenKota: kabKotaVal,
+    kabupatenKota_final: kabKotaVal,
+    provinsi: payload.provinsi || "Jawa Timur",
+    sumberInfo: payload.sumberInfo || "",
+    kronologi: payload.kronologi || "",
+    spesiesHPR: spesiesVal,
+    spesies_final: spesiesVal,
+    ras: payload.ras || "-",
+    jkHewan: payload.jkHewan || "",
+    umurHewan: payload.umurHewan || "",
+    satuanUmur: payload.satuanUmur || "Tahun",
+    metodePelihara: payload.metodePelihara || "",
+    kondisiHewan: payload.kondisiHewan || "",
+    riwayatVaksin: payload.riwayatVaksin || "",
+    tanggalVaksin: payload.tanggalVaksin || "-",
+    pemilikHewan: payload.pemilikHewan || "",
+    alamatPemilik: payload.alamatPemilik || "",
+    kontakPemilik: payload.kontakPemilik || "",
+    namaKorban: namaKorbanVal,
+    namaPasien: namaKorbanVal,
+    noHpKorban: noHpVal,
+    noHpPasien: noHpVal,
+    umurKorban: umurKorbanVal,
+    umurPasien: umurKorbanVal,
+    alamatKorban: alamatKorbanVal,
+    alamatPasien: alamatKorbanVal,
+    jkKorban: jkKorbanVal,
+    jkPasien: jkKorbanVal,
+    kondisiLuka: payload.kondisiLuka || "Kategori 1",
+    lokasiLuka: payload.lokasiLuka || "",
+    pertolonganPertama: payload.pertolonganPertama || "",
+    tindakanKasus: payload.tindakanKasus || "",
+    rekomendasi: payload.rekomendasi || "",
+    timKetua: payload.timKetua || "",
+    timAnggota: payload.timAnggota || "",
+    tanggalPelaksanaan: tglPelaksanaanVal,
+    pelaksanaNama: payload.pelaksanaNama || "",
+    pelaksanaNIP: payload.pelaksanaNIP || ""
+  } as any);
+
   const enhancedPayload: Record<string, any> = {
     ...payload,
     action: action,
     is_update: action === "update",
+    rowValues: orderedRowValues,
     // Field standar
     namaKorban: namaKorbanVal,
     noHpKorban: noHpVal,
@@ -1324,7 +1502,7 @@ export async function sendToAppsScript(
     "Umur Korban": umurKorbanVal ? `${umurKorbanVal} Tahun` : "",
     "Alamat Korban": alamatKorbanVal,
     "Jenis Kelamin Korban": jkKorbanVal,
-    "Kondisi Luka": payload.kondisiLuka || "",
+    "Kondisi Luka": payload.kondisiLuka || "Kategori 1",
     "Lokasi Luka": payload.lokasiLuka || "",
     "Pertolongan Pertama": payload.pertolonganPertama || "",
     "Tindakan Kasus": payload.tindakanKasus || "",
