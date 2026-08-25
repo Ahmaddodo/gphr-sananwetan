@@ -27,7 +27,8 @@ import {
   DEFAULT_SPREADSHEET_ID,
   DEFAULT_SPREADSHEET_URL,
   DEFAULT_WEB_APP_URL,
-  sendToAppsScript
+  sendToAppsScript,
+  repairSpreadsheetStructure
 } from "../lib/googleSheets";
 import { OfficerAccountManager } from "./OfficerAccountManager";
 import { GitHubSyncManager } from "./GitHubSyncManager";
@@ -68,6 +69,8 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
   const [successMsg, setSuccessMsg] = useState("");
   const [isTestingEndpoint, setIsTestingEndpoint] = useState(false);
   const [testResult, setTestResult] = useState<{ status: "success" | "error"; message: string } | null>(null);
+  const [isRepairingSheet, setIsRepairingSheet] = useState(false);
+  const [repairResult, setRepairResult] = useState<{ status: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     setLocalEndpointInput(webAppUrl);
@@ -216,6 +219,35 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
       });
     } finally {
       setIsTestingEndpoint(false);
+    }
+  };
+
+  const handleRepairSpreadsheet = async () => {
+    const target = localEndpointInput.trim() || webAppUrl.trim();
+    if (!target) {
+      setRepairResult({
+        status: "error",
+        message: "URL Web App belum diatur. Mohon isi URL Web App terlebih dahulu."
+      });
+      return;
+    }
+
+    setIsRepairingSheet(true);
+    setRepairResult(null);
+
+    try {
+      const res = await repairSpreadsheetStructure(target);
+      setRepairResult({
+        status: res.success ? "success" : "error",
+        message: res.message
+      });
+    } catch (err: any) {
+      setRepairResult({
+        status: "error",
+        message: `Gagal mengirim instruksi perbaikan: ${err?.message || "Kesalahan jaringan"}`
+      });
+    } finally {
+      setIsRepairingSheet(false);
     }
   };
 
@@ -622,6 +654,92 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
               <CheckCircle2 size={15} /> Simpan Sheet
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* PANEL PERBAIKAN STRUKTUR SPREADSHEET & PEMULIHAN KOLOM BERGESER */}
+      <div className="rounded-xl border border-amber-300 bg-gradient-to-br from-amber-50/90 to-amber-100/40 p-4.5 space-y-3.5 shadow-sm">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500 text-white font-black text-xs shadow-xs">
+                ⚡
+              </span>
+              <h4 className="font-bold text-amber-950 text-xs uppercase tracking-wide">
+                Solusi Kolom Bergeser & Pemulihan Spreadsheet Otomatis (36 Kolom Resmi)
+              </h4>
+            </div>
+            <p className="text-xs text-amber-900 leading-relaxed max-w-3xl">
+              Jika data yang masuk ke Google Sheet Anda sebelumnya bergeser (misal: kolom terisi tidak pas karena ada kolom ganda seperti <code>kelurahan</code> dan <code>Kelurahan</code>), gunakan fitur ini untuk menata ulang 36 kolom resmi secara otomatis.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleCopyAppsScript}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 font-bold text-xs shadow-xs transition cursor-pointer"
+              title="Salin kode Google Apps Script terbaru"
+            >
+              {copiedCode ? (
+                <>
+                  <Check size={14} className="text-emerald-600" />
+                  <span className="text-emerald-700">Kode Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={14} className="text-amber-700" />
+                  <span>Salin Skrip Baru</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRepairSpreadsheet}
+              disabled={isRepairingSheet}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shadow-sm transition cursor-pointer"
+            >
+              {isRepairingSheet ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Merapikan Spreadsheet...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} /> Perbaiki & Rapikan Spreadsheet Otomatis
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {repairResult && (
+          <div
+            className={`rounded-lg p-3 text-xs font-medium flex items-start gap-2 ${
+              repairResult.status === "success"
+                ? "bg-emerald-100 text-emerald-950 border border-emerald-300"
+                : "bg-rose-100 text-rose-950 border border-rose-300"
+            }`}
+          >
+            {repairResult.status === "success" ? (
+              <CheckCircle2 size={16} className="shrink-0 text-emerald-700 mt-0.5" />
+            ) : (
+              <AlertCircle size={16} className="shrink-0 text-rose-700 mt-0.5" />
+            )}
+            <div className="flex-1 leading-relaxed">{repairResult.message}</div>
+          </div>
+        )}
+
+        <div className="bg-white/80 border border-amber-200/80 rounded-lg p-3 text-[11px] text-amber-950 space-y-1.5">
+          <div className="font-bold text-amber-900 flex items-center gap-1">
+            <CheckCircle2 size={13} className="text-amber-600" />
+            3 Langkah Memastikan Sinkronisasi Spreadsheet Sempurna:
+          </div>
+          <ol className="list-decimal list-inside space-y-0.5 text-slate-700 pl-1">
+            <li>Buka spreadsheet Anda &gt; menu <b>Ekstensi</b> &gt; <b>Apps Script</b>.</li>
+            <li>Hapus kode lama di <code>Code.gs</code>, lalu <b>Paste (Tempel)</b> kode baru yang disalin dari tombol di atas, lalu <b>Simpan (Ctrl+S)</b>.</li>
+            <li>Klik tombol <b>Terapkan (Deploy)</b> &gt; <b>Kelola Penerapan</b> &gt; ikon pensil &gt; <b>Versi Baru</b> &gt; <b>Terapkan</b> (atau Penerapan Baru &gt; Web App &gt; Anyone &gt; Terapkan).</li>
+          </ol>
         </div>
       </div>
 

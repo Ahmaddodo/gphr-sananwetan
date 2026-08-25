@@ -66,7 +66,7 @@ import {
   computeAppNotifications,
   AppNotification
 } from "./lib/notificationService";
-import { OFFICIAL_SIGNATURE_STAMP_URL, DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP } from "./components/SignatureData";
+import { OFFICIAL_SIGNATURE_STAMP_URL, DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP, getOfficialSignatureUrl } from "./components/SignatureData";
 import {
   sendToAppsScript,
   DEFAULT_WEB_APP_URL,
@@ -175,7 +175,10 @@ export default function App() {
           ...initialFormState,
           ...parsed,
           pelaksanaNama: DEFAULT_PELAKSANA_NAMA,
-          pelaksanaNIP: DEFAULT_PELAKSANA_NIP
+          pelaksanaNIP: DEFAULT_PELAKSANA_NIP,
+          tandaTanganUrl: getOfficialSignatureUrl(parsed.tandaTanganUrl),
+          jenisTandaTangan: "gambar",
+          tandaTanganOtomatis: false
         };
       }
     } catch (err) {

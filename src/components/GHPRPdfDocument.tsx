@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { FormGHPRData } from "../types";
-import { OFFICIAL_SIGNATURE_STAMP_URL, DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP } from "./SignatureData";
+import { OFFICIAL_SIGNATURE_STAMP_URL, DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP, getOfficialSignatureUrl } from "./SignatureData";
 import { estimateFormContentHeight, measureFormElements, FormMeasurementResult } from "../lib/pdfMeasurement";
 
 interface GHPRPdfDocumentProps {
@@ -473,30 +473,14 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
               <div className="mt-0.5 font-semibold">Pelaksana,</div>
 
               {/* Dynamic Signature Area */}
-              {(formData.tandaTanganUrl || OFFICIAL_SIGNATURE_STAMP_URL) ? (
-                <div className="h-16 flex items-center justify-center my-0.5">
-                  <img
-                    src={formData.tandaTanganUrl || OFFICIAL_SIGNATURE_STAMP_URL}
-                    alt="Tanda Tangan Pelaksana"
-                    crossOrigin="anonymous"
-                    className="max-h-16 max-w-[200px] object-contain"
-                  />
-                </div>
-              ) : (formData.jenisTandaTangan === "otomatis" || formData.tandaTanganOtomatis !== false) ? (
-                <div className="h-16 flex flex-col items-center justify-center my-0.5">
-                  <div
-                    className="text-xl text-slate-900 leading-none select-none font-normal py-1"
-                    style={{ fontFamily: "'Caveat', 'Dancing Script', cursive" }}
-                  >
-                    {formData.pelaksanaNama || DEFAULT_PELAKSANA_NAMA}
-                  </div>
-                  <div className="text-[7.5px] text-blue-800 font-bold tracking-wider uppercase border border-blue-600/50 px-1.5 py-[1px] rounded bg-blue-50/60 leading-tight">
-                    ✓ TTD Digital Terverifikasi
-                  </div>
-                </div>
-              ) : (
-                <div className="h-16" />
-              )}
+              <div className="h-16 flex items-center justify-center my-0.5">
+                <img
+                  src={getOfficialSignatureUrl(formData.tandaTanganUrl)}
+                  alt="Tanda Tangan Pelaksana"
+                  crossOrigin="anonymous"
+                  className="max-h-16 max-w-[200px] object-contain"
+                />
+              </div>
 
               <div>
                 ( <b className="uppercase">{formData.pelaksanaNama || DEFAULT_PELAKSANA_NAMA}</b> )

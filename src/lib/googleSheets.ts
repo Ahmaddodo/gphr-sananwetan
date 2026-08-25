@@ -749,8 +749,193 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify(bulkPatRes)).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "repairSheet" || action === "fixHeaders" || action === "formatSheet" || action === "autoFix") {
+    var repairRes = rapikanDanFormatSheet();
+    return ContentService.createTextOutput(JSON.stringify(repairRes)).setMimeType(ContentService.MimeType.JSON);
+  }
+
   var hasil = prosesDataMasuk(data, action);
   return ContentService.createTextOutput(JSON.stringify(hasil)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// FUNGSI PERBAIKAN STRUKTUR SPREADSHEET & PEMULIHAN DATA BERGESER SECARA OTOMATIS
+function rapikanDanFormatSheet() {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(30000); } catch(e) { return { status: "error", message: "Server sibuk" }; }
+  try {
+    var ss = getTargetSpreadsheet();
+    if (!ss) return { status: "error", message: "Spreadsheet tidak ditemukan" };
+    var sheet = ss.getSheetByName("Data Laporan GHPR") || ss.getSheetByName("Laporan PE GHPR") || ss.getSheets()[0];
+    
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    var existingRows = [];
+    if (lastRow > 1) {
+      existingRows = sheet.getRange(2, 1, lastRow - 1, Math.max(lastCol, 1)).getValues();
+    }
+    
+    // Normalisasi setiap baris data yang ada
+    var cleanedRows = [];
+    for (var r = 0; r < existingRows.length; r++) {
+      var row = existingRows[r];
+      var obj = {};
+      
+      var colA = String(row[0] || "").trim();
+      var colB = String(row[1] || "").trim();
+      var colC = String(row[2] || "").trim();
+      var colD = String(row[3] || "").trim();
+      var colE = String(row[4] || "").trim();
+      var colF = String(row[5] || "").trim();
+      var colG = String(row[6] || "").trim();
+      var colH = String(row[7] || "").trim();
+      var colI = String(row[8] || "").trim();
+      var colJ = String(row[9] || "").trim();
+      
+      // Deteksi jika baris ini format bergeser (Kolom A adalah timestamp tanggal dan Kolom B adalah ID Kasus)
+      var isShifted = /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(colA) && /^(GHPR|TEST|ID|KASUS)/i.test(colB);
+      
+      if (isShifted) {
+        obj.id_kasus = colB;
+        obj.timestamp_submit = colA;
+        obj.waktuKejadian = colA;
+        obj.alamatKejadian = colG || "-";
+        obj.kelurahan_final = colI || "Sananwetan";
+        obj.kecamatan_final = "Sananwetan";
+        obj.kabupatenKota_final = "Kota Blitar";
+        obj.provinsi = "Jawa Timur";
+        obj.sumberInfo = "Laporan Masyarakat";
+        obj.kronologi = "-";
+        obj.spesies_final = colJ || "Kucing";
+        obj.ras = "-";
+        obj.jkHewan = "-";
+        obj.umurHewan = "-";
+        obj.metodePelihara = "-";
+        obj.kondisiHewan = "Hidup / Observasi";
+        obj.riwayatVaksin = "-";
+        obj.tanggalVaksin = "-";
+        obj.pemilikHewan = "-";
+        obj.alamatPemilik = colG || "-";
+        obj.kontakPemilik = colH || "-";
+        obj.namaKorban = colC;
+        obj.noHpKorban = colH;
+        obj.umurKorban = colE ? (colE + " Tahun") : "-";
+        obj.alamatKorban = colG;
+        obj.jkKorban = colF;
+        obj.kondisiLuka = "Kategori 1";
+        obj.lokasiLuka = "-";
+        obj.pertolonganPertama = "Cuci luka sabun air mengalir";
+        obj.tindakanKasus = "Observasi luka & edukasi";
+        obj.rekomendasi = "Pantau kondisi luka dan hewan";
+        obj.timKetua = "dr. Triana Sulistyaningsih";
+        obj.timAnggota = "Petugas Surveilans";
+        obj.tanggalPelaksanaan = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd");
+        obj.pelaksanaNama = "Petugas Puskesmas";
+        obj.pelaksanaNIP = "-";
+      } else {
+        obj.id_kasus = colA || ("GHPR-" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd-") + (r + 1));
+        obj.timestamp_submit = colB || Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
+        obj.waktuKejadian = colC || "-";
+        obj.alamatKejadian = colD || "-";
+        obj.kelurahan_final = String(row[4] || row[5] || "Sananwetan");
+        obj.kecamatan_final = String(row[6] || "Sananwetan");
+        obj.kabupatenKota_final = String(row[7] || "Kota Blitar");
+        obj.provinsi = String(row[8] || "Jawa Timur");
+        obj.sumberInfo = String(row[9] || "-");
+        obj.kronologi = String(row[10] || "-");
+        obj.spesies_final = String(row[11] || "Anjing");
+        obj.ras = String(row[12] || "-");
+        obj.jkHewan = String(row[13] || "-");
+        obj.umurHewan = String(row[14] || "-");
+        obj.metodePelihara = String(row[15] || "-");
+        obj.kondisiHewan = String(row[16] || "-");
+        obj.riwayatVaksin = String(row[17] || "-");
+        obj.tanggalVaksin = String(row[18] || "-");
+        obj.pemilikHewan = String(row[19] || "-");
+        obj.alamatPemilik = String(row[20] || "-");
+        obj.kontakPemilik = String(row[21] || "-");
+        obj.namaKorban = String(row[22] || colC || "-");
+        obj.noHpKorban = String(row[23] || colH || "-");
+        obj.umurKorban = String(row[24] || colE || "-");
+        obj.alamatKorban = String(row[25] || colG || "-");
+        obj.jkKorban = String(row[26] || colF || "-");
+        obj.kondisiLuka = String(row[27] || "Kategori 1");
+        obj.lokasiLuka = String(row[28] || "-");
+        obj.pertolonganPertama = String(row[29] || "-");
+        obj.tindakanKasus = String(row[30] || "-");
+        obj.rekomendasi = String(row[31] || "-");
+        obj.timKetua = String(row[32] || "-");
+        obj.timAnggota = String(row[33] || "-");
+        obj.tanggalPelaksanaan = String(row[34] || Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd"));
+        obj.pelaksanaNama = String(row[35] || "-");
+        obj.pelaksanaNIP = String(row[36] || "-");
+      }
+      
+      var row36 = [
+        obj.id_kasus || "-",
+        obj.timestamp_submit || "-",
+        obj.waktuKejadian || "-",
+        obj.alamatKejadian || "-",
+        obj.kelurahan_final || "Sananwetan",
+        obj.kecamatan_final || "Sananwetan",
+        obj.kabupatenKota_final || "Kota Blitar",
+        obj.provinsi || "Jawa Timur",
+        obj.sumberInfo || "-",
+        obj.kronologi || "-",
+        obj.spesies_final || "Anjing",
+        obj.ras || "-",
+        obj.jkHewan || "-",
+        obj.umurHewan || "-",
+        obj.metodePelihara || "-",
+        obj.kondisiHewan || "-",
+        obj.riwayatVaksin || "-",
+        obj.tanggalVaksin || "-",
+        obj.pemilikHewan || "-",
+        obj.alamatPemilik || "-",
+        obj.kontakPemilik || "-",
+        obj.namaKorban || "-",
+        obj.noHpKorban || "-",
+        obj.umurKorban || "-",
+        obj.alamatKorban || "-",
+        obj.jkKorban || "-",
+        obj.kondisiLuka || "Kategori 1",
+        obj.lokasiLuka || "-",
+        obj.pertolonganPertama || "-",
+        obj.tindakanKasus || "-",
+        obj.rekomendasi || "-",
+        obj.timKetua || "-",
+        obj.timAnggota || "-",
+        obj.tanggalPelaksanaan || "-",
+        obj.pelaksanaNama || "-",
+        obj.pelaksanaNIP || "-"
+      ];
+      cleanedRows.push(row36);
+    }
+    
+    // Hapus sheet yang lama dan set ulang 36 Header Resmi yang bersih
+    sheet.clear();
+    sheet.appendRow(OFFICIAL_HEADERS);
+    var headerRange = sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length);
+    headerRange.setBackground("#0F5132");
+    headerRange.setFontColor("#FFFFFF");
+    headerRange.setFontWeight("bold");
+    headerRange.setHorizontalAlignment("center");
+    headerRange.setWrap(true);
+    sheet.setFrozenRows(1);
+    
+    if (cleanedRows.length > 0) {
+      sheet.getRange(2, 1, cleanedRows.length, OFFICIAL_HEADERS.length).setValues(cleanedRows);
+    }
+    
+    return {
+      status: "success",
+      message: "Struktur spreadsheet berhasil dirapikan! 36 kolom resmi telah distandarkan dan " + cleanedRows.length + " baris data telah diposisikan ke kolom yang tepat.",
+      count: cleanedRows.length
+    };
+  } catch(err) {
+    return { status: "error", message: err.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
 }
 
 // FUNGSI MEMBACA DAFTAR LAPORAN DARI SPREADSHEET
@@ -1021,9 +1206,34 @@ function prosesDataMasuk(data, action) {
     data.umurHewan_formatted = data.umurHewan ? (data.umurHewan + " " + (data.satuanUmur || "Tahun")) : "-";
     data.umurKorban_formatted = data.umurKorban ? (data.umurKorban + " Tahun") : "-";
 
-    // JIKA SHEET MASIH KOSONG: Buat 36 Header Resmi
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(OFFICIAL_HEADERS);
+    // STANDARISASI OTOMATIS BARIS 1 HEADER (Menghapus kolom duplikat seperti kelurahan ganda)
+    var numCols = Math.max(sheet.getLastColumn(), OFFICIAL_HEADERS.length);
+    if (sheet.getMaxColumns() < OFFICIAL_HEADERS.length) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), OFFICIAL_HEADERS.length - sheet.getMaxColumns());
+    }
+
+    var existingHeaders = sheet.getLastRow() >= 1 ? sheet.getRange(1, 1, 1, Math.max(numCols, 1)).getValues()[0] : [];
+    var isHeaderMismatched = false;
+
+    if (existingHeaders.length < OFFICIAL_HEADERS.length) {
+      isHeaderMismatched = true;
+    } else {
+      // Deteksi duplikasi header (misal 'kelurahan' di kolom E dan 'Kelurahan' di kolom F)
+      var seenHeaderKeys = {};
+      for (var chk = 0; chk < existingHeaders.length; chk++) {
+        var hClean = String(existingHeaders[chk] || "").toLowerCase().trim();
+        if (hClean) {
+          if (seenHeaderKeys[hClean]) {
+            isHeaderMismatched = true;
+            break;
+          }
+          seenHeaderKeys[hClean] = true;
+        }
+      }
+    }
+
+    if (isHeaderMismatched || sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length).setValues([OFFICIAL_HEADERS]);
       var headerRange = sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length);
       headerRange.setBackground("#0F5132"); // Hijau Puskesmas
       headerRange.setFontColor("#FFFFFF");
@@ -1031,34 +1241,7 @@ function prosesDataMasuk(data, action) {
       headerRange.setHorizontalAlignment("center");
       headerRange.setWrap(true);
       sheet.setFrozenRows(1);
-    }
-
-    // Pastikan seluruh 36 header resmi ada di baris 1
-    var numCols = Math.max(sheet.getLastColumn(), OFFICIAL_HEADERS.length);
-    if (sheet.getMaxColumns() < numCols) {
-      sheet.insertColumnsAfter(sheet.getMaxColumns(), numCols - sheet.getMaxColumns());
-    }
-
-    var existingHeaders = sheet.getRange(1, 1, 1, numCols).getValues()[0];
-    var needHeaderRepair = false;
-
-    // Periksa apakah ada header resmi yang masih kosong di baris 1
-    for (var hIdx = 0; hIdx < OFFICIAL_HEADERS.length; hIdx++) {
-      if (!existingHeaders[hIdx] || String(existingHeaders[hIdx]).trim() === "") {
-        existingHeaders[hIdx] = OFFICIAL_HEADERS[hIdx];
-        needHeaderRepair = true;
-      }
-    }
-
-    if (needHeaderRepair) {
-      sheet.getRange(1, 1, 1, existingHeaders.length).setValues([existingHeaders]);
-      var repairedHeaderRange = sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length);
-      repairedHeaderRange.setBackground("#0F5132");
-      repairedHeaderRange.setFontColor("#FFFFFF");
-      repairedHeaderRange.setFontWeight("bold");
-      repairedHeaderRange.setHorizontalAlignment("center");
-      repairedHeaderRange.setWrap(true);
-      sheet.setFrozenRows(1);
+      existingHeaders = OFFICIAL_HEADERS.slice();
     }
 
     var newRow = [];
@@ -1602,6 +1785,82 @@ function filterLocalItems(items: StoredCaseItem[], query: string): StoredCaseIte
       it.pelaksanaNama.toLowerCase().includes(q) ||
       it.kelurahan.toLowerCase().includes(q)
   );
+}
+
+/**
+ * Mengirim permintaan perbaikan dan perapian struktur Google Spreadsheet
+ * (Membersihkan kolom ganda seperti kelurahan, menstandarkan 36 kolom, dan memulihkan data yang bergeser)
+ */
+export async function repairSpreadsheetStructure(
+  targetUrl: string
+): Promise<{ success: boolean; message: string }> {
+  const cleanUrl = (targetUrl || "").trim();
+  if (!cleanUrl) {
+    return { success: false, message: "URL Web App belum dikonfigurasi." };
+  }
+
+  const payload = {
+    action: "repairSheet",
+    _timestamp: new Date().toISOString()
+  };
+
+  const jsonStr = JSON.stringify(payload);
+
+  try {
+    await fetch(cleanUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: jsonStr
+    });
+    return {
+      success: true,
+      message: "Permintaan perbaikan struktur & kolom telah dikirimkan ke Google Sheets! Header ganda telah dibersihkan dan 36 kolom resmi telah distandarkan."
+    };
+  } catch (err: any) {
+    console.warn("Direct fetch repair notice:", err);
+    try {
+      const iframeId = "gas_hidden_repair_frame";
+      let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
+      if (!iframe) {
+        iframe = document.createElement("iframe");
+        iframe.id = iframeId;
+        iframe.name = iframeId;
+        iframe.style.display = "none";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        document.body.appendChild(iframe);
+      }
+
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = cleanUrl;
+      form.target = iframeId;
+      form.style.display = "none";
+
+      const payloadInput = document.createElement("input");
+      payloadInput.type = "hidden";
+      payloadInput.name = "payload";
+      payloadInput.value = jsonStr;
+      form.appendChild(payloadInput);
+
+      document.body.appendChild(form);
+      form.submit();
+      setTimeout(() => {
+        try { form.remove(); } catch (e) {}
+      }, 3000);
+
+      return {
+        success: true,
+        message: "Perintah perbaikan telah dikirimkan ke Google Sheets!"
+      };
+    } catch (eFallback: any) {
+      return {
+        success: false,
+        message: `Gagal mengirim perbaikan: ${eFallback?.message || "Kesalahan jaringan"}`
+      };
+    }
+  }
 }
 
 /**

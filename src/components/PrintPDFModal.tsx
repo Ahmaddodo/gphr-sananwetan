@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Printer, X, Download, FileText, Sparkles, Loader2, Layers } from "lucide-react";
+import { Printer, X, Download, FileText, Sparkles, Loader2, Layers, CheckCircle2, AlertCircle } from "lucide-react";
 import { FormGHPRData } from "../types";
 import { GHPRPdfDocument } from "./GHPRPdfDocument";
-import { OFFICIAL_SIGNATURE_STAMP_URL, DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP } from "./SignatureData";
+import { OFFICIAL_SIGNATURE_STAMP_URL, DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP, getOfficialSignatureUrl } from "./SignatureData";
 import {
   measureFormElements,
   estimateFormContentHeight,
@@ -76,6 +76,96 @@ export const samplePdfData: FormGHPRData = {
   jenisTandaTangan: "gambar"
 };
 
+/**
+ * Render elemen dokumen ke dalam Canvas secara bersih di wadah off-screen berukuran standar.
+ * Menghilangkan bayangan modal (shadow-xl), sudut melengkung, serta variasi lebar layar HP/desktop
+ * sehingga hasil tangkapan 100% identik dan rapi seperti cetakan dokumen asli.
+ */
+async function captureCleanDocumentSheet(sourceElement: HTMLElement, targetWidthPx: number = 816): Promise<HTMLCanvasElement> {
+  const clone = sourceElement.cloneNode(true) as HTMLElement;
+
+  // Standarisasi ukuran dan hapus efek kartu layar
+  clone.style.width = `${targetWidthPx}px`;
+  clone.style.maxWidth = `${targetWidthPx}px`;
+  clone.style.minWidth = `${targetWidthPx}px`;
+  clone.style.boxSizing = "border-box";
+  clone.style.margin = "0";
+  clone.style.boxShadow = "none";
+  clone.style.borderRadius = "0";
+  clone.style.padding = "24px 28px 24px 28px";
+  clone.style.backgroundColor = "#ffffff";
+  clone.style.color = "#000000";
+  clone.style.transform = "none";
+  clone.style.pageBreakBefore = "auto";
+
+  // Hapus class pembungkus yang hanya untuk tampilan modal layar
+  clone.classList.remove(
+    "shadow-xl",
+    "shadow-2xl",
+    "shadow-lg",
+    "shadow-sm",
+    "rounded-sm",
+    "rounded-md",
+    "rounded-lg",
+    "mb-6",
+    "p-4",
+    "sm:p-6",
+    "md:p-8"
+  );
+
+  // Buat wadah terisolasi di luar layar
+  const host = document.createElement("div");
+  host.style.position = "fixed";
+  host.style.top = "-12000px";
+  host.style.left = "-12000px";
+  host.style.width = `${targetWidthPx}px`;
+  host.style.backgroundColor = "#ffffff";
+  host.style.zIndex = "-99999";
+  host.style.opacity = "1";
+  host.style.pointerEvents = "none";
+  host.appendChild(clone);
+  document.body.appendChild(host);
+
+  try {
+    // Pastikan seluruh gambar (stempel, tanda tangan, foto) telah termuat sempurna
+    const imgs = Array.from(clone.querySelectorAll("img"));
+    await Promise.all(
+      imgs.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete && img.naturalHeight !== 0) {
+              resolve();
+            } else {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+              setTimeout(resolve, 2000);
+            }
+          })
+      )
+    );
+
+    // Jeda sejenak untuk kalkulasi font & rendering DOM
+    await new Promise((r) => setTimeout(r, 60));
+
+    // Capture resolusi tinggi (2.5x = ~240 DPI tajam seperti vektor)
+    const canvas = await html2canvas(clone, {
+      scale: 2.5,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      width: targetWidthPx,
+      windowWidth: targetWidthPx,
+    });
+
+    return canvas;
+  } finally {
+    if (document.body.contains(host)) {
+      document.body.removeChild(host);
+    }
+  }
+}
+
 export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
   showPdfModal,
   setShowPdfModal,
@@ -86,6 +176,7 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
   getFinalKabKota,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [paperSize, setPaperSize] = useState<"legal" | "f4" | "a4">("legal");
   const [measurement, setMeasurement] = useState<FormMeasurementResult>(() =>
     estimateFormContentHeight(formData)
@@ -106,38 +197,18 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
 
   if (!showPdfModal) return null;
 
+  /**
+   * Pemicu Dialog Cetak Browser Langsung
+   */
   const handlePrint = () => {
     try {
-      const sheet1 = document.getElementById("ghpr-sheet-1");
-      const sheet2 = document.getElementById("ghpr-sheet-2");
-      const rootArea = document.getElementById("ghpr-print-area");
-
-      const elementToPrint = rootArea || sheet1;
-      if (!elementToPrint) {
-        window.print();
-        return;
-      }
-
-      // Gunakan teknik hidden iframe untuk isolasi cetak yang bersih
-      let printIframe = document.getElementById("ghpr-isolated-print-frame") as HTMLIFrameElement;
-      if (printIframe) {
-        printIframe.remove();
-      }
-
-      printIframe = document.createElement("iframe");
-      printIframe.id = "ghpr-isolated-print-frame";
-      printIframe.style.position = "fixed";
-      printIframe.style.right = "0";
-      printIframe.style.bottom = "0";
-      printIframe.style.width = "0";
-      printIframe.style.height = "0";
-      printIframe.style.border = "none";
-      document.body.appendChild(printIframe);
-
-      const doc = printIframe.contentWindow?.document;
-      if (!doc) {
-        window.print();
-        return;
+      // Siapkan style ukuran kertas sementara jika diperlukan
+      const styleId = "ghpr-dynamic-print-size";
+      let styleTag = document.getElementById(styleId) as HTMLStyleElement;
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = styleId;
+        document.head.appendChild(styleTag);
       }
 
       const pageSizeCss =
@@ -147,109 +218,31 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
           ? "215mm 330mm portrait"
           : "legal portrait";
 
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html lang="id">
-          <head>
-            <meta charset="UTF-8">
-            <title>Form PE GHPR - ${formData.namaKorban || "Dokumen"}</title>
-            <link rel="preconnect" href="https://fonts.googleapis.com">
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-            <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
-            <style>
-              @page {
-                size: ${pageSizeCss};
-                margin: 6mm 8mm 6mm 8mm;
-              }
-              * {
-                box-sizing: border-box;
-              }
-              html, body {
-                background: #ffffff !important;
-                color: #000000 !important;
-                font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
-                margin: 0 !important;
-                padding: 0 !important;
-                font-size: 11px;
-                line-height: 1.25;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              #ghpr-print-area {
-                width: 100% !important;
-                max-width: 100% !important;
-                padding: 0 !important;
-                margin: 0 !important;
-              }
-              .ghpr-page-sheet {
-                background: #ffffff !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                box-shadow: none !important;
-                border: none !important;
-                width: 100% !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-              #ghpr-sheet-2, .ghpr-sheet-2 {
-                page-break-before: always !important;
-                break-before: page !important;
-                padding-top: 4px !important;
-              }
-              table {
-                width: 100% !important;
-                border-collapse: collapse !important;
-                margin-bottom: 0 !important;
-                font-size: 10.5px !important;
-              }
-              td, th {
-                border: 1px solid #000000 !important;
-                padding: 4px !important;
-                vertical-align: top;
-              }
-              td table, th table {
-                margin: 0 !important;
-              }
-              td table td {
-                padding: 3px !important;
-              }
-              .avoid-break {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-              img {
-                max-width: 100%;
-                height: auto;
-              }
-            </style>
-          </head>
-          <body>
-            ${elementToPrint.outerHTML}
-          </body>
-        </html>
+      styleTag.innerHTML = `
+        @media print {
+          @page {
+            size: ${pageSizeCss} !important;
+            margin: 6mm 8mm 6mm 8mm !important;
+          }
+        }
       `;
 
-      doc.open();
-      doc.write(htmlContent);
-      doc.close();
-
-      setTimeout(() => {
-        try {
-          printIframe.contentWindow?.focus();
-          printIframe.contentWindow?.print();
-        } catch (printErr) {
-          console.warn("Iframe print error, falling back to window.print():", printErr);
-          window.print();
-        }
-      }, 500);
+      window.focus();
+      window.print();
     } catch (e) {
       console.error("Window print error:", e);
-      window.print();
+      // Fallback unduh jika dialog cetak tidak diizinkan di container tertentu
+      handleDownloadPdf();
     }
   };
 
+  /**
+   * Unduh Dokumen PDF Resmi 100% Identik dengan Review
+   */
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
+    setDownloadSuccess(false);
+
     try {
       const sheet1 = document.getElementById("ghpr-sheet-1");
       const sheet2 = document.getElementById("ghpr-sheet-2");
@@ -259,23 +252,27 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
         throw new Error("Elemen formulir tidak ditemukan");
       }
 
-      // Tentukan ukuran kertas
+      // Konfigurasi ukuran kertas jsPDF
       let pdfFormat: [number, number] | "a4" | "legal" = "legal";
       let pageWidthMm = 215.9;
       let pageHeightMm = 355.6;
+      let targetWidthPx = 816; // 215.9mm @ 96 DPI
 
       if (paperSize === "a4") {
         pdfFormat = "a4";
         pageWidthMm = 210;
         pageHeightMm = 297;
+        targetWidthPx = 794;
       } else if (paperSize === "f4") {
         pdfFormat = [215, 330];
         pageWidthMm = 215;
         pageHeightMm = 330;
+        targetWidthPx = 813;
       } else {
         pdfFormat = "legal";
         pageWidthMm = 215.9;
         pageHeightMm = 355.6;
+        targetWidthPx = 816;
       }
 
       const pdf = new jsPDF({
@@ -285,38 +282,24 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
         compress: true,
       });
 
-      const canvasConfig = {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: "#ffffff",
-        logging: false,
-        imageTimeout: 10000,
-        removeContainer: true,
-      };
-
-      const marginMm = 8;
-      const printableWidthMm = pageWidthMm - marginMm * 2;
-
       if (sheet1 && sheet2) {
-        // Halaman 1: Sheet 1
-        const canvas1 = await html2canvas(sheet1, canvasConfig);
-        const imgData1 = canvas1.toDataURL("image/jpeg", 0.95);
-        const contentHeightMm1 = Math.min((canvas1.height * printableWidthMm) / canvas1.width, pageHeightMm - marginMm * 2);
-        pdf.addImage(imgData1, "JPEG", marginMm, marginMm, printableWidthMm, contentHeightMm1);
+        // Render Lembar 1 secara bersih
+        const canvas1 = await captureCleanDocumentSheet(sheet1, targetWidthPx);
+        const imgData1 = canvas1.toDataURL("image/png");
+        const contentHeightMm1 = (canvas1.height * pageWidthMm) / canvas1.width;
+        pdf.addImage(imgData1, "PNG", 0, 0, pageWidthMm, Math.min(contentHeightMm1, pageHeightMm), undefined, "FAST");
 
-        // Halaman 2: Sheet 2
+        // Render Lembar 2 secara bersih di Halaman 2
         pdf.addPage(pdfFormat, "portrait");
-        const canvas2 = await html2canvas(sheet2, canvasConfig);
-        const imgData2 = canvas2.toDataURL("image/jpeg", 0.95);
-        const contentHeightMm2 = Math.min((canvas2.height * printableWidthMm) / canvas2.width, pageHeightMm - marginMm * 2);
-        pdf.addImage(imgData2, "JPEG", marginMm, marginMm, printableWidthMm, contentHeightMm2);
+        const canvas2 = await captureCleanDocumentSheet(sheet2, targetWidthPx);
+        const imgData2 = canvas2.toDataURL("image/png");
+        const contentHeightMm2 = (canvas2.height * pageWidthMm) / canvas2.width;
+        pdf.addImage(imgData2, "PNG", 0, 0, pageWidthMm, Math.min(contentHeightMm2, pageHeightMm), undefined, "FAST");
       } else if (rootArea) {
-        // Fallback satu dokumen penuh
-        const canvas = await html2canvas(rootArea, canvasConfig);
-        const imgData = canvas.toDataURL("image/jpeg", 0.95);
-        const contentHeightMm = (canvas.height * printableWidthMm) / canvas.width;
-        pdf.addImage(imgData, "JPEG", marginMm, marginMm, printableWidthMm, contentHeightMm);
+        const canvas = await captureCleanDocumentSheet(rootArea, targetWidthPx);
+        const imgData = canvas.toDataURL("image/png");
+        const contentHeightMm = (canvas.height * pageWidthMm) / canvas.width;
+        pdf.addImage(imgData, "PNG", 0, 0, pageWidthMm, Math.min(contentHeightMm, pageHeightMm), undefined, "FAST");
       }
 
       const cleanName = formData.namaKorban
@@ -324,9 +307,11 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
         : "Laporan";
 
       pdf.save(`Form_PE_GHPR_${cleanName}.pdf`);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 4000);
     } catch (err) {
       console.error("Gagal membuat PDF otomatis:", err);
-      // Pemicu fallback ke dialog cetak jika html2canvas terhalang
+      // Pemicu fallback langsung ke window.print
       handlePrint();
     } finally {
       setIsGenerating(false);
@@ -334,7 +319,10 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
   };
 
   const handleLoadSample = () => {
-    setFormData(samplePdfData);
+    setFormData({
+      ...samplePdfData,
+      tandaTanganUrl: getOfficialSignatureUrl(samplePdfData.tandaTanganUrl)
+    });
   };
 
   return (
@@ -345,18 +333,18 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
       {/* Modal Top Bar (Hidden on print) */}
       <div
         id="ghpr-modal-header"
-        className="bg-slate-900 text-white px-4 sm:px-6 py-3.5 flex items-center justify-between border-b border-slate-800 shrink-0 print:hidden flex-wrap gap-3"
+        className="bg-slate-900 text-white px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-800 shrink-0 print:hidden flex-wrap gap-3"
       >
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shrink-0">
+          <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shrink-0 shadow-xs">
             <FileText size={18} />
           </div>
           <div>
             <h3 className="text-sm font-bold tracking-tight uppercase">
-              Pratinjau Cetak & Download PDF
+              Pratinjau Cetak & Unduh PDF Resmi
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Dokumen Resmi Formulir Penyelidikan Epidemiologi GHPR
+              Dokumen Formulir Penyelidikan Epidemiologi GHPR (UPT Puskesmas Sananwetan)
             </p>
           </div>
         </div>
@@ -375,7 +363,7 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
                   ? "bg-blue-600 text-white shadow-xs"
                   : "text-slate-300 hover:text-white"
               }`}
-              title="Kertas Legal (8.5 x 14 in / 216 x 356 mm)"
+              title="Kertas Legal (8.5 x 14 in / 215.9 x 355.6 mm)"
             >
               Legal
             </button>
@@ -414,16 +402,21 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
             <Sparkles size={13} /> Contoh Data
           </button>
 
+          {/* Tombol Unduh PDF */}
           <button
             type="button"
             onClick={handleDownloadPdf}
             disabled={isGenerating}
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 disabled:opacity-50 text-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider transition shadow-sm cursor-pointer"
-            title="Unduh file PDF dengan pembagian halaman otomatis"
+            title="Unduh file PDF resmi (100% sama dengan pratinjau)"
           >
             {isGenerating ? (
               <>
-                <Loader2 size={15} className="animate-spin" /> Membuat PDF...
+                <Loader2 size={15} className="animate-spin" /> Memproses PDF...
+              </>
+            ) : downloadSuccess ? (
+              <>
+                <CheckCircle2 size={15} className="text-emerald-200" /> Berhasil Diunduh!
               </>
             ) : (
               <>
@@ -432,11 +425,12 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
             )}
           </button>
 
+          {/* Tombol Dialog Cetak Langsung */}
           <button
             type="button"
             onClick={handlePrint}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider transition shadow-sm cursor-pointer"
-            title="Buka Dialog Cetak / Simpan PDF Browser"
+            title="Buka Dialog Cetak Browser / Simpan PDF"
           >
             <Printer size={15} /> Dialog Cetak
           </button>
@@ -445,11 +439,31 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
             type="button"
             onClick={() => setShowPdfModal(false)}
             className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition ml-1 cursor-pointer"
+            title="Tutup Modal"
           >
             <X size={18} />
           </button>
         </div>
       </div>
+
+      {/* Status Bar info jika berhasil unduh */}
+      {downloadSuccess && (
+        <div className="bg-emerald-600 text-white text-xs px-4 py-2 flex items-center justify-between print:hidden animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={15} />
+            <span>
+              <strong>File PDF berhasil diunduh!</strong> Format dokumen telah diproses rapi 2 lembar sesuai pratinjau.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDownloadSuccess(false)}
+            className="text-emerald-100 hover:text-white"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Preview Container */}
       <div className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 bg-slate-800/90 flex flex-col items-center print:bg-white print:p-0 print:m-0 print:overflow-visible">
@@ -467,3 +481,4 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
     </div>
   );
 };
+

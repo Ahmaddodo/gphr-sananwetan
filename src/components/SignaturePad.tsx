@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { PenTool, CheckCircle2, RotateCcw, Sparkles, Image as ImageIcon, ShieldCheck, Lock } from "lucide-react";
 import { FormGHPRData } from "../types";
-import { OFFICIAL_SIGNATURE_STAMP_URL } from "./SignatureData";
+import { OFFICIAL_SIGNATURE_STAMP_URL, getOfficialSignatureUrl } from "./SignatureData";
 
 interface SignaturePadProps {
   formData: FormGHPRData;
@@ -16,10 +16,11 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 
   const activeMode = "gambar";
 
-  // Ensure default signature is populated if empty or set to automatic
+  // Pastikan stempel dan tanda tangan resmi selalu terisi permanen
   useEffect(() => {
-    if (!formData.tandaTanganUrl || formData.jenisTandaTangan !== "gambar") {
-      updateField("tandaTanganUrl", OFFICIAL_SIGNATURE_STAMP_URL);
+    const validUrl = getOfficialSignatureUrl(formData.tandaTanganUrl);
+    if (formData.tandaTanganUrl !== validUrl || formData.jenisTandaTangan !== "gambar") {
+      updateField("tandaTanganUrl", validUrl);
       updateField("jenisTandaTangan", "gambar");
       updateField("tandaTanganOtomatis", false);
     }
@@ -83,9 +84,10 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
         <div className="p-4 bg-white/95 rounded-xl border border-slate-300 text-center shadow-inner">
           <div className="bg-white p-2 rounded-lg border border-slate-200 inline-block max-w-full overflow-hidden">
             <img
-              src={formData.tandaTanganUrl || OFFICIAL_SIGNATURE_STAMP_URL}
+              src={getOfficialSignatureUrl(formData.tandaTanganUrl)}
               alt="Tanda Tangan & Stempel Resmi"
               className="max-h-28 max-w-full mx-auto object-contain rounded"
+              referrerPolicy="no-referrer"
             />
           </div>
         </div>
