@@ -20,7 +20,9 @@ import {
   KeyRound,
   FileText,
   ShieldAlert,
-  Github
+  Github,
+  Sparkles,
+  ShieldCheck
 } from "lucide-react";
 import { FormGHPRData, FormErrors, SubmissionResult, UserAccessProfile, PatientMonitoringItem } from "./types";
 import { Header } from "./components/Header";
@@ -271,6 +273,16 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<UserAccessProfile | null>(() => {
     return getActiveUserProfile();
+  });
+
+  // Mode Form Fleksibel (Revisi tanpa tanda bintang *, seluruh isian boleh dikosongi untuk input pasien baru)
+  const [isFlexibleMode, setIsFlexibleMode] = useState<boolean>(() => {
+    try {
+      const user = getActiveUserProfile();
+      return !!(user && (user.username.toLowerCase() === "admin" || user.role === "admin" || user.isKoordinator));
+    } catch {
+      return false;
+    }
   });
 
   // Notifikasi Sesi Berakhir Otomatis (Inactivity Timeout 1 Jam)
@@ -760,6 +772,12 @@ export default function App() {
   };
 
   const validateStep = (currentStep: number): boolean => {
+    // Jika mode fleksibel aktif (untuk admin input pasien baru), seluruh pertanyaan boleh dikosongi tanpa tanda bintang!
+    if (isFlexibleMode && !editingCaseId) {
+      setErrors({});
+      return true;
+    }
+
     const errs: FormErrors = {};
 
     if (currentStep === 1) {
@@ -983,7 +1001,11 @@ export default function App() {
           );
         }
 
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        // Langsung alihkan ke profil header daftar pasien dipantau
+        setTimeout(() => {
+          handleSwitchTab("monitoring");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }, 500);
       } else {
         // Untuk custom backend / API endpoint biasa
         const response = await fetch(targetUrl, {
@@ -1025,7 +1047,11 @@ export default function App() {
           );
         }
 
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        // Langsung alihkan ke profil header daftar pasien dipantau
+        setTimeout(() => {
+          handleSwitchTab("monitoring");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }, 500);
       }
     } catch (err: any) {
       console.warn("Koneksi gagal saat kirim data, mengamankan ke antrean offline:", err);
@@ -1055,7 +1081,12 @@ export default function App() {
       setResetSuccessMessage(
         `Koneksi terputus: Data laporan (${payload.id_kasus}) telah diamankan ke Antrean Offline Lokal dan akan otomatis disinkronkan ke Google Sheets ketika jaringan kembali online.`
       );
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      
+      // Langsung alihkan ke profil header daftar pasien dipantau
+      setTimeout(() => {
+        handleSwitchTab("monitoring");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }, 500);
     } finally {
       setIsSubmitting(false);
     }
@@ -1318,44 +1349,100 @@ export default function App() {
             {/* Main Form Card */}
             <div className={`${
               isAdminMode ? "lg:col-span-8" : "w-full"
-            } bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col`}>
-              <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-slate-100 flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                    {React.createElement(currentStepItem.icon, { size: 18, className: "text-blue-600 shrink-0" })}
-                    Langkah {step}: {currentStepItem.title}
-                  </h2>
-                  <p className="text-[11px] sm:text-xs font-semibold text-slate-500 tracking-wide mt-0.5">
-                    {editingCaseId
-                      ? "Mode Edit Kasus — Lengkapi seluruh isian bertanda bintang (*) sebelum menyimpan pembaruan."
-                      : "Formulir Surveilans PE GHPR — Lengkapi isian bertanda bintang (*)."}
-                  </p>
-                </div>
-                <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1">
-                  {step}/4
-                </span>
-              </div>
+            } flex flex-col space-y-4`}>
+              {/* Banner Mode Form Input Pasien Baru (Revisi Bebas Bintang) untuk Akses Admin */}
+              {(currentUser.username.toLowerCase() === "admin" || currentUser.role === "admin" || currentUser.isKoordinator) && !editingCaseId && (
+                <div className="rounded-2xl border border-emerald-300/80 bg-linear-to-r from-emerald-900 via-teal-900 to-slate-900 p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
+                      <Sparkles size={20} className="text-emerald-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm text-white">
+                          Salinan Formulir PE GHPR (Input Pasien Baru)
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-slate-950">
+                          Akses Admin
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isFlexibleMode
+                            ? "bg-emerald-500/30 text-emerald-200 border border-emerald-400/40"
+                            : "bg-slate-700 text-slate-300"
+                        }`}>
+                          {isFlexibleMode ? "Boleh Dikosongi di Seluruh Pertanyaan" : "Mode Standar (Wajib Lengkap)"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-100/90 mt-1 leading-relaxed">
+                        {isFlexibleMode
+                          ? "Tanda bintang (*) telah dinonaktifkan di seluruh isian. Anda dapat langsung melompat antar-langkah atau menyimpan pasien baru tanpa hambatan validasi."
+                          : "Formulir saat ini menerapkan tanda bintang merah (*) sebagai isian wajib."}
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="p-5 sm:p-6 md:p-7 flex-1">
-                <FormSteps
-                  step={step}
-                  formData={formData}
-                  errors={errors}
-                  updateField={updateField}
-                  listKelurahan={listKelurahan}
-                  listKecamatan={listKecamatan}
-                  listKabKota={listKabKota}
-                  OTHER_VAL={OTHER_VAL}
-                  OTHER_DATALIST={OTHER_DATALIST}
-                  isOther={isOther}
-                  isExactOther={isExactOther}
-                  getFinalKelurahan={getFinalKelurahan}
-                  getFinalKecamatan={getFinalKecamatan}
-                  getFinalKabKota={getFinalKabKota}
-                  isAdminMode={isAdminMode}
-                  isEditing={Boolean(editingCaseId)}
-                  editingCaseId={editingCaseId}
-                />
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsFlexibleMode(!isFlexibleMode);
+                        setErrors({});
+                        setSubmitError("");
+                      }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                        isFlexibleMode
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          : "bg-white/20 hover:bg-white/30 text-white"
+                      }`}
+                    >
+                      <ShieldCheck size={14} />
+                      {isFlexibleMode ? "Bebas Bintang: Aktif" : "Aktifkan Bebas Bintang"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      {React.createElement(currentStepItem.icon, { size: 18, className: "text-blue-600 shrink-0" })}
+                      Langkah {step}: {currentStepItem.title}
+                    </h2>
+                    <p className="text-[11px] sm:text-xs font-semibold text-slate-500 tracking-wide mt-0.5">
+                      {editingCaseId
+                        ? "Mode Edit Kasus — Lengkapi seluruh isian bertanda bintang (*) sebelum menyimpan pembaruan."
+                        : isFlexibleMode
+                        ? "Salinan Formulir Fleksibel — Seluruh pertanyaan boleh dikosongi untuk perekaman cepat pasien baru."
+                        : "Formulir Surveilans PE GHPR — Lengkapi isian bertanda bintang (*)."}
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1">
+                    {step}/4
+                  </span>
+                </div>
+
+                <div className="p-5 sm:p-6 md:p-7 flex-1">
+                  <FormSteps
+                    step={step}
+                    formData={formData}
+                    errors={errors}
+                    updateField={updateField}
+                    listKelurahan={listKelurahan}
+                    listKecamatan={listKecamatan}
+                    listKabKota={listKabKota}
+                    OTHER_VAL={OTHER_VAL}
+                    OTHER_DATALIST={OTHER_DATALIST}
+                    isOther={isOther}
+                    isExactOther={isExactOther}
+                    getFinalKelurahan={getFinalKelurahan}
+                    getFinalKecamatan={getFinalKecamatan}
+                    getFinalKabKota={getFinalKabKota}
+                    isAdminMode={isAdminMode}
+                    isEditing={Boolean(editingCaseId)}
+                    editingCaseId={editingCaseId}
+                    showAsterisk={editingCaseId ? true : !isFlexibleMode}
+                  />
 
                 {/* Form Footer Action Buttons */}
                 <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
@@ -1499,6 +1586,7 @@ export default function App() {
                 )}
               </div>
             </div>
+          </div>
 
             {/* Sidebar Card (4 cols) - Khusus Admin Mode */}
             {isAdminMode && (

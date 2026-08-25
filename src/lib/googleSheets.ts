@@ -395,6 +395,7 @@ var FIELD_MAP = {
   "id": "id_kasus",
   "no": "id_kasus",
   "nomor": "id_kasus",
+  "no kasus": "id_kasus",
   "kode kasus": "id_kasus",
   "waktu submit": "timestamp_submit",
   "timestamp_submit": "timestamp_submit",
@@ -405,6 +406,7 @@ var FIELD_MAP = {
   "tanggal kejadian": "waktuKejadian",
   "tgl kejadian": "waktuKejadian",
   "tanggal gigitan": "waktuKejadian",
+  "waktu gigitan": "waktuKejadian",
   "alamat kejadian": "alamatKejadian",
   "alamatkejadian": "alamatKejadian",
   "lokasi kejadian": "alamatKejadian",
@@ -412,7 +414,9 @@ var FIELD_MAP = {
   "kelurahan": "kelurahan_final",
   "desa/kelurahan": "kelurahan_final",
   "desa / kelurahan": "kelurahan_final",
+  "kelurahan/desa": "kelurahan_final",
   "desa": "kelurahan_final",
+  "wilayah": "kelurahan_final",
   "kelurahan_final": "kelurahan_final",
   "kecamatan": "kecamatan_final",
   "kecamatan_final": "kecamatan_final",
@@ -431,6 +435,7 @@ var FIELD_MAP = {
   "sumberinfo": "sumberInfo",
   "kronologi kejadian": "kronologi",
   "kronologi": "kronologi",
+  "kronologis": "kronologi",
   "uraian kejadian": "kronologi",
   "spesies hpr": "spesies_final",
   "spesieshpr": "spesies_final",
@@ -438,6 +443,7 @@ var FIELD_MAP = {
   "spesies": "spesies_final",
   "jenis hewan": "spesies_final",
   "hewan": "spesies_final",
+  "hewan penggigit": "spesies_final",
   "ras hewan": "ras",
   "ras": "ras",
   "jenis kelamin hewan": "jkHewan",
@@ -450,6 +456,7 @@ var FIELD_MAP = {
   "metode pemeliharaan": "metodePelihara",
   "metodepelihara": "metodePelihara",
   "pemeliharaan": "metodePelihara",
+  "cara pemeliharaan": "metodePelihara",
   "asalhewan": "asalHewan",
   "asal hewan": "asalHewan",
   "pakan": "pakan",
@@ -460,6 +467,7 @@ var FIELD_MAP = {
   "kondisi hewan": "kondisiHewan",
   "kondisihewan": "kondisiHewan",
   "keadaan hewan": "kondisiHewan",
+  "status hewan": "kondisiHewan",
   "riwayat vaksinasi": "riwayatVaksin",
   "riwayat vaksin": "riwayatVaksin",
   "riwayatvaksin": "riwayatVaksin",
@@ -469,6 +477,7 @@ var FIELD_MAP = {
   "tanggalvaksin": "tanggalVaksin",
   "tgl vaksinasi": "tanggalVaksin",
   "nama pemilik": "pemilikHewan",
+  "nama pemilik hewan": "pemilikHewan",
   "pemilik hewan": "pemilikHewan",
   "pemilikhewan": "pemilikHewan",
   "pemilik": "pemilikHewan",
@@ -480,28 +489,57 @@ var FIELD_MAP = {
   "telepon pemilik": "kontakPemilik",
   "nama korban": "namaKorban",
   "namakorban": "namaKorban",
+  "nama pasien": "namaKorban",
+  "namapasien": "namaKorban",
+  "nama lengkap": "namaKorban",
+  "nama lengkap korban": "namaKorban",
+  "nama lengkap pasien": "namaKorban",
+  "nama penderita": "namaKorban",
   "korban": "namaKorban",
+  "pasien": "namaKorban",
   "no hp korban": "noHpKorban",
   "nohpkorban": "noHpKorban",
   "hp korban": "noHpKorban",
+  "no hp pasien": "noHpKorban",
+  "nohppasien": "noHpKorban",
+  "hp pasien": "noHpKorban",
   "kontak korban": "noHpKorban",
   "kontakkorban": "noHpKorban",
+  "kontak pasien": "noHpKorban",
   "telepon korban": "noHpKorban",
+  "telepon pasien": "noHpKorban",
   "nomor hp korban": "noHpKorban",
+  "nomor hp pasien": "noHpKorban",
+  "no telp": "noHpKorban",
+  "no wa": "noHpKorban",
   "umur korban": "umurKorban_formatted",
   "umurkorban": "umurKorban_formatted",
   "usia korban": "umurKorban_formatted",
+  "umur pasien": "umurKorban_formatted",
+  "umurpasien": "umurKorban_formatted",
+  "usia pasien": "umurKorban_formatted",
+  "umur": "umurKorban_formatted",
+  "usia": "umurKorban_formatted",
   "alamat korban": "alamatKorban",
   "alamatkorban": "alamatKorban",
+  "alamat pasien": "alamatKorban",
+  "alamatpasien": "alamatKorban",
+  "alamat penderita": "alamatKorban",
+  "alamat": "alamatKorban",
   "jenis kelamin korban": "jkKorban",
   "jkkorban": "jkKorban",
   "jk korban": "jkKorban",
+  "jenis kelamin pasien": "jkKorban",
+  "jk pasien": "jkKorban",
   "kelamin korban": "jkKorban",
+  "kelamin pasien": "jkKorban",
+  "jenis kelamin": "jkKorban",
+  "kondisi korban": "kondisiKorban",
   "kondisi luka": "kondisiLuka",
   "kondisiluka": "kondisiLuka",
   "kondisi luka korban": "kondisiLuka",
   "kondisi luka saat ini": "kondisiLuka",
-  "status luka": "kondisiLuka",
+  "kategori luka": "kondisiLuka",
   "derajat luka": "kondisiLuka",
   "tingkat luka": "kondisiLuka",
   "keadaan luka": "kondisiLuka",
@@ -509,22 +547,37 @@ var FIELD_MAP = {
   "lokasi luka": "lokasiLuka",
   "lokasiluka": "lokasiLuka",
   "bagian tubuh digigit": "lokasiLuka",
+  "bagian tubuh": "lokasiLuka",
   "letak luka": "lokasiLuka",
+  "area luka": "lokasiLuka",
   "pertolongan pertama": "pertolonganPertama",
   "pertolonganpertama": "pertolonganPertama",
   "tindakan pertolongan": "pertolonganPertama",
+  "cuci luka": "pertolonganPertama",
+  "pencucian luka": "pertolonganPertama",
+  "p3k": "pertolonganPertama",
   "detail pertolongan": "detailPertolongan",
   "detailpertolongan": "detailPertolongan",
   "tindakan kasus": "tindakanKasus",
   "tindakankasus": "tindakanKasus",
+  "tindakan terhadap kasus": "tindakanKasus",
+  "tindakan terhadap korban": "tindakanKasus",
+  "tindakan korban": "tindakanKasus",
+  "tindakan pasien": "tindakanKasus",
+  "tindakan medis": "tindakanKasus",
+  "pemberian var": "tindakanKasus",
   "tindakan": "tindakanKasus",
   "tindakan terhadap hpr": "tindakanHPR",
+  "tindakan hpr": "tindakanHPR",
   "tindakanhpr": "tindakanHPR",
+  "observasi hpr": "tindakanHPR",
   "tindakan masyarakat": "tindakanMasyarakat",
   "tindakanmasyarakat": "tindakanMasyarakat",
   "rekomendasi": "rekomendasi",
   "rekomendasi / tindak lanjut": "rekomendasi",
+  "rekomendasi tindak lanjut": "rekomendasi",
   "tindak lanjut": "rekomendasi",
+  "rencana tindak lanjut": "rekomendasi",
   "fotodokumentasi": "fotoDokumentasi",
   "ketua tim pe": "timKetua",
   "ketua tim": "timKetua",
@@ -537,6 +590,7 @@ var FIELD_MAP = {
   "tanggalpelaksanaan": "tanggalPelaksanaan",
   "tanggal pelaksanaan pe": "tanggalPelaksanaan",
   "tgl pelaksanaan": "tanggalPelaksanaan",
+  "tanggal pe": "tanggalPelaksanaan",
   "pelaksana (petugas)": "pelaksanaNama",
   "pelaksanama": "pelaksanaNama",
   "pelaksana nama": "pelaksanaNama",
@@ -544,6 +598,8 @@ var FIELD_MAP = {
   "pelaksana": "pelaksanaNama",
   "petugas": "pelaksanaNama",
   "nama petugas": "pelaksanaNama",
+  "petugas pe": "pelaksanaNama",
+  "petugas pj": "pelaksanaNama",
   "nip pelaksana": "pelaksanaNIP",
   "pelaksananip": "pelaksanaNIP",
   "nip": "pelaksanaNIP",
@@ -972,8 +1028,9 @@ function prosesDataMasuk(data, action) {
 
     for (var colIdx = 0; colIdx < existingHeaders.length; colIdx++) {
       var rawHeaderText = String(existingHeaders[colIdx] || "");
-      var headerText = rawHeaderText.toLowerCase().trim();
-      var targetFieldKey = FIELD_MAP[headerText];
+      // Bersihkan nomor awalan seperti '1. ', '2) ', tanda baca, dan spasi berlebih
+      var headerText = rawHeaderText.replace(/^\s*\d+[\.\)\-]\s*/, "").replace(/[:\*]/g, "").toLowerCase().trim();
+      var targetFieldKey = FIELD_MAP[headerText] || FIELD_MAP[rawHeaderText.toLowerCase().trim()];
 
       var val = "";
       if (targetFieldKey && data[targetFieldKey] !== undefined && data[targetFieldKey] !== null && data[targetFieldKey] !== "") {
@@ -986,45 +1043,47 @@ function prosesDataMasuk(data, action) {
         // Pencarian pintar berdasarkan kata kunci header
         if (headerText.indexOf("kasus") !== -1 || headerText === "id" || headerText === "no") val = data.id_kasus;
         else if (headerText.indexOf("submit") !== -1 || headerText.indexOf("timestamp") !== -1) val = data.timestamp_submit;
-        else if (headerText.indexOf("kejadian") !== -1 && (headerText.indexOf("waktu") !== -1 || headerText.indexOf("tgl") !== -1 || headerText.indexOf("tanggal") !== -1)) val = data.waktuKejadian;
+        else if ((headerText.indexOf("kejadian") !== -1 || headerText.indexOf("gigitan") !== -1) && (headerText.indexOf("waktu") !== -1 || headerText.indexOf("tgl") !== -1 || headerText.indexOf("tanggal") !== -1)) val = data.waktuKejadian;
         else if (headerText.indexOf("alamat kejadian") !== -1 || headerText.indexOf("lokasi kejadian") !== -1 || headerText.indexOf("tempat kejadian") !== -1) val = data.alamatKejadian;
-        else if (headerText.indexOf("kelurahan") !== -1 || headerText.indexOf("desa") !== -1) val = data.kelurahan_final || data.kelurahan;
+        else if (headerText.indexOf("kelurahan") !== -1 || headerText.indexOf("desa") !== -1 || headerText.indexOf("wilayah") !== -1) val = data.kelurahan_final || data.kelurahan;
         else if (headerText.indexOf("kecamatan") !== -1) val = data.kecamatan_final || data.kecamatan;
         else if (headerText.indexOf("kabupaten") !== -1 || headerText.indexOf("kota") !== -1) val = data.kabupatenKota_final || data.kabupatenKota;
         else if (headerText.indexOf("provinsi") !== -1) val = data.provinsi;
         else if (headerText.indexOf("sumber") !== -1) val = data.sumberInfo;
         else if (headerText.indexOf("kronologi") !== -1 || headerText.indexOf("uraian") !== -1) val = data.kronologi;
-        else if (headerText.indexOf("spesies") !== -1 || headerText.indexOf("jenis hewan") !== -1) val = data.spesies_final || data.spesiesHPR;
+        else if (headerText.indexOf("spesies") !== -1 || headerText.indexOf("jenis hewan") !== -1 || headerText.indexOf("hewan penggigit") !== -1) val = data.spesies_final || data.spesiesHPR;
         else if (headerText.indexOf("ras") !== -1) val = data.ras;
         else if (headerText.indexOf("kelamin hewan") !== -1 || headerText.indexOf("jk hewan") !== -1) val = data.jkHewan;
         else if (headerText.indexOf("umur hewan") !== -1 || headerText.indexOf("usia hewan") !== -1) val = data.umurHewan_formatted || data.umurHewan;
         else if (headerText.indexOf("pelihara") !== -1) val = data.metodePelihara;
-        else if (headerText.indexOf("kondisi hewan") !== -1 || headerText.indexOf("keadaan hewan") !== -1) val = data.kondisiHewan;
-        else if (headerText.indexOf("riwayat vaksin") !== -1 || headerText.indexOf("vaksinasi") !== -1 && headerText.indexOf("tgl") === -1 && headerText.indexOf("tanggal") === -1) val = data.riwayatVaksin;
+        else if (headerText.indexOf("kondisi hewan") !== -1 || headerText.indexOf("keadaan hewan") !== -1 || headerText.indexOf("status hewan") !== -1) val = data.kondisiHewan;
+        else if (headerText.indexOf("riwayat vaksin") !== -1 || (headerText.indexOf("vaksinasi") !== -1 && headerText.indexOf("tgl") === -1 && headerText.indexOf("tanggal") === -1)) val = data.riwayatVaksin;
         else if (headerText.indexOf("tanggal vaksin") !== -1 || headerText.indexOf("tgl vaksin") !== -1) val = data.tanggalVaksin;
-        else if (headerText.indexOf("nama pemilik") !== -1 || (headerText.indexOf("pemilik") !== -1 && headerText.indexOf("alamat") === -1 && headerText.indexOf("kontak") === -1)) val = data.pemilikHewan;
+        else if (headerText.indexOf("nama pemilik") !== -1 || (headerText.indexOf("pemilik") !== -1 && headerText.indexOf("alamat") === -1 && headerText.indexOf("kontak") === -1 && headerText.indexOf("hp") === -1)) val = data.pemilikHewan;
         else if (headerText.indexOf("alamat pemilik") !== -1) val = data.alamatPemilik;
-        else if (headerText.indexOf("kontak") !== -1 || headerText.indexOf("hp") !== -1 || headerText.indexOf("telepon") !== -1) val = data.kontakPemilik;
-        else if (headerText.indexOf("nama korban") !== -1 || (headerText.indexOf("korban") !== -1 && headerText.indexOf("alamat") === -1 && headerText.indexOf("umur") === -1 && headerText.indexOf("usia") === -1 && headerText.indexOf("kelamin") === -1 && headerText.indexOf("jk") === -1 && headerText.indexOf("hp") === -1 && headerText.indexOf("kontak") === -1 && headerText.indexOf("telepon") === -1)) val = data.namaKorban;
-        else if (headerText.indexOf("no hp korban") !== -1 || headerText.indexOf("hp korban") !== -1 || headerText.indexOf("kontak korban") !== -1 || (headerText.indexOf("korban") !== -1 && (headerText.indexOf("hp") !== -1 || headerText.indexOf("kontak") !== -1 || headerText.indexOf("telepon") !== -1))) val = data.noHpKorban || data.kontakKorban;
-        else if (headerText.indexOf("umur korban") !== -1 || headerText.indexOf("usia korban") !== -1) val = data.umurKorban_formatted || data.umurKorban;
-        else if (headerText.indexOf("alamat korban") !== -1) val = data.alamatKorban;
-        else if (headerText.indexOf("kelamin korban") !== -1 || headerText.indexOf("jk korban") !== -1) val = data.jkKorban;
-        else if (headerText.indexOf("luka") !== -1 && headerText.indexOf("lokasi") === -1 && headerText.indexOf("letak") === -1 && headerText.indexOf("bagian") === -1) val = data.kondisiLuka;
-        else if (headerText.indexOf("lokasi luka") !== -1 || headerText.indexOf("letak luka") !== -1 || headerText.indexOf("bagian tubuh") !== -1) val = data.lokasiLuka;
-        else if (headerText.indexOf("pertolongan") !== -1) val = data.pertolonganPertama;
-        else if (headerText.indexOf("tindakan kasus") !== -1 || headerText.indexOf("tindakan terhadap korban") !== -1 || headerText === "tindakan") val = data.tindakanKasus;
-        else if (headerText.indexOf("tindakan terhadap hpr") !== -1 || headerText.indexOf("tindakan hpr") !== -1) val = data.tindakanHPR;
+        else if ((headerText.indexOf("pemilik") !== -1 && (headerText.indexOf("kontak") !== -1 || headerText.indexOf("hp") !== -1 || headerText.indexOf("telepon") !== -1))) val = data.kontakPemilik;
+        else if (headerText.indexOf("nama korban") !== -1 || headerText.indexOf("nama pasien") !== -1 || headerText.indexOf("nama lengkap") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && headerText.indexOf("alamat") === -1 && headerText.indexOf("umur") === -1 && headerText.indexOf("usia") === -1 && headerText.indexOf("kelamin") === -1 && headerText.indexOf("jk") === -1 && headerText.indexOf("hp") === -1 && headerText.indexOf("kontak") === -1 && headerText.indexOf("telepon") === -1)) val = data.namaKorban;
+        else if (headerText.indexOf("hp korban") !== -1 || headerText.indexOf("hp pasien") !== -1 || headerText.indexOf("no hp korban") !== -1 || headerText.indexOf("no hp pasien") !== -1 || headerText.indexOf("kontak korban") !== -1 || headerText.indexOf("kontak pasien") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && (headerText.indexOf("hp") !== -1 || headerText.indexOf("kontak") !== -1 || headerText.indexOf("telepon") !== -1 || headerText.indexOf("wa") !== -1))) val = data.noHpKorban || data.kontakKorban;
+        else if (headerText.indexOf("umur korban") !== -1 || headerText.indexOf("usia korban") !== -1 || headerText.indexOf("umur pasien") !== -1 || headerText.indexOf("usia pasien") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && (headerText.indexOf("umur") !== -1 || headerText.indexOf("usia") !== -1))) val = data.umurKorban_formatted || data.umurKorban;
+        else if (headerText.indexOf("alamat korban") !== -1 || headerText.indexOf("alamat pasien") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && headerText.indexOf("alamat") !== -1)) val = data.alamatKorban;
+        else if (headerText.indexOf("kelamin korban") !== -1 || headerText.indexOf("jk korban") !== -1 || headerText.indexOf("kelamin pasien") !== -1 || headerText.indexOf("jk pasien") !== -1 || ((headerText.indexOf("korban") !== -1 || headerText.indexOf("pasien") !== -1) && (headerText.indexOf("kelamin") !== -1 || headerText.indexOf("jk") !== -1))) val = data.jkKorban;
+        else if (headerText.indexOf("luka") !== -1 && headerText.indexOf("lokasi") === -1 && headerText.indexOf("letak") === -1 && headerText.indexOf("bagian") === -1 && headerText.indexOf("area") === -1) val = data.kondisiLuka;
+        else if (headerText.indexOf("lokasi luka") !== -1 || headerText.indexOf("letak luka") !== -1 || headerText.indexOf("bagian tubuh") !== -1 || headerText.indexOf("area luka") !== -1) val = data.lokasiLuka;
+        else if (headerText.indexOf("pertolongan") !== -1 || headerText.indexOf("cuci luka") !== -1 || headerText.indexOf("p3k") !== -1) val = data.pertolonganPertama;
+        else if (headerText.indexOf("tindakan kasus") !== -1 || headerText.indexOf("tindakan terhadap korban") !== -1 || headerText.indexOf("tindakan korban") !== -1 || headerText.indexOf("tindakan pasien") !== -1 || headerText.indexOf("tindakan medis") !== -1 || headerText === "tindakan") val = data.tindakanKasus;
+        else if (headerText.indexOf("tindakan terhadap hpr") !== -1 || headerText.indexOf("tindakan hpr") !== -1 || headerText.indexOf("observasi hpr") !== -1) val = data.tindakanHPR;
         else if (headerText.indexOf("rekomendasi") !== -1 || headerText.indexOf("tindak lanjut") !== -1) val = data.rekomendasi;
         else if (headerText.indexOf("ketua tim") !== -1) val = data.timKetua;
         else if (headerText.indexOf("anggota") !== -1) val = data.timAnggota;
-        else if (headerText.indexOf("tanggal pelaksana") !== -1 || headerText.indexOf("tgl pelaksana") !== -1) val = data.tanggalPelaksanaan;
+        else if (headerText.indexOf("tanggal pelaksana") !== -1 || headerText.indexOf("tgl pelaksana") !== -1 || headerText.indexOf("tanggal pe") !== -1) val = data.tanggalPelaksanaan;
         else if (headerText.indexOf("pelaksana") !== -1 && headerText.indexOf("nip") === -1) val = data.pelaksanaNama;
         else if (headerText.indexOf("nip") !== -1) val = data.pelaksanaNIP;
         else if (colIdx < OFFICIAL_HEADERS.length) {
           var posHeader = OFFICIAL_HEADERS[colIdx].toLowerCase();
           var posKey = FIELD_MAP[posHeader];
-          if (posKey && data[posKey] !== undefined) val = String(data[posKey]);
+          if (posKey && data[posKey] !== undefined && data[posKey] !== null && data[posKey] !== "") {
+            val = String(data[posKey]);
+          }
         }
       }
 
@@ -1200,10 +1259,81 @@ export async function sendToAppsScript(
     throw new Error("URL Web App kosong. Silakan atur di Pengaturan Google Sheets.");
   }
 
-  const enhancedPayload = {
+  const namaKorbanVal = (payload.namaKorban || payload.namaPasien || payload["Nama Korban"] || payload["Nama Pasien"] || "").trim();
+  const noHpVal = (payload.noHpKorban || payload.noHpPasien || payload.kontakKorban || payload["No HP Korban"] || payload.kontakPemilik || "").trim();
+  const umurKorbanVal = (payload.umurKorban || payload.umurPasien || payload["Umur Korban"] || "").trim();
+  const alamatKorbanVal = (payload.alamatKorban || payload.alamatPasien || payload["Alamat Korban"] || "").trim();
+  const jkKorbanVal = (payload.jkKorban || payload.jkPasien || payload["Jenis Kelamin Korban"] || "").trim();
+  const kelurahanVal = (payload.kelurahan_final || payload.kelurahan || payload["Kelurahan"] || "Sananwetan").trim();
+  const kecamatanVal = (payload.kecamatan_final || payload.kecamatan || payload["Kecamatan"] || "Sananwetan").trim();
+  const kabKotaVal = (payload.kabupatenKota_final || payload.kabupatenKota || payload["Kabupaten/Kota"] || "Kota Blitar").trim();
+  const spesiesVal = (payload.spesies_final || payload.spesiesHPR || payload["Spesies HPR"] || "Anjing").trim();
+  const waktuKejadianVal = (payload.waktuKejadian || payload["Waktu Kejadian"] || new Date().toISOString().slice(0, 16)).trim();
+  const tglPelaksanaanVal = (payload.tanggalPelaksanaan || payload["Tanggal Pelaksanaan"] || new Date().toISOString().slice(0, 10)).trim();
+
+  const enhancedPayload: Record<string, any> = {
     ...payload,
     action: action,
-    is_update: action === "update"
+    is_update: action === "update",
+    // Field standar
+    namaKorban: namaKorbanVal,
+    noHpKorban: noHpVal,
+    umurKorban: umurKorbanVal,
+    alamatKorban: alamatKorbanVal,
+    jkKorban: jkKorbanVal,
+    kelurahan: kelurahanVal,
+    kelurahan_final: kelurahanVal,
+    kecamatan: kecamatanVal,
+    kecamatan_final: kecamatanVal,
+    kabupatenKota: kabKotaVal,
+    kabupatenKota_final: kabKotaVal,
+    spesiesHPR: spesiesVal,
+    spesies_final: spesiesVal,
+    waktuKejadian: waktuKejadianVal,
+    tanggalPelaksanaan: tglPelaksanaanVal,
+    // Alias sinonim pasien
+    namaPasien: namaKorbanVal,
+    noHpPasien: noHpVal,
+    umurPasien: umurKorbanVal,
+    alamatPasien: alamatKorbanVal,
+    jkPasien: jkKorbanVal,
+    // Alias Header Resmi Google Spreadsheet
+    "ID Kasus": payload.id_kasus || "",
+    "Waktu Submit": payload.timestamp_submit || new Date().toISOString(),
+    "Waktu Kejadian": waktuKejadianVal,
+    "Alamat Kejadian": payload.alamatKejadian || "",
+    "Kelurahan": kelurahanVal,
+    "Kecamatan": kecamatanVal,
+    "Kabupaten/Kota": kabKotaVal,
+    "Provinsi": payload.provinsi || "Jawa Timur",
+    "Sumber Informasi": payload.sumberInfo || "",
+    "Kronologi Kejadian": payload.kronologi || "",
+    "Spesies HPR": spesiesVal,
+    "Ras Hewan": payload.ras || "-",
+    "Jenis Kelamin Hewan": payload.jkHewan || "",
+    "Umur Hewan": payload.umurHewan ? `${payload.umurHewan} ${payload.satuanUmur || "Tahun"}`.trim() : "",
+    "Metode Pemeliharaan": payload.metodePelihara || "",
+    "Kondisi Hewan Saat Ini": payload.kondisiHewan || "",
+    "Riwayat Vaksinasi": payload.riwayatVaksin || "",
+    "Tanggal Vaksinasi": payload.tanggalVaksin || "-",
+    "Nama Pemilik": payload.pemilikHewan || "",
+    "Alamat Pemilik": payload.alamatPemilik || "",
+    "Kontak Pemilik": payload.kontakPemilik || "",
+    "Nama Korban": namaKorbanVal,
+    "No HP Korban": noHpVal,
+    "Umur Korban": umurKorbanVal ? `${umurKorbanVal} Tahun` : "",
+    "Alamat Korban": alamatKorbanVal,
+    "Jenis Kelamin Korban": jkKorbanVal,
+    "Kondisi Luka": payload.kondisiLuka || "",
+    "Lokasi Luka": payload.lokasiLuka || "",
+    "Pertolongan Pertama": payload.pertolonganPertama || "",
+    "Tindakan Kasus": payload.tindakanKasus || "",
+    "Rekomendasi": payload.rekomendasi || "",
+    "Ketua Tim PE": payload.timKetua || "",
+    "Anggota Tim PE": payload.timAnggota || "",
+    "Tanggal Pelaksanaan": tglPelaksanaanVal,
+    "Pelaksana (Petugas)": payload.pelaksanaNama || "",
+    "NIP Pelaksana": payload.pelaksanaNIP || ""
   };
 
   const jsonStr = JSON.stringify(enhancedPayload);

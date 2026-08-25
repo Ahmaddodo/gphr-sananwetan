@@ -253,6 +253,14 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
       if (onPatientAdded) {
         onPatientAdded(payload.id_kasus);
       }
+
+      // Langsung pindahkan ke profil header daftar pasien dipantau
+      if (onSwitchToMonitoring) {
+        setTimeout(() => {
+          onSwitchToMonitoring();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }, 500);
+      }
     } catch (err: any) {
       console.warn("Koneksi gagal, mengamankan ke antrean offline:", err);
       addToOfflineQueue({
@@ -273,6 +281,14 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
 
       if (onPatientAdded) {
         onPatientAdded(payload.id_kasus);
+      }
+
+      // Langsung pindahkan ke profil header daftar pasien dipantau
+      if (onSwitchToMonitoring) {
+        setTimeout(() => {
+          onSwitchToMonitoring();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }, 500);
       }
     } finally {
       setIsSubmitting(false);
@@ -387,7 +403,10 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
           <button
             key={st.num}
             type="button"
-            onClick={() => setStep(st.num)}
+            onClick={() => {
+              setStep(st.num);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
             className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition cursor-pointer ${
               step === st.num
                 ? "bg-white text-slate-900 shadow-xs border border-slate-200/80 font-bold ring-2 ring-emerald-500/20"
@@ -446,7 +465,10 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
             {step > 1 && (
               <button
                 type="button"
-                onClick={() => setStep((s) => Math.max(1, s - 1))}
+                onClick={() => {
+                  setStep((s) => Math.max(1, s - 1));
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
               >
                 <ArrowLeft size={14} /> Langkah {step - 1}
@@ -455,7 +477,10 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
             {step < 4 && (
               <button
                 type="button"
-                onClick={() => setStep((s) => Math.min(4, s + 1))}
+                onClick={() => {
+                  setStep((s) => Math.min(4, s + 1));
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
               >
                 Langkah {step + 1} <ArrowRight size={14} />
