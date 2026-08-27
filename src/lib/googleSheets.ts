@@ -2258,29 +2258,11 @@ export async function fetchDirectGoogleSheetRows(
 export async function fetchOfficerAccountsFromAppsScript(
   targetUrl?: string
 ): Promise<{ success: boolean; data: any[]; message: string }> {
-  const cleanUrl = (targetUrl || "").trim();
+  const cleanUrl = (targetUrl || getWebAppUrl() || "").trim();
+  const currentSheetId = (getSavedSheetConfig()?.spreadsheetId || getSheetId() || DEFAULT_SPREADSHEET_ID).trim();
 
-  // Strategi 1: Coba langsung dari Google Spreadsheet Tab 'Data_Petugas'
-  try {
-    const directRes = await fetchDirectGoogleSheetRows(DEFAULT_SPREADSHEET_ID, [
-      "Data_Petugas",
-      "Data Petugas",
-      "Petugas"
-    ]);
-
-    if (directRes.success && directRes.rows.length > 0) {
-      return {
-        success: true,
-        data: directRes.rows,
-        message: `Berhasil memuat ${directRes.rows.length} akun petugas langsung dari Google Sheets (tab: ${directRes.sheetUsed}).`
-      };
-    }
-  } catch (eDirect) {
-    console.warn("Direct officer fetch notice:", eDirect);
-  }
-
-  // Strategi 2: Coba melalui Apps Script Web App jika URL tersedia
-  if (cleanUrl) {
+  // Strategi 1: Coba melalui Apps Script Web App jika URL tersedia (karena terhubung langsung ke bound spreadsheet)
+  if (cleanUrl && cleanUrl.startsWith("http")) {
     try {
       const fetchUrl = `${cleanUrl}${cleanUrl.includes("?") ? "&" : "?"}action=getAccounts&_t=${Date.now()}`;
       const res = await fetch(fetchUrl, {
@@ -2295,7 +2277,7 @@ export async function fetchOfficerAccountsFromAppsScript(
           return {
             success: true,
             data: accounts,
-            message: `Berhasil memuat ${accounts.length} akun petugas via Web App.`
+            message: `Berhasil memuat ${accounts.length} akun petugas terverifikasi via Web App.`
           };
         }
       }
@@ -2304,10 +2286,35 @@ export async function fetchOfficerAccountsFromAppsScript(
     }
   }
 
+  // Strategi 2: Coba langsung dari Google Spreadsheet Tab 'Data_Petugas' menggunakan Active Spreadsheet ID
+  if (currentSheetId) {
+    try {
+      const directRes = await fetchDirectGoogleSheetRows(currentSheetId, [
+        "Data_Petugas",
+        "Data Petugas",
+        "Petugas",
+        "Akun_Petugas",
+        "Akun Petugas",
+        "Daftar_Petugas",
+        "Data_Akun"
+      ]);
+
+      if (directRes.success && directRes.rows.length > 0) {
+        return {
+          success: true,
+          data: directRes.rows,
+          message: `Berhasil memuat ${directRes.rows.length} akun petugas langsung dari Google Sheets (tab: ${directRes.sheetUsed}).`
+        };
+      }
+    } catch (eDirect) {
+      console.warn("Direct officer fetch notice:", eDirect);
+    }
+  }
+
   return {
     success: false,
     data: [],
-    message: "Belum ada akun petugas khusus di spreadsheet, menggunakan konfigurasi standar 7 petugas."
+    message: "Belum ada akun petugas khusus di spreadsheet, menggunakan konfigurasi akun aktif."
   };
 }
 

@@ -16,6 +16,22 @@ export const VITE_WEB_APP_URL = VITE_APPS_SCRIPT_URL;
 
 export function getSheetId(): string {
   try {
+    if (typeof localStorage !== "undefined") {
+      const savedConfig = localStorage.getItem("ghpr_google_sheet_config_v1");
+      if (savedConfig) {
+        const parsed = JSON.parse(savedConfig);
+        if (parsed?.spreadsheetId && !parsed.spreadsheetId.includes("script.google.com")) {
+          return parsed.spreadsheetId.trim();
+        }
+      }
+      const savedUrl = localStorage.getItem("ghpr_google_sheets_url_v1") || localStorage.getItem("ghpr_gas_url_v2");
+      if (savedUrl && savedUrl.includes("docs.google.com/spreadsheets/d/")) {
+        const match = savedUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+      }
+    }
     if (typeof import.meta !== "undefined" && import.meta.env?.VITE_SHEET_ID) {
       return import.meta.env.VITE_SHEET_ID.trim();
     }
@@ -25,6 +41,12 @@ export function getSheetId(): string {
 
 export function getWebAppUrl(): string {
   try {
+    if (typeof localStorage !== "undefined") {
+      const saved = localStorage.getItem("ghpr_google_sheets_url_v1") || localStorage.getItem("ghpr_gas_url_v2");
+      if (saved && saved.trim() !== "" && saved.startsWith("https://script.google.com/macros/s/")) {
+        return saved.trim();
+      }
+    }
     if (typeof import.meta !== "undefined" && import.meta.env?.VITE_APPS_SCRIPT_URL) {
       return import.meta.env.VITE_APPS_SCRIPT_URL.trim();
     }

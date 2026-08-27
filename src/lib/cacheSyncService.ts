@@ -15,8 +15,8 @@ import {
 } from "./patientMonitoring";
 import { getWebAppUrl } from "./config";
 
-export const APP_CACHE_VERSION_KEY = "ghpr_app_version_tag_v4";
-export const CURRENT_APP_VERSION = "2026.08.22.v4_cloud_officers_synced";
+export const APP_CACHE_VERSION_KEY = "ghpr_app_version_tag_v5";
+export const CURRENT_APP_VERSION = "2026.08.27.v5_login_entry_strict";
 
 /**
  * Inisialisasi awal saat aplikasi dibuka atau di-install oleh user baru.
@@ -30,38 +30,34 @@ export async function initializeAppSyncAndBustStaleCache(): Promise<void> {
   try {
     const storedVersion = localStorage.getItem(APP_CACHE_VERSION_KEY);
 
-    // 1. Jika ada upgrade versi atau instalasi baru, periksa dan rekonsiliasi akun petugas
+    // 1. Jika ada upgrade versi atau instalasi baru, bersihkan sesi lama dan rekonsiliasi akun petugas
     if (storedVersion !== CURRENT_APP_VERSION) {
       console.log(`[CacheSync] Mendeteksi versi baru (${CURRENT_APP_VERSION}). Memperbarui akun & sinkronisasi...`);
 
-      // Rekonsiliasi akun petugas resmi bawaan
+      // Bersihkan sesi aktif lama dari localStorage agar selalu menampilkan form login saat URL dibuka
+      try {
+        localStorage.removeItem("ghpr_active_user_access_profile_v2");
+        localStorage.removeItem("ghpr_active_user_profile");
+      } catch (e) {}
+
+      // Rekonsiliasi akun petugas: pastikan akun ada tanpa menimpa perubahan kustom dari spreadsheet
       try {
         const existingOfficers = getOfficerProfiles();
         const mergedOfficers = [...existingOfficers];
 
-        // Pastikan setiap akun resmi di PREDEFINED_USER_PROFILES ada di storage
+        // Pastikan setiap username dasar di PREDEFINED_USER_PROFILES ada di storage
         for (const defaultOfficer of PREDEFINED_USER_PROFILES) {
           const idx = mergedOfficers.findIndex(
             (o) => o.username?.toLowerCase() === defaultOfficer.username?.toLowerCase()
           );
           if (idx < 0) {
-            // Tambahkan jika belum ada
+            // Tambahkan jika akun belum ada sama sekali
             mergedOfficers.push(defaultOfficer);
-          } else {
-            // Perbarui data penting jika default berubah (misal NIP/nama resmi) tanpa merusak password kustom
-            mergedOfficers[idx] = {
-              ...defaultOfficer,
-              ...mergedOfficers[idx],
-              nama: mergedOfficers[idx].nama || defaultOfficer.nama,
-              nip: mergedOfficers[idx].nip || defaultOfficer.nip,
-              kelurahan: mergedOfficers[idx].kelurahan || defaultOfficer.kelurahan,
-              role: mergedOfficers[idx].role || defaultOfficer.role,
-              isKoordinator: defaultOfficer.isKoordinator || mergedOfficers[idx].isKoordinator
-            };
           }
         }
 
-        saveOfficerProfiles(mergedOfficers);
+        // Simpan secara lokal tanpa menimpa Google Sheets (shouldPushToRemote = false)
+        saveOfficerProfiles(mergedOfficers, false);
       } catch (err) {
         console.warn("[CacheSync] Gagal rekonsiliasi akun petugas:", err);
       }

@@ -330,7 +330,9 @@ export function getLastUserActivityTimestamp(): number {
 // Periksa apakah sesi telah kedaluwarsa karena tidak aktif selama lebih dari 1 jam
 export function isSessionExpired(): boolean {
   try {
-    const active = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
+    const active = typeof sessionStorage !== "undefined"
+      ? sessionStorage.getItem(STORAGE_KEY_ACTIVE_USER)
+      : (typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY_ACTIVE_USER) : null);
     if (!active || active === "null" || active === "guest" || active === "") return false;
     const lastActive = getLastUserActivityTimestamp();
     const elapsed = Date.now() - lastActive;
@@ -387,7 +389,7 @@ export function getOfficerProfiles(): UserAccessProfile[] {
 }
 
 // Simpan Perubahan Akun Petugas oleh Pengembang / Admin
-export function saveOfficerProfiles(profiles: UserAccessProfile[]): void {
+export function saveOfficerProfiles(profiles: UserAccessProfile[], shouldPushToRemote: boolean = true): void {
   try {
     // Pastikan setiap password di-hash secara aman sebelum disimpan
     const securedProfiles = profiles.map((p) => {
@@ -404,9 +406,12 @@ export function saveOfficerProfiles(profiles: UserAccessProfile[]): void {
       };
     });
     localStorage.setItem(STORAGE_KEY_OFFICER_PROFILES, JSON.stringify(securedProfiles));
+    localStorage.setItem("petugas", JSON.stringify(securedProfiles));
 
     // Sinkronisasi dengan sesi user aktif jika ada yang diubah namanya/profilnya
-    const activeRaw = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
+    const activeRaw = typeof sessionStorage !== "undefined"
+      ? sessionStorage.getItem(STORAGE_KEY_ACTIVE_USER)
+      : null;
     if (activeRaw && activeRaw !== "null" && activeRaw !== "guest") {
       try {
         const activeParsed = JSON.parse(activeRaw);
@@ -416,7 +421,9 @@ export function saveOfficerProfiles(profiles: UserAccessProfile[]): void {
           );
           if (updatedActive) {
             const { password, ...sanitized } = updatedActive;
-            localStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(sanitized));
+            if (typeof sessionStorage !== "undefined") {
+              sessionStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(sanitized));
+            }
           }
         }
       } catch (e) {}
@@ -428,12 +435,14 @@ export function saveOfficerProfiles(profiles: UserAccessProfile[]): void {
       window.dispatchEvent(new Event("storage"));
     }
 
-    // Otomatis push sinkronisasi akun ke Google Spreadsheet
-    const endpoint = getWebAppUrl();
-    if (endpoint) {
-      pushOfficerProfilesToGoogleSheets(securedProfiles, endpoint).catch((err) => {
-        console.warn("[OfficerSync] Background push error:", err);
-      });
+    // Otomatis push sinkronisasi akun ke Google Spreadsheet jika diizinkan
+    if (shouldPushToRemote) {
+      const endpoint = getWebAppUrl();
+      if (endpoint) {
+        pushOfficerProfilesToGoogleSheets(securedProfiles, endpoint).catch((err) => {
+          console.warn("[OfficerSync] Background push error:", err);
+        });
+      }
     }
   } catch (e) {
     console.warn("Gagal menyimpan officer profiles ke localStorage:", e);
@@ -469,10 +478,10 @@ export async function syncOfficerProfilesFromGoogleSheets(
       const remoteAccounts = res.data;
       const localProfiles = getOfficerProfiles();
 
-      // Gabungkan akun cloud dengan lokal
+      // Gabungkan akun cloud dengan lokal (Google Sheets sebagai Cloud Truth)
       const mergedMap = new Map<string, UserAccessProfile>();
 
-      // Masukkan default terlebih dahulu
+      // Masukkan default terlebih dahulu sebagai fallback template
       for (const p of PREDEFINED_USER_PROFILES) {
         if (p.username) mergedMap.set(p.username.toLowerCase(), p);
       }
@@ -480,28 +489,47 @@ export async function syncOfficerProfilesFromGoogleSheets(
       for (const p of localProfiles) {
         if (p.username) mergedMap.set(p.username.toLowerCase(), p);
       }
-      // Timpa / tambahkan dari akun Google Sheets (sebagai cloud truth)
+      // Timpa / tambahkan dari akun Google Sheets (sebagai cloud truth utama)
       for (const r of remoteAccounts) {
-        const u = String(r.username || r.Username || r.user || r.User || "").toLowerCase().trim();
+        const u = String(
+          r.username || r.Username || r.user || r.User || r.USERNAME || r.nip || r.NIP || ""
+        ).toLowerCase().trim();
+
         if (u) {
           const existing = mergedMap.get(u);
-          const rawIsK = r.isKoordinator !== undefined ? r.isKoordinator : (r.Koordinator || r.is_koordinator);
+          const rawIsK = r.isKoordinator !== undefined 
+            ? r.isKoordinator 
+            : (r.Koordinator || r.is_koordinator || r["Is Koordinator"] || r["Koordinator?"]);
           const isK = rawIsK === true || String(rawIsK).toLowerCase() === "true" || u === "admin" || u === "widodo";
-          const kel = (r.kelurahan || r.Kelurahan || existing?.kelurahan || "Sananwetan") as KelurahanWilayah;
-          const nama = String(r.nama || r.Nama || r.namaPetugas || r["Nama Petugas"] || existing?.nama || "").trim() || "Petugas Puskesmas";
-          const nip = String(r.nip || r.NIP || existing?.nip || "-").trim() || "-";
-          const jabatan = String(r.jabatan || r.Jabatan || existing?.jabatan || "Petugas Surveilans").trim();
+          
+          const rawKel = r.kelurahan || r.Kelurahan || r["Wilayah Kelurahan"] || r.wilayah || existing?.kelurahan || "Sananwetan";
+          const kel = (isK ? "Semua" : rawKel) as KelurahanWilayah;
+          
+          const nama = String(
+            r.nama || r.Nama || r.namaPetugas || r["Nama Petugas"] || r["nama_petugas"] || r["Nama Lengkap"] || existing?.nama || ""
+          ).trim() || "Petugas Puskesmas";
+          
+          const nip = String(r.nip || r.NIP || r.Nip || r["NIP Petugas"] || existing?.nip || "-").trim() || "-";
+          const jabatan = String(r.jabatan || r.Jabatan || r["Jabatan"] || existing?.jabatan || "Petugas Surveilans").trim();
+          const email = String(r.email || r.Email || r["Email"] || existing?.email || `${u}@puskesmas.sananwetan.go.id`).trim();
+
+          let password = r.password || r.Password || r["Password (SHA-256)"] || r.kata_sandi || existing?.password;
+          if (!password || String(password).trim() === "") {
+            password = hashPassword("password123", u);
+          } else if (typeof password === "string" && (password.length !== 64 || !/^[0-9a-f]{64}$/i.test(password))) {
+            password = hashPassword(password.trim(), u);
+          }
 
           const finalProfile: UserAccessProfile = {
-            id: r.id || existing?.id || `user-${u}`,
+            id: r.id || r.ID || existing?.id || `user-${u}`,
             nama: nama,
             nip: nip,
             jabatan: jabatan,
-            kelurahan: isK ? "Semua" : kel,
+            kelurahan: kel,
             role: String(r.role || r.Role || existing?.role || (isK ? "Koordinator Surveilans Rabies Puskesmas" : `Petugas Wilayah Kel. ${kel}`)),
             username: u,
-            password: r.password || r.Password || existing?.password || hashPassword("password123", u),
-            email: r.email || r.Email || existing?.email || `${u}@puskesmas.sananwetan.go.id`,
+            password: password,
+            email: email,
             canCreate: true,
             canUpdate: true,
             canDelete: isK,
@@ -512,7 +540,30 @@ export async function syncOfficerProfilesFromGoogleSheets(
       }
 
       const finalProfiles = Array.from(mergedMap.values());
+      // Simpan langsung ke storage lokal
       localStorage.setItem(STORAGE_KEY_OFFICER_PROFILES, JSON.stringify(finalProfiles));
+      localStorage.setItem("petugas", JSON.stringify(finalProfiles));
+
+      // Perbarui sesi aktif jika nama/profil petugas yang sedang login diubah di spreadsheet
+      const activeRaw = typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(STORAGE_KEY_ACTIVE_USER)
+        : null;
+      if (activeRaw && activeRaw !== "null" && activeRaw !== "guest") {
+        try {
+          const activeParsed = JSON.parse(activeRaw);
+          if (activeParsed && (activeParsed.id || activeParsed.username)) {
+            const updatedActive = finalProfiles.find(
+              (p) => p.id === activeParsed.id || (p.username && p.username.toLowerCase() === activeParsed.username?.toLowerCase())
+            );
+            if (updatedActive) {
+              const { password, ...sanitized } = updatedActive;
+              if (typeof sessionStorage !== "undefined") {
+                sessionStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(sanitized));
+              }
+            }
+          }
+        } catch (e) {}
+      }
 
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("ghpr_officers_updated", { detail: finalProfiles }));
@@ -559,7 +610,11 @@ export function getActiveUserProfile(): UserAccessProfile | null {
       logoutPetugas();
       return null;
     }
-    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
+    // Prioritaskan sesi aktif dari sessionStorage (tab browser aktif)
+    const saved = typeof sessionStorage !== "undefined"
+      ? sessionStorage.getItem(STORAGE_KEY_ACTIVE_USER)
+      : null;
+
     if (saved) {
       if (saved === "null" || saved === "guest" || saved === "") return null;
       const parsed = JSON.parse(saved);
@@ -587,11 +642,23 @@ export function saveActiveUserProfile(profile: UserAccessProfile | null): void {
     if (profile) {
       // Hapus kata sandi dari session storage untuk keamanan maksimal
       const { password, ...sanitizedProfile } = profile;
-      localStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(sanitizedProfile));
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(STORAGE_KEY_ACTIVE_USER, JSON.stringify(sanitizedProfile));
+      }
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(STORAGE_KEY_ACTIVE_USER);
+      }
       recordUserActivity();
     } else {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_USER, "null");
-      localStorage.removeItem(STORAGE_KEY_LAST_ACTIVITY);
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.removeItem(STORAGE_KEY_ACTIVE_USER);
+        sessionStorage.setItem(STORAGE_KEY_ACTIVE_USER, "null");
+      }
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(STORAGE_KEY_ACTIVE_USER);
+        localStorage.setItem(STORAGE_KEY_ACTIVE_USER, "null");
+        localStorage.removeItem(STORAGE_KEY_LAST_ACTIVITY);
+      }
     }
   } catch (e) {
     console.warn("Gagal menyimpan active user profile:", e);

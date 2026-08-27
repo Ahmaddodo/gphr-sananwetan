@@ -30,6 +30,10 @@ import {
   sendToAppsScript,
   repairSpreadsheetStructure
 } from "../lib/googleSheets";
+import {
+  syncOfficerProfilesFromGoogleSheets,
+  syncPatientsFromGoogleSheets
+} from "../lib/patientMonitoring";
 import { OfficerAccountManager } from "./OfficerAccountManager";
 import { GitHubSyncManager } from "./GitHubSyncManager";
 import { AdminDeviceSyncPanel } from "./AdminDeviceSyncPanel";
@@ -127,8 +131,15 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
     setWebAppUrl(normalized);
     try {
       localStorage.setItem("ghpr_google_sheets_url_v1", normalized);
-      setSuccessMsg("Web App Endpoint URL berhasil disimpan dan diperbaiki!");
-      setTimeout(() => setSuccessMsg(""), 3500);
+      setSuccessMsg("Web App Endpoint URL berhasil disimpan! Menyinkronkan data petugas & pasien dari spreadsheet...");
+
+      // Tarik seketika data petugas dan pasien dari spreadsheet baru agar data lokal diperbarui
+      syncOfficerProfilesFromGoogleSheets(normalized).then((res) => {
+        if (onAccountsUpdated) onAccountsUpdated();
+      });
+      syncPatientsFromGoogleSheets(normalized);
+
+      setTimeout(() => setSuccessMsg(""), 4500);
     } catch (e) {
       console.warn("Gagal menyimpan ke localStorage:", e);
     }
@@ -143,6 +154,10 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
     try {
       localStorage.setItem("ghpr_google_sheets_url_v1", DEFAULT_WEB_APP_URL);
       setSuccessMsg("URL Web App telah dikembalikan ke URL aktif bawaan!");
+      syncOfficerProfilesFromGoogleSheets(DEFAULT_WEB_APP_URL).then(() => {
+        if (onAccountsUpdated) onAccountsUpdated();
+      });
+      syncPatientsFromGoogleSheets(DEFAULT_WEB_APP_URL);
       setTimeout(() => setSuccessMsg(""), 3500);
     } catch (e) {
       console.warn("Gagal reset URL:", e);
@@ -296,9 +311,16 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
 
     saveSheetConfig(config);
     setSheetConfig(config);
-    setSuccessMsg(`Google Spreadsheet baru berhasil dihubungkan!`);
+    setSuccessMsg(`Google Spreadsheet baru (${realId.slice(0, 8)}...) berhasil dihubungkan! Menyinkronkan data petugas & kasus...`);
     setSheetUrlInput("");
-    setTimeout(() => setSuccessMsg(""), 4000);
+
+    // Tarik seketika data dari sheet baru
+    syncOfficerProfilesFromGoogleSheets().then(() => {
+      if (onAccountsUpdated) onAccountsUpdated();
+    });
+    syncPatientsFromGoogleSheets();
+
+    setTimeout(() => setSuccessMsg(""), 4500);
   };
 
   const handleCopyAppsScript = () => {

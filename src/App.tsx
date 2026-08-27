@@ -255,20 +255,15 @@ export default function App() {
   const [submitError, setSubmitError] = useState<string>("");
   const [feedbackCount, setFeedbackCount] = useState<number>(0);
 
-  // Tab Navigasi & Hak Akses Pengguna
+  // Tab Navigasi & Hak Akses Pengguna (Default: "form" / Mode Formulir Publik)
   const [activeTab, setActiveTab] = useState<ActiveAppTab>(() => {
     try {
-      const user = getActiveUserProfile();
-      const isAdm = user && (user.username.toLowerCase() === "admin" || user.role === "admin");
       const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB);
       if (saved === "monitoring" || saved === "form" || saved === "settings") {
-        if (!isAdm && saved === "form" && !localStorage.getItem(STORAGE_KEY_EDITING_ID)) {
-          return "monitoring";
-        }
         return saved as ActiveAppTab;
       }
     } catch (e) {}
-    return "monitoring";
+    return "form";
   });
 
   const [adminSettingsSubTab, setAdminSettingsSubTab] = useState<"accounts" | "sync" | "sheets" | "github" | "flexible_form">("flexible_form");
@@ -503,19 +498,26 @@ export default function App() {
     setCurrentUser(user);
     saveActiveUserProfile(user);
     setSessionExpiredNotice("");
-    if (!user.isKoordinator && user.kelurahan !== "Semua") {
-      setFormData((prev) => ({
-        ...prev,
-        kelurahan: user.kelurahan,
-        kelurahanCustom: ""
-      }));
-    }
-    // Halaman pertama setelah berhasil login adalah Daftar Pasien Dipantau (Monitoring)
-    setActiveTab("monitoring");
+
+    // Sesuaikan data form awal dengan identitas dan hak akses petugas yang login
+    setFormData((prev) => ({
+      ...prev,
+      kelurahan: !user.isKoordinator && user.kelurahan !== "Semua" ? user.kelurahan : prev.kelurahan || "Sananwetan",
+      kelurahanCustom: "",
+      timKetua: user.nama || prev.timKetua,
+      pelaksanaNama: user.nama || prev.pelaksanaNama,
+      pelaksanaNIP: user.nip && user.nip !== "-" ? user.nip : prev.pelaksanaNIP
+    }));
+
+    // SEMUA USERNAME KETIKA KLIK MASUK KE SISTEM, HALAMAN YANG TAMPIL ADALAH MODE PUBLIK (FORMULIR PE GHPR)
+    setActiveTab("form");
+    setIsAdminMode(false);
     try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "monitoring");
+      localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "form");
+      localStorage.setItem("ghpr_app_view_mode", "public");
     } catch (e) {}
-    setResetSuccessMessage(`Berhasil masuk sebagai ${user.nama} (${user.role}).`);
+
+    setResetSuccessMessage(`Berhasil masuk sebagai ${user.nama} (${user.role}). Menampilkan Formulir PE GHPR (Mode Publik).`);
     setTimeout(() => setResetSuccessMessage(""), 4000);
   };
 
@@ -524,16 +526,13 @@ export default function App() {
     setCurrentUser(null);
     setShowLoginModal(false);
     setSessionExpiredNotice("");
+    setActiveTab("form");
+    setIsAdminMode(false);
   };
 
   const handleSwitchTab = (tab: ActiveAppTab) => {
     if (tab === "settings" && !isAdminMode) {
-      setActiveTab("monitoring");
-      return;
-    }
-    const isUsernameAdmin = currentUser && currentUser.username.toLowerCase() === "admin";
-    if (tab === "form" && !isUsernameAdmin && !editingCaseId) {
-      setActiveTab("monitoring");
+      setActiveTab("form");
       return;
     }
     setActiveTab(tab);
@@ -543,14 +542,12 @@ export default function App() {
   };
 
   const handleStartNewPatientInput = () => {
-    const isUsernameAdmin = currentUser && currentUser.username.toLowerCase() === "admin";
-    if (!isUsernameAdmin) {
-      setResetSuccessMessage("Input data kasus baru hanya dapat dilakukan oleh akun Admin.");
-      setTimeout(() => setResetSuccessMessage(""), 4000);
-      return;
-    }
-    setAdminSettingsSubTab("flexible_form");
-    handleSwitchTab("settings");
+    handleNewReport();
+    setActiveTab("form");
+    setIsAdminMode(false);
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "form");
+    } catch (e) {}
   };
 
   const handleOpenPatientFullFormEdit = (patient: PatientMonitoringItem) => {
@@ -810,6 +807,10 @@ export default function App() {
     const resetState: FormGHPRData = {
       ...initialFormState,
       tanggalPelaksanaan: new Date().toISOString().slice(0, 10),
+      kelurahan: currentUser && !currentUser.isKoordinator && currentUser.kelurahan !== "Semua" ? currentUser.kelurahan : initialFormState.kelurahan,
+      timKetua: currentUser?.nama || initialFormState.timKetua,
+      pelaksanaNama: currentUser?.nama || initialFormState.pelaksanaNama,
+      pelaksanaNIP: currentUser?.nip && currentUser.nip !== "-" ? currentUser.nip : initialFormState.pelaksanaNIP
     };
 
     setFormData(resetState);
