@@ -38,25 +38,27 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
         <div className="flex items-center justify-between gap-3 overflow-x-auto no-scrollbar py-2">
           {/* Main Navigation Tabs */}
           <div className="flex items-center gap-2">
-            {/* Tab Formulir PE GHPR: Tampil untuk SEMUA USERNAME (Mode Publik Sesuai Hak Akses) */}
-            <button
-              id="nav-tab-form"
-              type="button"
-              onClick={() => setActiveTab("form")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === "form"
-                  ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-              }`}
-            >
-              <FileText size={16} />
-              <span>{editingCaseId ? "Edit Form Kasus" : "Formulir PE GHPR"}</span>
-              {editingCaseId && (
-                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded ml-1 animate-pulse">
-                  Edit
-                </span>
-              )}
-            </button>
+            {/* Tab Formulir PE GHPR: HANYA TAMPIL UNTUK USERNAME ADMIN ATAU EDIT KASUS */}
+            {(isAdmin || editingCaseId) && (
+              <button
+                id="nav-tab-form"
+                type="button"
+                onClick={() => setActiveTab("form")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  activeTab === "form"
+                    ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <FileText size={16} />
+                <span>{editingCaseId ? "Edit Form Kasus" : "Formulir PE GHPR"}</span>
+                {editingCaseId && (
+                  <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded ml-1 animate-pulse">
+                    Edit
+                  </span>
+                )}
+              </button>
+            )}
 
             <button
               id="nav-tab-monitoring"
@@ -127,13 +129,13 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
 
           {/* Quick Info / Quick Action Button / Log Out */}
           <div className="flex items-center gap-2 shrink-0">
-            {activeTab === "monitoring" ? (
+            {activeTab === "monitoring" && isAdmin ? (
               <button
                 id="btn-quick-new-case"
                 type="button"
                 onClick={onNewInputClick}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white px-3.5 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
-                title="Buka form input kasus baru (Mode Publik)"
+                title="Buka form input kasus baru (Khusus Admin)"
               >
                 <PlusCircle size={15} />
                 <span>+ Input Pasien Baru</span>

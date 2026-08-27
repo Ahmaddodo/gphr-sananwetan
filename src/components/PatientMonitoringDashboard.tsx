@@ -161,8 +161,8 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
     };
   }, [webAppUrl]);
 
-  // Hak akses admin untuk input pasien baru & menu admin (hanya role/username admin)
-  const isAdminUser = (currentUser?.username || "").toLowerCase() === "admin" || currentUser?.role === "admin";
+  // Hak akses admin untuk input pasien baru & menu admin (hanya username admin)
+  const isAdminUser = (currentUser?.username || "").toLowerCase() === "admin";
 
   // Filtered Patients List with quickFilter consideration
   const displayedPatients = useMemo(() => {

@@ -255,15 +255,20 @@ export default function App() {
   const [submitError, setSubmitError] = useState<string>("");
   const [feedbackCount, setFeedbackCount] = useState<number>(0);
 
-  // Tab Navigasi & Hak Akses Pengguna (Default: "form" / Mode Formulir Publik)
+  // Tab Navigasi & Hak Akses Pengguna (Admin: form/monitoring, Selain Admin: monitoring)
   const [activeTab, setActiveTab] = useState<ActiveAppTab>(() => {
     try {
+      const user = getActiveUserProfile();
+      const isAdmin = user && user.username.toLowerCase() === "admin";
+      if (!isAdmin) {
+        return "monitoring";
+      }
       const saved = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(STORAGE_KEY_ACTIVE_TAB) : null;
       if (saved === "monitoring" || saved === "form" || saved === "settings") {
         return saved as ActiveAppTab;
       }
     } catch (e) {}
-    return "form";
+    return "monitoring";
   });
 
   const [adminSettingsSubTab, setAdminSettingsSubTab] = useState<"accounts" | "sync" | "sheets" | "github" | "flexible_form">("flexible_form");
@@ -503,6 +508,8 @@ export default function App() {
     saveActiveUserProfile(user);
     setSessionExpiredNotice("");
 
+    const isUserAdmin = (user.username || "").toLowerCase() === "admin";
+
     // Sesuaikan data form awal dengan identitas dan hak akses petugas yang login
     setFormData((prev) => ({
       ...prev,
@@ -513,15 +520,30 @@ export default function App() {
       pelaksanaNIP: user.nip && user.nip !== "-" ? user.nip : prev.pelaksanaNIP
     }));
 
-    // SEMUA USERNAME KETIKA KLIK MASUK KE SISTEM, HALAMAN YANG TAMPIL ADALAH MODE PUBLIK (FORMULIR PE GHPR)
-    setActiveTab("form");
-    setIsAdminMode(false);
-    try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "form");
-      localStorage.setItem("ghpr_app_view_mode", "public");
-    } catch (e) {}
-
-    setResetSuccessMessage(`Berhasil masuk sebagai ${user.nama} (${user.role}). Menampilkan Formulir PE GHPR (Mode Publik).`);
+    if (isUserAdmin) {
+      setActiveTab("monitoring");
+      setIsAdminMode(true);
+      try {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "monitoring");
+        }
+        localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "monitoring");
+        localStorage.setItem("ghpr_app_view_mode", "admin");
+      } catch (e) {}
+      setResetSuccessMessage(`Berhasil masuk sebagai Admin.`);
+    } else {
+      // Selain username admin, formulir PE GHPR & input pasien baru dihilangkan, langsung ke Daftar Pasien Dipantau
+      setActiveTab("monitoring");
+      setIsAdminMode(false);
+      try {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "monitoring");
+        }
+        localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "monitoring");
+        localStorage.setItem("ghpr_app_view_mode", "public");
+      } catch (e) {}
+      setResetSuccessMessage(`Berhasil masuk sebagai ${user.nama} (${user.role}). Menampilkan Daftar Pasien Dipantau.`);
+    }
     setTimeout(() => setResetSuccessMessage(""), 4000);
   };
 
@@ -530,26 +552,49 @@ export default function App() {
     setCurrentUser(null);
     setShowLoginModal(false);
     setSessionExpiredNotice("");
-    setActiveTab("form");
+    setActiveTab("monitoring");
     setIsAdminMode(false);
   };
 
   const handleSwitchTab = (tab: ActiveAppTab) => {
+    const isUserAdmin = (currentUser?.username || "").toLowerCase() === "admin";
+    if (!isUserAdmin) {
+      if (tab === "settings") {
+        setActiveTab("monitoring");
+        return;
+      }
+      if (tab === "form" && !editingCaseId) {
+        setActiveTab("monitoring");
+        return;
+      }
+    }
     if (tab === "settings" && !isAdminMode) {
-      setActiveTab("form");
+      setActiveTab("monitoring");
       return;
     }
     setActiveTab(tab);
     try {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(STORAGE_KEY_ACTIVE_TAB, tab);
+      }
       localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, tab);
     } catch (e) {}
   };
 
   const handleStartNewPatientInput = () => {
+    const isUserAdmin = (currentUser?.username || "").toLowerCase() === "admin";
+    if (!isUserAdmin) {
+      setResetSuccessMessage("Formulir PE GHPR dan Input Pasien Baru hanya dapat diakses oleh username Admin.");
+      setTimeout(() => setResetSuccessMessage(""), 4000);
+      return;
+    }
     handleNewReport();
     setActiveTab("form");
-    setIsAdminMode(false);
+    setIsAdminMode(true);
     try {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "form");
+      }
       localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "form");
     } catch (e) {}
   };
