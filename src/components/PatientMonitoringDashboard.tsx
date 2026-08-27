@@ -53,6 +53,7 @@ interface PatientMonitoringDashboardProps {
   onRefreshPatients: () => void;
   onNewInputCase: () => void;
   onEditFullFormCase: (patient: PatientMonitoringItem) => void;
+  onPrintPatientCase?: (patient: PatientMonitoringItem) => void;
   onOpenLoginModal?: () => void;
   onLogout?: () => void;
   onOpenSettings?: () => void;
@@ -70,6 +71,7 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
   onRefreshPatients,
   onNewInputCase,
   onEditFullFormCase,
+  onPrintPatientCase,
   onOpenLoginModal,
   onLogout,
   onOpenSettings,
@@ -795,10 +797,23 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
                             type="button"
                             onClick={() => onEditFullFormCase(patient)}
                             className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 text-blue-700 transition cursor-pointer"
-                            title="Buka form penyelidikan PE GHPR lengkap"
+                            title="Buka form penyelidikan PE GHPR lengkap (Edit)"
                           >
                             <Edit3 size={14} />
                           </button>
+
+                          {/* Print / Cetak PDF Button */}
+                          {onPrintPatientCase && (
+                            <button
+                              id={`btn-print-patient-${patient.id_kasus}`}
+                              type="button"
+                              onClick={() => onPrintPatientCase(patient)}
+                              className="p-1.5 rounded-lg border border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-700 transition cursor-pointer"
+                              title="Cetak & Pratinjau Form PE PDF Pasien Ini"
+                            >
+                              <Printer size={14} />
+                            </button>
+                          )}
 
                           {/* Delete Button (HANYA tampil untuk username admin) */}
                           {canDelete && (
@@ -906,6 +921,17 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
                         <Edit3 size={13} />
                         <span>Form PE</span>
                       </button>
+                      {onPrintPatientCase && (
+                        <button
+                          type="button"
+                          onClick={() => onPrintPatientCase(patient)}
+                          className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-emerald-200"
+                          title="Cetak Form PE PDF"
+                        >
+                          <Printer size={13} />
+                          <span>Cetak</span>
+                        </button>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -957,6 +983,7 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
         currentUser={currentUser}
         onOpenUpdateModal={(p) => setSelectedPatientForUpdate(p)}
         onOpenFullFormEdit={onEditFullFormCase}
+        onPrintPatientCase={onPrintPatientCase}
       />
 
       {/* Delete Confirmation Modal */}

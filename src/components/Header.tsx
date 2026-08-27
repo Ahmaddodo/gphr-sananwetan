@@ -35,7 +35,7 @@ interface HeaderProps {
   showConfig: boolean;
   setShowConfig: React.Dispatch<React.SetStateAction<boolean>>;
   setShowJsonModal: (val: boolean) => void;
-  setShowPdfModal: (val: boolean) => void;
+  setShowPdfModal?: (val: boolean) => void;
   setWebAppUrl: (val: string) => void;
   lastSavedTime: string | null;
   handleResetForm: () => void;
@@ -438,15 +438,6 @@ export const Header: React.FC<HeaderProps & {
               </button>
             </>
           )}
-
-          {/* Tombol Cetak PDF - Selalu Tampil untuk Publik & Admin */}
-          <button
-            type="button"
-            onClick={() => setShowPdfModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white px-3 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer"
-          >
-            <Printer size={14} /> <span>Cetak PDF</span>
-          </button>
         </div>
       </div>
 

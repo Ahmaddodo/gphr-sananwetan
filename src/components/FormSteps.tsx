@@ -63,17 +63,17 @@ export const FormSteps: React.FC<FormStepsProps> = ({
     };
   }, []);
 
+  const currentPelaksanaNama = DEFAULT_PELAKSANA_NAMA;
+  const currentPelaksanaNIP = DEFAULT_PELAKSANA_NIP;
+
   useEffect(() => {
-    if (!formData.pelaksanaNama) {
+    if (formData.pelaksanaNama !== DEFAULT_PELAKSANA_NAMA) {
       updateField("pelaksanaNama", DEFAULT_PELAKSANA_NAMA);
     }
-    if (!formData.pelaksanaNIP) {
+    if (formData.pelaksanaNIP !== DEFAULT_PELAKSANA_NIP) {
       updateField("pelaksanaNIP", DEFAULT_PELAKSANA_NIP);
     }
   }, [formData.pelaksanaNama, formData.pelaksanaNIP, updateField]);
-
-  const currentPelaksanaNama = formData.pelaksanaNama || DEFAULT_PELAKSANA_NAMA;
-  const currentPelaksanaNIP = formData.pelaksanaNIP || DEFAULT_PELAKSANA_NIP;
 
   return (
     <div className="space-y-6">
@@ -1008,12 +1008,12 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                     <span>Nama Pelaksana</span>
                   </label>
                   <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20 flex items-center gap-1">
-                    <Lock size={10} /> Terverifikasi
+                    <Lock size={10} /> Terkunci (Paten)
                   </span>
                 </div>
                 <div className="relative">
                   <input
-                    value={currentPelaksanaNama}
+                    value={DEFAULT_PELAKSANA_NAMA}
                     readOnly
                     className="w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3.5 py-2.5 pr-9 text-sm text-emerald-300 font-semibold cursor-not-allowed outline-none shadow-inner"
                   />
@@ -1021,7 +1021,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                     <Lock size={14} />
                   </div>
                 </div>
-                <p className="text-[10.5px] text-slate-400">Penanggung Jawab Form: {currentPelaksanaNama}</p>
+                <p className="text-[10.5px] text-slate-400">Penanggung Jawab Form: {DEFAULT_PELAKSANA_NAMA}</p>
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -1035,7 +1035,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                 </div>
                 <div className="relative">
                   <input
-                    value={currentPelaksanaNIP}
+                    value={DEFAULT_PELAKSANA_NIP}
                     readOnly
                     className="w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3.5 py-2.5 pr-9 text-sm text-emerald-300 font-semibold cursor-not-allowed outline-none shadow-inner"
                   />
@@ -1043,7 +1043,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                     <Lock size={14} />
                   </div>
                 </div>
-                <p className="text-[10.5px] text-slate-400">NIP Resmi: {currentPelaksanaNIP}</p>
+                <p className="text-[10.5px] text-slate-400">NIP Resmi: {DEFAULT_PELAKSANA_NIP}</p>
               </div>
             </div>
 

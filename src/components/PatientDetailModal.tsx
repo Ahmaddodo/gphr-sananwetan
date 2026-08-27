@@ -23,6 +23,7 @@ interface PatientDetailModalProps {
   currentUser: UserAccessProfile;
   onOpenUpdateModal: (patient: PatientMonitoringItem) => void;
   onOpenFullFormEdit: (patient: PatientMonitoringItem) => void;
+  onPrintPatientCase?: (patient: PatientMonitoringItem) => void;
 }
 
 export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
@@ -31,12 +32,18 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
   patient,
   currentUser,
   onOpenUpdateModal,
-  onOpenFullFormEdit
+  onOpenFullFormEdit,
+  onPrintPatientCase
 }) => {
   if (!isOpen || !patient) return null;
 
   const handlePrint = () => {
-    window.print();
+    if (onPrintPatientCase) {
+      onClose();
+      onPrintPatientCase(patient);
+    } else {
+      window.print();
+    }
   };
 
   return (

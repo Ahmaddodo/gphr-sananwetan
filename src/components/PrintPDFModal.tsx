@@ -77,93 +77,40 @@ export const samplePdfData: FormGHPRData = {
 };
 
 /**
- * Render elemen dokumen ke dalam Canvas secara bersih di wadah off-screen berukuran standar.
- * Menghilangkan bayangan modal (shadow-xl), sudut melengkung, serta variasi lebar layar HP/desktop
- * sehingga hasil tangkapan 100% identik dan rapi seperti cetakan dokumen asli.
+ * Render elemen lembar dokumen ke dalam Canvas resolusi tinggi.
+ * Mengambil tampilan asli dari DOM pratinjau yang sedang dilihat pengguna
+ * sehingga hasil tangkapan 100% identik dan persis dengan yang direview.
  */
 async function captureCleanDocumentSheet(sourceElement: HTMLElement, targetWidthPx: number = 816): Promise<HTMLCanvasElement> {
-  const clone = sourceElement.cloneNode(true) as HTMLElement;
-
-  // Standarisasi ukuran dan hapus efek kartu layar
-  clone.style.width = `${targetWidthPx}px`;
-  clone.style.maxWidth = `${targetWidthPx}px`;
-  clone.style.minWidth = `${targetWidthPx}px`;
-  clone.style.boxSizing = "border-box";
-  clone.style.margin = "0";
-  clone.style.boxShadow = "none";
-  clone.style.borderRadius = "0";
-  clone.style.padding = "24px 28px 24px 28px";
-  clone.style.backgroundColor = "#ffffff";
-  clone.style.color = "#000000";
-  clone.style.transform = "none";
-  clone.style.pageBreakBefore = "auto";
-
-  // Hapus class pembungkus yang hanya untuk tampilan modal layar
-  clone.classList.remove(
-    "shadow-xl",
-    "shadow-2xl",
-    "shadow-lg",
-    "shadow-sm",
-    "rounded-sm",
-    "rounded-md",
-    "rounded-lg",
-    "mb-6",
-    "p-4",
-    "sm:p-6",
-    "md:p-8"
+  // Pastikan seluruh gambar (stempel, tanda tangan, foto dokumentasi) telah termuat
+  const imgs = Array.from(sourceElement.querySelectorAll("img"));
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete && img.naturalHeight !== 0) {
+            resolve();
+          } else {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            setTimeout(resolve, 1500);
+          }
+        })
+    )
   );
 
-  // Buat wadah terisolasi di luar layar
-  const host = document.createElement("div");
-  host.style.position = "fixed";
-  host.style.top = "-12000px";
-  host.style.left = "-12000px";
-  host.style.width = `${targetWidthPx}px`;
-  host.style.backgroundColor = "#ffffff";
-  host.style.zIndex = "-99999";
-  host.style.opacity = "1";
-  host.style.pointerEvents = "none";
-  host.appendChild(clone);
-  document.body.appendChild(host);
+  // Capture canvas langsung dari elemen tampilan asli dengan kualitas tinggi (2.5x)
+  const canvas = await html2canvas(sourceElement, {
+    scale: 2.5,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: "#ffffff",
+    logging: false,
+    scrollX: 0,
+    scrollY: 0,
+  });
 
-  try {
-    // Pastikan seluruh gambar (stempel, tanda tangan, foto) telah termuat sempurna
-    const imgs = Array.from(clone.querySelectorAll("img"));
-    await Promise.all(
-      imgs.map(
-        (img) =>
-          new Promise<void>((resolve) => {
-            if (img.complete && img.naturalHeight !== 0) {
-              resolve();
-            } else {
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
-              setTimeout(resolve, 2000);
-            }
-          })
-      )
-    );
-
-    // Jeda sejenak untuk kalkulasi font & rendering DOM
-    await new Promise((r) => setTimeout(r, 60));
-
-    // Capture resolusi tinggi (2.5x = ~240 DPI tajam seperti vektor)
-    const canvas = await html2canvas(clone, {
-      scale: 2.5,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      width: targetWidthPx,
-      windowWidth: targetWidthPx,
-    });
-
-    return canvas;
-  } finally {
-    if (document.body.contains(host)) {
-      document.body.removeChild(host);
-    }
-  }
+  return canvas;
 }
 
 export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
@@ -198,17 +145,15 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
   if (!showPdfModal) return null;
 
   /**
-   * Pemicu Dialog Cetak Browser Langsung
+   * Pemicu Dialog Cetak & Pratinjau Cetak Browser Handal
+   * Membuka dokumen dalam jendela / tab cetak mandiri dengan resolusi tinggi & CSS print presisi
    */
   const handlePrint = () => {
     try {
-      // Siapkan style ukuran kertas sementara jika diperlukan
-      const styleId = "ghpr-dynamic-print-size";
-      let styleTag = document.getElementById(styleId) as HTMLStyleElement;
-      if (!styleTag) {
-        styleTag = document.createElement("style");
-        styleTag.id = styleId;
-        document.head.appendChild(styleTag);
+      const printArea = document.getElementById("ghpr-print-area");
+      if (!printArea) {
+        window.print();
+        return;
       }
 
       const pageSizeCss =
@@ -216,63 +161,226 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
           ? "A4 portrait"
           : paperSize === "f4"
           ? "215mm 330mm portrait"
-          : "legal portrait";
+          : "215.9mm 355.6mm portrait";
 
-      styleTag.innerHTML = `
-        @media print {
-          @page {
-            size: ${pageSizeCss} !important;
-            margin: 6mm 8mm 6mm 8mm !important;
-          }
+      const victimName = formData.namaKorban ? formData.namaKorban.trim() : "Laporan";
+
+      // Kumpulkan styles
+      const styleNodes = Array.from(document.querySelectorAll("link[rel='stylesheet'], style"));
+      let stylesHtml = "";
+      styleNodes.forEach((node) => {
+        stylesHtml += node.outerHTML;
+      });
+
+      const printHtml = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Form PE GHPR - ${victimName}</title>
+  ${stylesHtml}
+  <style>
+    @page {
+      size: ${pageSizeCss};
+      margin: 8mm 10mm 8mm 10mm;
+    }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      box-sizing: border-box;
+    }
+    html, body {
+      background: #ffffff !important;
+      color: #000000 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif !important;
+    }
+    .print-bar {
+      position: sticky;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #1e293b;
+      color: #ffffff;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 9999;
+      font-family: system-ui, sans-serif;
+    }
+    .print-btn {
+      background: #2563eb;
+      color: #ffffff;
+      border: none;
+      padding: 8px 18px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: 0.2s;
+    }
+    .print-btn:hover {
+      background: #1d4ed8;
+    }
+    .close-btn {
+      background: #475569;
+      color: #ffffff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      margin-left: 8px;
+    }
+    .ghpr-page-sheet {
+      box-shadow: none !important;
+      border: none !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+      max-width: 215.9mm !important;
+    }
+    .ghpr-sheet-2, #ghpr-sheet-2 {
+      page-break-before: always !important;
+      break-before: page !important;
+    }
+    .ghpr-footer {
+      height: 2.5cm !important;
+      min-height: 2.5cm !important;
+      max-height: 2.5cm !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      box-sizing: border-box !important;
+    }
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+    }
+    td, th {
+      border: 1px solid #000000 !important;
+    }
+    @media print {
+      .print-bar {
+        display: none !important;
+      }
+      body {
+        padding: 0 !important;
+      }
+      .ghpr-page-sheet {
+        padding: 0 !important;
+        max-width: none !important;
+      }
+      .ghpr-sheet-2, #ghpr-sheet-2 {
+        page-break-before: always !important;
+        break-before: page !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-bar">
+    <div>
+      <strong>Mode Cetak: Formulir PE GHPR (${victimName})</strong>
+      <span style="opacity: 0.8; font-size: 12px; margin-left: 10px;">Ukuran: ${paperSize.toUpperCase()}</span>
+    </div>
+    <div>
+      <button class="print-btn" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+      <button class="close-btn" onclick="window.close()">✕ Tutup</button>
+    </div>
+  </div>
+  <div style="padding: 20px 0; background: #f8fafc; min-height: 100vh;" class="print:p-0 print:bg-white">
+    <div style="max-width: 215.9mm; margin: 0 auto; background: #ffffff; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);" class="print:p-0 print:shadow-none">
+      ${printArea.innerHTML}
+    </div>
+  </div>
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        try {
+          window.print();
+        } catch(e) {
+          console.log(e);
         }
-      `;
+      }, 500);
+    });
+  </script>
+</body>
+</html>`;
 
-      window.focus();
-      window.print();
+      const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
+      const blobUrl = URL.createObjectURL(blob);
+      const printWindow = window.open(blobUrl, "_blank");
+
+      if (!printWindow) {
+        // Jika pop-up diblokir, buat iframe tersembunyi sebagai fallback otomatis
+        const iframeId = "ghpr-print-iframe";
+        let oldIframe = document.getElementById(iframeId);
+        if (oldIframe) {
+          document.body.removeChild(oldIframe);
+        }
+        const iframe = document.createElement("iframe");
+        iframe.id = iframeId;
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "none";
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch {
+            window.print();
+          }
+        }, 500);
+      }
     } catch (e) {
       console.error("Window print error:", e);
-      // Fallback unduh jika dialog cetak tidak diizinkan di container tertentu
-      handleDownloadPdf();
+      window.print();
     }
   };
 
   /**
-   * Unduh Dokumen PDF Resmi 100% Identik dengan Review
+   * Unduh Dokumen PDF Resmi Proporsional & Presisi
    */
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
     setDownloadSuccess(false);
 
     try {
+      const rootArea = document.getElementById("ghpr-print-area");
       const sheet1 = document.getElementById("ghpr-sheet-1");
       const sheet2 = document.getElementById("ghpr-sheet-2");
-      const rootArea = document.getElementById("ghpr-print-area");
 
-      if (!rootArea && !sheet1) {
+      const targetElement = rootArea || sheet1;
+      if (!targetElement) {
         throw new Error("Elemen formulir tidak ditemukan");
       }
 
-      // Konfigurasi ukuran kertas jsPDF
+      // Konfigurasi ukuran kertas jsPDF (dalam satuan mm)
       let pdfFormat: [number, number] | "a4" | "legal" = "legal";
       let pageWidthMm = 215.9;
       let pageHeightMm = 355.6;
-      let targetWidthPx = 816; // 215.9mm @ 96 DPI
 
       if (paperSize === "a4") {
         pdfFormat = "a4";
         pageWidthMm = 210;
         pageHeightMm = 297;
-        targetWidthPx = 794;
       } else if (paperSize === "f4") {
         pdfFormat = [215, 330];
         pageWidthMm = 215;
         pageHeightMm = 330;
-        targetWidthPx = 813;
       } else {
         pdfFormat = "legal";
         pageWidthMm = 215.9;
         pageHeightMm = 355.6;
-        targetWidthPx = 816;
       }
 
       const pdf = new jsPDF({
@@ -282,24 +390,55 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
         compress: true,
       });
 
-      if (sheet1 && sheet2) {
-        // Render Lembar 1 secara bersih
-        const canvas1 = await captureCleanDocumentSheet(sheet1, targetWidthPx);
-        const imgData1 = canvas1.toDataURL("image/png");
-        const contentHeightMm1 = (canvas1.height * pageWidthMm) / canvas1.width;
-        pdf.addImage(imgData1, "PNG", 0, 0, pageWidthMm, Math.min(contentHeightMm1, pageHeightMm), undefined, "FAST");
+      const marginMm = 8;
+      const renderWidthMm = pageWidthMm - marginMm * 2;
+      const maxPageContentHeightMm = pageHeightMm - marginMm * 2;
 
-        // Render Lembar 2 secara bersih di Halaman 2
+      if (sheet1 && sheet2) {
+        // Render Lembar 1 pada Halaman 1
+        const canvas1 = await captureCleanDocumentSheet(sheet1);
+        const imgData1 = canvas1.toDataURL("image/jpeg", 0.98);
+        const contentHeightMm1 = (canvas1.height * renderWidthMm) / canvas1.width;
+        pdf.addImage(
+          imgData1,
+          "JPEG",
+          marginMm,
+          marginMm,
+          renderWidthMm,
+          Math.min(contentHeightMm1, maxPageContentHeightMm),
+          undefined,
+          "FAST"
+        );
+
+        // Render Lembar 2 pada Halaman 2 (dengan foto tinggi 500px dan ttd resmi)
         pdf.addPage(pdfFormat, "portrait");
-        const canvas2 = await captureCleanDocumentSheet(sheet2, targetWidthPx);
-        const imgData2 = canvas2.toDataURL("image/png");
-        const contentHeightMm2 = (canvas2.height * pageWidthMm) / canvas2.width;
-        pdf.addImage(imgData2, "PNG", 0, 0, pageWidthMm, Math.min(contentHeightMm2, pageHeightMm), undefined, "FAST");
-      } else if (rootArea) {
-        const canvas = await captureCleanDocumentSheet(rootArea, targetWidthPx);
-        const imgData = canvas.toDataURL("image/png");
-        const contentHeightMm = (canvas.height * pageWidthMm) / canvas.width;
-        pdf.addImage(imgData, "PNG", 0, 0, pageWidthMm, Math.min(contentHeightMm, pageHeightMm), undefined, "FAST");
+        const canvas2 = await captureCleanDocumentSheet(sheet2);
+        const imgData2 = canvas2.toDataURL("image/jpeg", 0.98);
+        const contentHeightMm2 = (canvas2.height * renderWidthMm) / canvas2.width;
+        pdf.addImage(
+          imgData2,
+          "JPEG",
+          marginMm,
+          marginMm,
+          renderWidthMm,
+          Math.min(contentHeightMm2, maxPageContentHeightMm),
+          undefined,
+          "FAST"
+        );
+      } else if (targetElement) {
+        const canvas = await captureCleanDocumentSheet(targetElement);
+        const totalContentHeightMm = (canvas.height * renderWidthMm) / canvas.width;
+        const imgData = canvas.toDataURL("image/jpeg", 0.98);
+        pdf.addImage(
+          imgData,
+          "JPEG",
+          marginMm,
+          marginMm,
+          renderWidthMm,
+          Math.min(totalContentHeightMm, maxPageContentHeightMm),
+          undefined,
+          "FAST"
+        );
       }
 
       const cleanName = formData.namaKorban
@@ -311,7 +450,6 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
       setTimeout(() => setDownloadSuccess(false), 4000);
     } catch (err) {
       console.error("Gagal membuat PDF otomatis:", err);
-      // Pemicu fallback langsung ke window.print
       handlePrint();
     } finally {
       setIsGenerating(false);

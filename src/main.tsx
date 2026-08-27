@@ -22,8 +22,8 @@ try {
   console.warn("Inisialisasi cache sync tertunda:", err);
 }
 
-// Registrasi Service Worker PWA otomatis dengan refresh instan saat versi baru terdeteksi
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+// Registrasi Service Worker PWA otomatis dengan refresh instan saat versi baru terdeteksi di production
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && !import.meta.env.DEV) {
   try {
     const updateSW = registerSW({
       immediate: true,

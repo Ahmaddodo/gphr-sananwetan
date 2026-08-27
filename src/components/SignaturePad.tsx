@@ -81,12 +81,12 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 
       {/* GAMBAR STEMPEL & TTD RESMI */}
       <div className="space-y-3">
-        <div className="p-4 bg-white/95 rounded-xl border border-slate-300 text-center shadow-inner">
-          <div className="bg-white p-2 rounded-lg border border-slate-200 inline-block max-w-full overflow-hidden">
+        <div className="p-4 bg-white rounded-xl border border-slate-300 text-center shadow-inner">
+          <div className="bg-white p-3 rounded-lg border border-slate-200 inline-flex items-center justify-center max-w-full overflow-hidden">
             <img
               src={getOfficialSignatureUrl(formData.tandaTanganUrl)}
               alt="Tanda Tangan & Stempel Resmi"
-              className="max-h-28 max-w-full mx-auto object-contain rounded"
+              className="h-32 sm:h-36 max-w-full mx-auto object-contain rounded"
               referrerPolicy="no-referrer"
             />
           </div>

@@ -1,25 +1,33 @@
-import officialStampImg from "../assets/images/official_stamp_signature.webp";
+import croppedWhiteStampImg from "../assets/images/official_stamp_cropped_white.png";
+import puskesmasLogoImg from "../assets/images/puskesmas_logo_1786842695806.jpg";
 
 export const DEFAULT_PELAKSANA_NAMA = "Widodo Suprianto A.Md.Kep";
 export const DEFAULT_PELAKSANA_NIP = "197606252009011007";
 
-// Stempel & Tanda Tangan Resmi UPT Puskesmas Sananwetan (Ungu Asli - Paten & Permanen)
-export const OFFICIAL_SIGNATURE_STAMP_URL = officialStampImg;
+// Stempel & Tanda Tangan Resmi UPT Puskesmas Sananwetan (Dipangkas presisi, objek lebih besar & background putih murni)
+export const OFFICIAL_SIGNATURE_STAMP_URL = croppedWhiteStampImg;
+
+// Logo resmi UPT Puskesmas Sananwetan
+export const PUSKESMAS_LOGO_URL = puskesmasLogoImg;
 
 /**
- * Helper untuk memastikan URL stempel & tanda tangan resmi selalu valid dan tidak berubah
+ * Helper untuk memastikan URL stempel & tanda tangan resmi selalu mengarah ke gambar stempel resmi terpotong proporsional & berlatar putih bersih
  */
 export function getOfficialSignatureUrl(url?: string | null): string {
-  if (!url || typeof url !== "string" || url.trim() === "" || url.startsWith("data:image/svg+xml") || url.includes("<svg")) {
+  if (
+    !url ||
+    typeof url !== "string" ||
+    url.trim() === "" ||
+    url.startsWith("data:image/svg+xml") ||
+    url.includes("<svg") ||
+    url.includes("regenerated_image") ||
+    url.includes("clean_white") ||
+    url.includes("widodo_stamp") ||
+    url.includes("official_stamp_signature") ||
+    url.includes("official-signature-stamp") ||
+    url.includes("official_user_uploaded_stamp.jpg")
+  ) {
     return OFFICIAL_SIGNATURE_STAMP_URL;
   }
   return url;
 }
-
-// Logo resmi UPT Puskesmas Sananwetan Data URL
-export const PUSKESMAS_LOGO_URL = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="%23059669" stroke="%23047857" stroke-width="4"/><circle cx="50" cy="50" r="38" fill="%23ffffff"/><path d="M42,24 H58 V42 H76 V58 H58 V76 H42 V58 H24 V42 H42 Z" fill="%23059669"/><circle cx="50" cy="50" r="8" fill="%23ffffff"/><path d="M50,45 L50,55 M45,50 L55,50" stroke="%23059669" stroke-width="2" stroke-linecap="round"/></svg>`;
-
-
-
-
-

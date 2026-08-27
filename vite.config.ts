@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const base = process.env.BASE_URL || './';
+  const base = process.env.BASE_URL || '/';
   return {
     base,
     plugins: [
@@ -96,8 +96,14 @@ export default defineConfig(() => {
       },
     },
     server: {
+      port: 3000,
+      host: '0.0.0.0',
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    preview: {
+      port: 3000,
+      host: '0.0.0.0',
     },
   };
 });

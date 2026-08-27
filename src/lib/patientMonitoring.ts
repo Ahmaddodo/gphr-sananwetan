@@ -998,46 +998,46 @@ export function syncPatientFromFormSubmission(
 
   const finalKel = formData.kelurahanCustom && formData.kelurahan.toLowerCase().includes("lainnya")
     ? formData.kelurahanCustom
-    : formData.kelurahan || "Sananwetan";
+    : formData.kelurahan || "";
 
   const finalKec = formData.kecamatanCustom && formData.kecamatan.toLowerCase().includes("lainnya")
     ? formData.kecamatanCustom
-    : formData.kecamatan || "Sananwetan";
+    : formData.kecamatan || "";
 
   const finalKab = formData.kabupatenKotaCustom && formData.kabupatenKota.toLowerCase().includes("lainnya")
     ? formData.kabupatenKotaCustom
-    : formData.kabupatenKota || "Kota Blitar";
+    : formData.kabupatenKota || "";
 
   const finalHpr = formData.spesiesLain && formData.spesiesHPR === "Lainnya"
     ? formData.spesiesLain
-    : formData.spesiesHPR || "Anjing";
+    : formData.spesiesHPR || "";
 
   const updatedPatient: PatientMonitoringItem = {
     id_kasus,
     timestamp_submit: new Date().toLocaleString("id-ID"),
-    waktuKejadian: formData.waktuKejadian || new Date().toISOString(),
-    namaKorban: formData.namaKorban || "Tanpa Nama",
-    umurKorban: formData.umurKorban || "-",
-    jkKorban: formData.jkKorban || "Laki-laki",
-    alamatKorban: formData.alamatKorban || formData.alamatKejadian || "-",
-    kontakKorban: formData.noHpKorban || formData.kontakPemilik || "-",
-    noHpKorban: formData.noHpKorban || "-",
+    waktuKejadian: formData.waktuKejadian || "",
+    namaKorban: formData.namaKorban || "",
+    umurKorban: formData.umurKorban || "",
+    jkKorban: formData.jkKorban || "",
+    alamatKorban: formData.alamatKorban || formData.alamatKejadian || "",
+    kontakKorban: formData.noHpKorban || formData.kontakPemilik || "",
+    noHpKorban: formData.noHpKorban || "",
     kelurahan: finalKel,
     kecamatan: finalKec,
     kabupatenKota: finalKab,
     spesiesHPR: finalHpr,
-    rasHewan: formData.ras || "-",
-    kondisiHewan: formData.kondisiHewan || "Dalam Observasi",
-    pemilikHewan: formData.pemilikHewan || "-",
-    alamatPemilik: formData.alamatPemilik || "-",
-    kontakPemilik: formData.kontakPemilik || "-",
-    kondisiLuka: formData.kondisiLuka || "-",
-    lokasiLuka: formData.lokasiLuka || "-",
-    pertolonganPertama: formData.pertolonganPertama || "-",
+    rasHewan: formData.ras || "",
+    kondisiHewan: formData.kondisiHewan || "",
+    pemilikHewan: formData.pemilikHewan || "",
+    alamatPemilik: formData.alamatPemilik || "",
+    kontakPemilik: formData.kontakPemilik || "",
+    kondisiLuka: formData.kondisiLuka || "",
+    lokasiLuka: formData.lokasiLuka || "",
+    pertolonganPertama: formData.pertolonganPertama || "",
     detailPertolongan: formData.detailPertolongan || "",
-    tindakanKasus: formData.tindakanKasus || "-",
-    tindakanHPR: formData.tindakanHPR || "Observasi 14 Hari",
-    rekomendasi: formData.rekomendasi || "-",
+    tindakanKasus: formData.tindakanKasus || "",
+    tindakanHPR: formData.tindakanHPR || "",
+    rekomendasi: formData.rekomendasi || "",
     statusPemantauan: existing?.statusPemantauan || "Dalam Pemantauan (Aktif)",
     statusHewanObservasi: existing?.statusHewanObservasi || "Sehat / Normal (Observasi)",
     hariObservasiKe: existing?.hariObservasiKe || 1,
@@ -1054,18 +1054,18 @@ export function syncPatientFromFormSubmission(
         id: `log-init-${Date.now()}`,
         tanggal: tglKejadian,
         hariKe: 1,
-        petugasNama: formData.pelaksanaNama || "Widodo Suprianto A.Md.Kep",
-        petugasNIP: formData.pelaksanaNIP || "197606252009011007",
+        petugasNama: formData.pelaksanaNama || "",
+        petugasNIP: formData.pelaksanaNIP || "",
         kelurahan: finalKel,
-        kondisiKorban: formData.kondisiLuka || "Luka gigitan dalam perawatan",
-        statusLuka: formData.kondisiLuka || "-",
-        kondisiHewan: formData.kondisiHewan || "Dalam Observasi",
-        tindakanDilakukan: formData.tindakanKasus || "Penyelidikan Epidemiologi & Perawatan Luka",
-        catatanKhusus: formData.rekomendasi || "Laporan PE GHPR berhasil dicatat ke sistem monitoring."
+        kondisiKorban: formData.kondisiLuka || "",
+        statusLuka: formData.kondisiLuka || "",
+        kondisiHewan: formData.kondisiHewan || "",
+        tindakanDilakukan: formData.tindakanKasus || "",
+        catatanKhusus: formData.rekomendasi || ""
       }
     ],
-    petugasPJ: formData.pelaksanaNama || "Widodo Suprianto A.Md.Kep",
-    nipPJ: formData.pelaksanaNIP || "197606252009011007",
+    petugasPJ: formData.pelaksanaNama || "",
+    nipPJ: formData.pelaksanaNIP || "",
     lastUpdated: new Date().toLocaleString("id-ID"),
     fullData: formData
   };

@@ -89,9 +89,9 @@ const initialFormState: FormGHPRData = {
   kelurahanCustom: "",
   kecamatan: "",
   kecamatanCustom: "",
-  kabupatenKota: "Kota Blitar",
+  kabupatenKota: "",
   kabupatenKotaCustom: "",
-  provinsi: "Jawa Timur",
+  provinsi: "",
   sumberInfo: "",
   kronologi: "",
   spesiesHPR: "",
@@ -99,7 +99,7 @@ const initialFormState: FormGHPRData = {
   ras: "",
   jkHewan: "",
   umurHewan: "",
-  satuanUmur: "Tahun",
+  satuanUmur: "",
   metodePelihara: "",
   asalHewan: "",
   pakan: "",
@@ -608,6 +608,68 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleOpenPatientPdfPrint = (patient: PatientMonitoringItem) => {
+    const raw: Record<string, any> = patient.fullData || {};
+    const printForm: FormGHPRData = {
+      ...initialFormState,
+      waktuKejadian: patient.waktuKejadian || raw.waktuKejadian || "",
+      alamatKejadian: patient.alamatKorban || raw.alamatKejadian || "",
+      kelurahan: patient.kelurahan || raw.kelurahan || "",
+      kelurahanCustom: patient.kelurahan || "",
+      kecamatan: patient.kecamatan || "Sananwetan",
+      kecamatanCustom: "",
+      kabupatenKota: patient.kabupatenKota || "Kota Blitar",
+      kabupatenKotaCustom: "",
+      provinsi: raw.provinsi || "Jawa Timur",
+      sumberInfo: raw.sumberInfo || "Laporan Petugas Puskesmas",
+      kronologi: raw.kronologi || `Kasus gigitan HPR di wilayah Kel. ${patient.kelurahan || "-"}`,
+      spesiesHPR: patient.spesiesHPR || "Anjing",
+      spesiesLain: raw.spesiesLain || "",
+      ras: patient.rasHewan || raw.ras || "Lokal",
+      jkHewan: raw.jkHewan || "Jantan",
+      umurHewan: raw.umurHewan || "1",
+      satuanUmur: raw.satuanUmur || "Tahun",
+      metodePelihara: raw.metodePelihara || "Diliarkan / Bebas",
+      asalHewan: raw.asalHewan || "Lokal",
+      pakan: raw.pakan || "Sisa Makanan Rumah Tangga",
+      biosekuriti: raw.biosekuriti || "Tidak Ada",
+      sumberAir: raw.sumberAir || "Sumur",
+      kondisiHewan: patient.kondisiHewan || "Dalam Observasi",
+      pemilikHewan: patient.pemilikHewan || "-",
+      alamatPemilik: patient.alamatPemilik || "-",
+      kontakPemilik: patient.kontakPemilik || "-",
+      riwayatVaksin: raw.riwayatVaksin || "Tidak Tahu",
+      tanggalVaksin: raw.tanggalVaksin || "",
+      namaKorban: patient.namaKorban || "",
+      umurKorban: patient.umurKorban || "",
+      noHpKorban: patient.noHpKorban || patient.kontakKorban || "-",
+      alamatKorban: patient.alamatKorban || "-",
+      jkKorban: patient.jkKorban || "Laki-laki",
+      kondisiKorban: raw.kondisiKorban || "Luka gigitan dalam perawatan",
+      pertolonganPertama: patient.pertolonganPertama || "Cuci luka sabun air mengalir 15 menit",
+      detailPertolongan: patient.detailPertolongan || patient.pertolonganPertama || "",
+      kondisiLuka: patient.kondisiLuka || "Kategori 2",
+      lokasiLuka: patient.lokasiLuka || "Tangan",
+      tindakanHPR: patient.tindakanHPR || "Observasi 14 Hari",
+      tindakanKasus: patient.tindakanKasus || "Pemberian VAR",
+      tindakanMasyarakat: raw.tindakanMasyarakat || "-",
+      rekomendasi: patient.rekomendasi || "Observasi harian kondisi hewan dan korban",
+      sumberLaporan: raw.sumberLaporan || "Laporan Petugas Faskes",
+      fotoDokumentasi: raw.fotoDokumentasi || "",
+      timKetua: raw.timKetua || currentUser?.nama || "Petugas Puskesmas",
+      timAnggota: raw.timAnggota || "Kader Kesehatan Kelurahan",
+      tanggalPelaksanaan: raw.tanggalPelaksanaan || new Date().toISOString().slice(0, 10),
+      pelaksanaNama: DEFAULT_PELAKSANA_NAMA,
+      pelaksanaNIP: DEFAULT_PELAKSANA_NIP,
+      tandaTanganUrl: OFFICIAL_SIGNATURE_STAMP_URL,
+      tandaTanganOtomatis: false,
+      jenisTandaTangan: "gambar"
+    };
+
+    setFormData(printForm);
+    setShowPdfModal(true);
+  };
+
   // Auto-Save Effect
   useEffect(() => {
     try {
@@ -881,10 +943,9 @@ export default function App() {
     const finalKel = getFinalKelurahan();
     const finalKec = getFinalKecamatan();
     const finalKab = getFinalKabKota();
-    const defaultKel = currentUser && currentUser.kelurahan !== "Semua" ? currentUser.kelurahan : "Sananwetan";
-    const kel = finalKel || formData.kelurahan || defaultKel;
-    const kec = finalKec || formData.kecamatan || "Sananwetan";
-    const kab = finalKab || formData.kabupatenKota || "Kota Blitar";
+    const kel = finalKel || formData.kelurahan || "";
+    const kec = finalKec || formData.kecamatan || "";
+    const kab = finalKab || formData.kabupatenKota || "";
 
     return {
       id_kasus: editingCaseId || submittedData?.id || generatedId,
@@ -895,16 +956,16 @@ export default function App() {
       kelurahan: kel,
       kecamatan: kec,
       kabupatenKota: kab,
-      provinsi: formData.provinsi || "Jawa Timur",
-      spesies_final: formData.spesiesHPR === "Lainnya" ? (formData.spesiesLain || "Lainnya") : (formData.spesiesHPR || "Anjing"),
+      provinsi: formData.provinsi || "",
+      spesies_final: formData.spesiesHPR === "Lainnya" ? (formData.spesiesLain || "") : (formData.spesiesHPR || ""),
       kelurahan_final: kel,
       kecamatan_final: kec,
       kabupatenKota_final: kab,
-      namaKorban: formData.namaKorban || "Pasien GHPR",
-      noHpKorban: formData.noHpKorban || formData.kontakPemilik || "-",
-      kondisiLuka: formData.kondisiLuka || "Kategori 1",
+      namaKorban: formData.namaKorban || "",
+      noHpKorban: formData.noHpKorban || "",
+      kondisiLuka: formData.kondisiLuka || "",
     };
-  }, [formData, submittedData, editingCaseId, currentUser, getFinalKelurahan, getFinalKecamatan, getFinalKabKota]);
+  }, [formData, submittedData, editingCaseId, getFinalKelurahan, getFinalKecamatan, getFinalKabKota]);
 
   const handleSubmit = async () => {
     setSubmitError("");
@@ -1264,6 +1325,7 @@ export default function App() {
             onRefreshPatients={handleRefreshPatients}
             onNewInputCase={handleStartNewPatientInput}
             onEditFullFormCase={handleOpenPatientFullFormEdit}
+            onPrintPatientCase={handleOpenPatientPdfPrint}
             onOpenLoginModal={currentUser.username.toLowerCase() === "admin" || currentUser.role === "admin" ? () => setShowLoginModal(true) : undefined}
             onLogout={handleLogout}
             onOpenSettings={isAdminMode ? () => {

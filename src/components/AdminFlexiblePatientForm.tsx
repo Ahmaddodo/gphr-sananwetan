@@ -36,9 +36,9 @@ const initialFlexibleFormState: FormGHPRData = {
   kelurahanCustom: "",
   kecamatan: "",
   kecamatanCustom: "",
-  kabupatenKota: "Kota Blitar",
+  kabupatenKota: "",
   kabupatenKotaCustom: "",
-  provinsi: "Jawa Timur",
+  provinsi: "",
   sumberInfo: "",
   kronologi: "",
   spesiesHPR: "",
@@ -46,7 +46,7 @@ const initialFlexibleFormState: FormGHPRData = {
   ras: "",
   jkHewan: "",
   umurHewan: "",
-  satuanUmur: "Tahun",
+  satuanUmur: "",
   metodePelihara: "",
   asalHewan: "",
   pakan: "",
@@ -172,15 +172,14 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
     const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
     const generatedId = `GHPR-${dateStr}-${randomSuffix}`;
 
-    const activeUser = getActiveUserProfile();
     const finalKel = getFinalKelurahan();
     const finalKec = getFinalKecamatan();
     const finalKab = getFinalKabKota();
 
-    const kel = finalKel || formData.kelurahan || (activeUser?.kelurahan && activeUser.kelurahan !== "Semua" ? activeUser.kelurahan : "Sananwetan");
-    const kec = finalKec || formData.kecamatan || "Sananwetan";
-    const kab = finalKab || formData.kabupatenKota || "Kota Blitar";
-    const namaPasien = (formData.namaKorban || "").trim() || "Pasien Baru (Admin)";
+    const kel = finalKel || formData.kelurahan || "";
+    const kec = finalKec || formData.kecamatan || "";
+    const kab = finalKab || formData.kabupatenKota || "";
+    const namaPasien = (formData.namaKorban || "").trim();
 
     const payload = {
       id_kasus: generatedId,
@@ -192,17 +191,17 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
       kelurahan: kel,
       kecamatan: kec,
       kabupatenKota: kab,
-      provinsi: formData.provinsi || "Jawa Timur",
-      spesies_final: formData.spesiesHPR === "Lainnya" ? (formData.spesiesLain || "Lainnya") : (formData.spesiesHPR || "Anjing"),
+      provinsi: formData.provinsi || "",
+      spesies_final: formData.spesiesHPR === "Lainnya" ? (formData.spesiesLain || "") : (formData.spesiesHPR || ""),
       kelurahan_final: kel,
       kecamatan_final: kec,
       kabupatenKota_final: kab,
-      waktuKejadian: formData.waktuKejadian || now.toISOString().slice(0, 16),
-      tanggalPelaksanaan: formData.tanggalPelaksanaan || now.toISOString().slice(0, 10),
+      waktuKejadian: formData.waktuKejadian || "",
+      tanggalPelaksanaan: formData.tanggalPelaksanaan || "",
       pelaksanaNama: formData.pelaksanaNama || DEFAULT_PELAKSANA_NAMA,
       pelaksanaNIP: formData.pelaksanaNIP || DEFAULT_PELAKSANA_NIP,
-      kondisiLuka: formData.kondisiLuka || "Kategori 1",
-      noHpKorban: formData.noHpKorban || formData.kontakPemilik || "-",
+      kondisiLuka: formData.kondisiLuka || "",
+      noHpKorban: formData.noHpKorban || "",
     };
 
     const saveLocalHistory = () => {
