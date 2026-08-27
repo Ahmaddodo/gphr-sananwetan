@@ -7,12 +7,7 @@ import {
   LogIn,
   ShieldCheck,
   AlertCircle,
-  Clock,
-  KeyRound,
-  Users,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle2
+  Clock
 } from "lucide-react";
 import { UserAccessProfile } from "../types";
 import {
@@ -39,9 +34,8 @@ export const UserLoginView: React.FC<UserLoginViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showSecurityInfo, setShowSecurityInfo] = useState<boolean>(false);
-  const [showAccountList, setShowAccountList] = useState<boolean>(false);
   const [isSyncingWithCloud, setIsSyncingWithCloud] = useState<boolean>(false);
-  const [officerProfiles, setOfficerProfiles] = useState<UserAccessProfile[]>(() => getOfficerProfiles());
+  const [, setOfficerProfiles] = useState<UserAccessProfile[]>(() => getOfficerProfiles());
 
   // Otomatis sinkronisasi akun & data dari Google Sheets saat aplikasi pertama dibuka di perangkat
   useEffect(() => {
@@ -67,12 +61,6 @@ export const UserLoginView: React.FC<UserLoginViewProps> = ({
       isMounted = false;
     };
   }, []);
-
-  const handleSelectQuickAccount = (uname: string) => {
-    setUsernameInput(uname);
-    setPasswordInput("password123");
-    setErrorMessage("");
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,54 +301,8 @@ export const UserLoginView: React.FC<UserLoginViewProps> = ({
               </div>
             </form>
 
-            {/* Quick Officer Account Helper Accordion */}
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowAccountList((prev) => !prev)}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/80 text-blue-900 text-xs font-bold transition cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Users size={15} className="text-blue-600" />
-                  <span>Bantuan & Daftar Akun Petugas Wilayah</span>
-                </div>
-                {showAccountList ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-              </button>
-
-              {showAccountList && (
-                <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2.5 animate-in fade-in">
-                  <div className="text-[11px] text-slate-600 leading-relaxed">
-                    Klik akun wilayah Anda di bawah untuk mengisi form login secara otomatis (Password default: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono font-bold text-blue-700">password123</code>):
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                    {officerProfiles.map((p) => (
-                      <button
-                        key={p.id || p.username}
-                        type="button"
-                        onClick={() => handleSelectQuickAccount(p.username)}
-                        className="flex items-center justify-between text-left p-2 rounded-lg bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition cursor-pointer group shadow-2xs"
-                      >
-                        <div className="truncate mr-1">
-                          <div className="font-bold text-slate-800 text-[11px] truncate group-hover:text-blue-700">
-                            {p.kelurahan === "Semua" ? (p.username === "admin" ? "Admin / Koordinator" : p.nama.split(" ")[0]) : `Kel. ${p.kelurahan}`}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-mono">
-                            User: <span className="font-bold text-slate-700">{p.username}</span>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 group-hover:bg-blue-600 group-hover:text-white px-1.5 py-0.5 rounded transition shrink-0">
-                          Pilih
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Bottom Actions: Security info & Sync Status */}
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs flex-wrap gap-2">
+            <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs flex-wrap gap-2">
               <div className="inline-flex items-center gap-1.5 text-slate-500 text-[11px]">
                 <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
                 <span>Autentikasi SHA-256</span>
