@@ -861,9 +861,9 @@ export const GitHubSyncManager: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-emerald-950 text-xs uppercase tracking-wider">
-                    Formulir Publik (Live)
+                    Tautan Publik & Sistem Login (Live)
                   </h4>
-                  <span className="text-[10px] text-emerald-700">GitHub Pages Deployment</span>
+                  <span className="text-[10px] text-emerald-700">Akses Langsung ke Sistem Login Aplikasi</span>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
@@ -878,23 +878,23 @@ export const GitHubSyncManager: React.FC = () => {
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <a
-                  href={config.liveFormUrl || "https://ahmaddodo.github.io/form-ghpr-sananwetan/"}
+                  href={`${(config.liveFormUrl || "https://ahmaddodo.github.io/form-ghpr-sananwetan/").replace(/\/$/, "")}/?login=true`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-xs cursor-pointer"
                 >
-                  <span>Buka Form Publik</span>
+                  <span>Buka Sistem Login</span>
                   <ExternalLink size={13} />
                 </a>
 
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(config.liveFormUrl || "https://ahmaddodo.github.io/form-ghpr-sananwetan/", "liveForm")}
+                  onClick={() => copyToClipboard(`${(config.liveFormUrl || "https://ahmaddodo.github.io/form-ghpr-sananwetan/").replace(/\/$/, "")}/?login=true`, "liveForm")}
                   className="inline-flex items-center gap-1 py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer border border-slate-200"
-                  title="Salin tautan formulir publik"
+                  title="Salin tautan langsung sistem login"
                 >
                   {copiedLiveForm ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                  <span>{copiedLiveForm ? "Tersalin!" : "Salin"}</span>
+                  <span>{copiedLiveForm ? "Tersalin!" : "Salin Link"}</span>
                 </button>
               </div>
             </div>

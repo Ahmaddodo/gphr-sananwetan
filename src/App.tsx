@@ -275,6 +275,23 @@ export default function App() {
   const [sheetConfig, setSheetConfig] = useState<ConnectedSheetConfig>(() => getSavedSheetConfig());
 
   const [currentUser, setCurrentUser] = useState<UserAccessProfile | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const hash = window.location.hash;
+        if (
+          params.get("login") === "1" ||
+          params.get("login") === "true" ||
+          params.get("auth") === "1" ||
+          params.get("masuk") === "1" ||
+          params.get("action") === "login" ||
+          hash === "#login"
+        ) {
+          logoutPetugas();
+          return null;
+        }
+      } catch (e) {}
+    }
     return getActiveUserProfile();
   });
 
