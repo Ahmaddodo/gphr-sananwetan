@@ -23,18 +23,13 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
       window.addEventListener('error', function(e) {
-        if (e && e.message && !e.message.includes('ResizeObserver')) {
-          var rec = document.getElementById('preloader-recovery');
-          if (rec) {
-            rec.style.display = 'block';
-            var p = rec.querySelector('p');
-            if (p) p.innerHTML = '<span style="color:#b91c1c;font-weight:600;">Kendala modul: ' + (e.message || 'Error').slice(0, 100) + '</span><br>Klik tombol di bawah untuk menyegarkan cache:';
-          }
+        if (e && e.message && !/ResizeObserver|google|gsi|clarity|analytics/i.test(e.message)) {
+          console.warn('App notice:', e.message);
         }
       });
     </script>
-    <script type="module" crossorigin src="./assets/index-DLsP7DF0.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CbSXN3xj.css">
+    <script type="module" crossorigin src="./assets/index-BLnZ355D.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CFmO9Br3.css">
   <link rel="manifest" href="./manifest.webmanifest"></head>
   <body class="bg-slate-50 text-slate-900 selection:bg-sky-500 selection:text-white">
     <div id="root">
@@ -53,7 +48,7 @@
           setTimeout(function() {
             var rec = document.getElementById('preloader-recovery');
             if (rec) rec.style.display = 'block';
-          }, 4000);
+          }, 12000);
         </script>
       </div>
     </div>
