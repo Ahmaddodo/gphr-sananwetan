@@ -763,13 +763,14 @@ export default function App() {
     setEditingCaseId(null);
     try {
       localStorage.removeItem(STORAGE_KEY_EDITING_ID);
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.removeItem(STORAGE_KEY_EDITING_ID);
+      }
     } catch (e) {}
-    setResetSuccessMessage("Mode edit dibatalkan.");
+    setResetSuccessMessage("Mode edit dibatalkan. Kembali ke Daftar Pasien Dipantau.");
     setTimeout(() => setResetSuccessMessage(""), 4000);
-    const isAdm = currentUser && (currentUser.username.toLowerCase() === "admin" || currentUser.role === "admin");
-    if (!isAdm) {
-      handleSwitchTab("monitoring");
-    }
+    handleSwitchTab("monitoring");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSelectCaseForEdit = (caseItem: StoredCaseItem) => {
@@ -1106,10 +1107,26 @@ export default function App() {
         syncPatientFromFormSubmission(formData, payload.id_kasus, isUpdateMode);
         handleRefreshPatients();
 
+        if (isUpdateMode) {
+          setEditingCaseId(null);
+          try {
+            localStorage.removeItem(STORAGE_KEY_EDITING_ID);
+            if (typeof sessionStorage !== "undefined") {
+              sessionStorage.removeItem(STORAGE_KEY_EDITING_ID);
+            }
+          } catch (e) {}
+        }
+
         setResetSuccessMessage(
-          `Mode Offline: Laporan ${payload.id_kasus} (${formData.namaKorban}) berhasil disimpan ke memori perangkat dan masuk antrean sinkronisasi. Data akan otomatis dikirim ke Google Sheets saat Anda terhubung online kembali.`
+          isUpdateMode
+            ? `Mode Offline: Pembaruan Laporan ${payload.id_kasus} (${formData.namaKorban}) disimpan ke memori lokal & antrean. Otomatis dikirim ke Google Sheets saat online kembali.`
+            : `Mode Offline: Laporan ${payload.id_kasus} (${formData.namaKorban}) berhasil disimpan ke memori perangkat dan masuk antrean sinkronisasi. Data akan otomatis dikirim ke Google Sheets saat Anda terhubung online kembali.`
         );
-        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        setTimeout(() => {
+          handleSwitchTab("monitoring");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }, 400);
       } catch (errOffline) {
         console.error("Gagal simpan offline:", errOffline);
       } finally {
@@ -1598,13 +1615,25 @@ export default function App() {
                       <ChevronLeft size={16} /> Kembali
                     </button>
 
-                    <button
-                      onClick={handleResetForm}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3.5 py-2.5 text-xs font-bold text-rose-700 transition"
-                      title="Kosongkan seluruh isian formulir"
-                    >
-                      <RotateCcw size={15} /> Reset Form
-                    </button>
+                    {/* Tombol Reset Form hanya tampil di mode input baru, disembunyikan saat mode edit data */}
+                    {editingCaseId ? (
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 px-3.5 py-2.5 text-xs font-bold text-amber-900 transition cursor-pointer"
+                        title="Batalkan proses edit dan kembali ke daftar pasien dipantau"
+                      >
+                        <X size={15} /> Batal Edit
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleResetForm}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3.5 py-2.5 text-xs font-bold text-rose-700 transition"
+                        title="Kosongkan seluruh isian formulir"
+                      >
+                        <RotateCcw size={15} /> Reset Form
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3">

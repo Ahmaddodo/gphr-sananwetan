@@ -478,13 +478,15 @@ export const Header: React.FC<HeaderProps & {
               <span className="text-xs text-slate-500 font-medium">
                 Setiap laporan yang dikirim akan secara otomatis tersimpan di baris baru Google Sheets.
               </span>
-              <button
-                onClick={handleResetForm}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 transition shadow-sm cursor-pointer"
-                title="Hapus semua isian formulir dan bersihkan memori lokal (localStorage)"
-              >
-                <RotateCcw size={14} /> Reset Form & Draf Lokal
-              </button>
+              {!editingCaseId && (
+                <button
+                  onClick={handleResetForm}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 transition shadow-sm cursor-pointer"
+                  title="Hapus semua isian formulir dan bersihkan memori lokal (localStorage)"
+                >
+                  <RotateCcw size={14} /> Reset Form & Draf Lokal
+                </button>
+              )}
             </div>
           </div>
         </div>
