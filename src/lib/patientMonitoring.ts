@@ -311,20 +311,35 @@ export const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
 // Catat waktu aktivitas pengguna terkini
 export function recordUserActivity(): void {
   try {
-    localStorage.setItem(STORAGE_KEY_LAST_ACTIVITY, Date.now().toString());
+    const nowStr = Date.now().toString();
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem(STORAGE_KEY_LAST_ACTIVITY, nowStr);
+    }
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(STORAGE_KEY_LAST_ACTIVITY, nowStr);
+    }
   } catch (e) {}
 }
 
-// Ambil timestamp aktivitas terakhir
+// Ambil timestamp aktivitas terakhir (0 jika belum tercatat)
 export function getLastUserActivityTimestamp(): number {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY_LAST_ACTIVITY);
-    if (saved) {
-      const parsed = Number(saved);
-      if (!isNaN(parsed) && parsed > 0) return parsed;
+    if (typeof sessionStorage !== "undefined") {
+      const sess = sessionStorage.getItem(STORAGE_KEY_LAST_ACTIVITY);
+      if (sess) {
+        const parsed = Number(sess);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    }
+    if (typeof localStorage !== "undefined") {
+      const saved = localStorage.getItem(STORAGE_KEY_LAST_ACTIVITY);
+      if (saved) {
+        const parsed = Number(saved);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
     }
   } catch (e) {}
-  return Date.now();
+  return 0;
 }
 
 // Periksa apakah sesi telah kedaluwarsa karena tidak aktif selama lebih dari 1 jam
@@ -332,9 +347,10 @@ export function isSessionExpired(): boolean {
   try {
     const active = typeof sessionStorage !== "undefined"
       ? sessionStorage.getItem(STORAGE_KEY_ACTIVE_USER)
-      : (typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY_ACTIVE_USER) : null);
-    if (!active || active === "null" || active === "guest" || active === "") return false;
+      : null;
+    if (!active || active === "null" || active === "guest" || active === "") return true;
     const lastActive = getLastUserActivityTimestamp();
+    if (lastActive <= 0) return false; // Sesi baru yang belum ada rekam jejak timeout
     const elapsed = Date.now() - lastActive;
     return elapsed >= INACTIVITY_TIMEOUT_MS;
   } catch (e) {

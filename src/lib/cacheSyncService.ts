@@ -15,8 +15,8 @@ import {
 } from "./patientMonitoring";
 import { getWebAppUrl } from "./config";
 
-export const APP_CACHE_VERSION_KEY = "ghpr_app_version_tag_v5";
-export const CURRENT_APP_VERSION = "2026.08.27.v5_login_entry_strict";
+export const APP_CACHE_VERSION_KEY = "ghpr_app_version_tag_v6";
+export const CURRENT_APP_VERSION = "2026.08.27.v6_instant_login_landing";
 
 /**
  * Inisialisasi awal saat aplikasi dibuka atau di-install oleh user baru.
@@ -34,10 +34,18 @@ export async function initializeAppSyncAndBustStaleCache(): Promise<void> {
     if (storedVersion !== CURRENT_APP_VERSION) {
       console.log(`[CacheSync] Mendeteksi versi baru (${CURRENT_APP_VERSION}). Memperbarui akun & sinkronisasi...`);
 
-      // Bersihkan sesi aktif lama dari localStorage agar selalu menampilkan form login saat URL dibuka
+      // Bersihkan sesi aktif lama dari storage agar selalu menampilkan form login saat URL dibuka
       try {
         localStorage.removeItem("ghpr_active_user_access_profile_v2");
         localStorage.removeItem("ghpr_active_user_profile");
+        localStorage.removeItem("ghpr_active_app_tab_v2");
+        localStorage.removeItem("ghpr_app_view_mode");
+      } catch (e) {}
+      try {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.removeItem("ghpr_active_user_access_profile_v2");
+          sessionStorage.removeItem("ghpr_active_app_tab_v2");
+        }
       } catch (e) {}
 
       // Rekonsiliasi akun petugas: pastikan akun ada tanpa menimpa perubahan kustom dari spreadsheet

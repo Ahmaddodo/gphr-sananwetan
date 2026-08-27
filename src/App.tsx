@@ -258,7 +258,7 @@ export default function App() {
   // Tab Navigasi & Hak Akses Pengguna (Default: "form" / Mode Formulir Publik)
   const [activeTab, setActiveTab] = useState<ActiveAppTab>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB);
+      const saved = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(STORAGE_KEY_ACTIVE_TAB) : null;
       if (saved === "monitoring" || saved === "form" || saved === "settings") {
         return saved as ActiveAppTab;
       }
@@ -391,7 +391,9 @@ export default function App() {
   useEffect(() => {
     const handleOfficersSync = () => {
       const refreshed = getActiveUserProfile();
-      setCurrentUser(refreshed);
+      if (refreshed) {
+        setCurrentUser(refreshed);
+      }
     };
     const handlePatientDataSync = () => {
       setPatientsList(getAllPatients());
@@ -458,7 +460,9 @@ export default function App() {
       .then((res) => {
         handleRefreshPatients();
         const refreshedUser = getActiveUserProfile();
-        setCurrentUser(refreshedUser);
+        if (refreshedUser) {
+          setCurrentUser(refreshedUser);
+        }
       })
       .catch((err) => {
         console.warn("Startup cloud sync notice:", err);
