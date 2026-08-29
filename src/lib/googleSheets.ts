@@ -1490,41 +1490,41 @@ function prosesDataMasuk(data, action) {
       if (h === "nip pelaksana" || h === "nip" || h === "nip petugas") {
         return d.pelaksanaNIP || "-";
       }
-      if (h === "status pemantauan" || h === "status pemantauan korban" || h === "status_pemantauan") {
-        return d.statusPemantauan || "-";
+      if (h.indexOf("status pemantauan") !== -1 || h === "status" || h === "status kasus") {
+        return d.statusPemantauan || d["Status Pemantauan"] || "-";
       }
-      if (h === "hari observasi" || h === "hari observasi ke" || h === "hari_observasi") {
-        return d.hariObservasi !== undefined && d.hariObservasi !== null ? String(d.hariObservasi) : (d.hariObservasiKe ? String(d.hariObservasiKe) : "-");
+      if (h.indexOf("hari observasi") !== -1 || h === "hari" || h === "hari ke") {
+        return d.hariObservasi !== undefined && d.hariObservasi !== null ? String(d.hariObservasi) : (d["Hari Observasi"] || d.hariObservasiKe ? String(d.hariObservasiKe) : "-");
       }
-      if (h === "status hewan observasi" || h === "status_hewan_observasi" || h === "status observasi hewan") {
-        return d.statusHewanObservasi || "-";
+      if (h.indexOf("status hewan") !== -1 || h.indexOf("hewan observasi") !== -1) {
+        return d.statusHewanObservasi || d["Status Hewan Observasi"] || "-";
       }
-      if (h === "jadwal var dosis 0" || h === "var dosis 0" || h === "dosis 0" || h === "dosis0") {
-        return d.jadwalVAR_0 || d.jadwalVARDosis0 || d.dosis0 || "-";
+      if ((h.indexOf("var") !== -1 && (h.indexOf("0") !== -1 || h.indexOf("nol") !== -1)) || h.indexOf("dosis 0") !== -1 || h.indexOf("dosis0") !== -1) {
+        return d.jadwalVAR_0 || d["Jadwal VAR Dosis 0"] || d.jadwalVARDosis0 || d.dosis0 || "-";
       }
-      if (h === "jadwal var dosis 3" || h === "var dosis 3" || h === "dosis 3" || h === "dosis3") {
-        return d.jadwalVAR_3 || d.jadwalVARDosis3 || d.dosis3 || "-";
+      if ((h.indexOf("var") !== -1 && (h.indexOf("3") !== -1 || h.indexOf("tiga") !== -1)) || h.indexOf("dosis 3") !== -1 || h.indexOf("dosis3") !== -1) {
+        return d.jadwalVAR_3 || d["Jadwal VAR Dosis 3"] || d.jadwalVARDosis3 || d.dosis3 || "-";
       }
-      if (h === "jadwal var dosis 7" || h === "var dosis 7" || h === "dosis 7" || h === "dosis7") {
-        return d.jadwalVAR_7 || d.jadwalVARDosis7 || d.dosis7 || "-";
+      if ((h.indexOf("var") !== -1 && (h.indexOf("7") !== -1 || h.indexOf("tujuh") !== -1)) || h.indexOf("dosis 7") !== -1 || h.indexOf("dosis7") !== -1) {
+        return d.jadwalVAR_7 || d["Jadwal VAR Dosis 7"] || d.jadwalVARDosis7 || d.dosis7 || "-";
       }
-      if (h === "jadwal var dosis 21" || h === "var dosis 21" || h === "dosis 21" || h === "dosis21") {
-        return d.jadwalVAR_21 || d.jadwalVARDosis21 || d.dosis21 || "-";
+      if ((h.indexOf("var") !== -1 && (h.indexOf("21") !== -1 || h.indexOf("dua satu") !== -1)) || h.indexOf("dosis 21") !== -1 || h.indexOf("dosis21") !== -1) {
+        return d.jadwalVAR_21 || d["Jadwal VAR Dosis 21"] || d.jadwalVARDosis21 || d.dosis21 || "-";
       }
-      if (h === "catatan perkembangan harian" || h === "catatan harian" || h === "catatan perkembangan" || h === "log perkembangan" || h === "riwayat pemantauan") {
-        return d.catatanPerkembanganHarian || d.catatanLogHarian || d.riwayatLogHarian || "-";
+      if (h.indexOf("catatan") !== -1 || h.indexOf("perkembangan") !== -1 || h.indexOf("log") !== -1) {
+        return d.catatanPerkembanganHarian || d["Catatan Perkembangan Harian"] || d.catatanLogHarian || d.riwayatLogHarian || "-";
       }
-      if (h === "suhu tubuh terkini" || h === "suhu tubuh" || h === "suhu badan" || h === "suhutubuh") {
+      if (h.indexOf("suhu") !== -1) {
         return d.suhuTubuhTerkini || d.suhuTubuh || "-";
       }
-      if (h === "petugas pj monitoring" || h === "pj monitoring" || h === "petugas monitoring") {
-        return d.petugasPJMonitoring || d.petugasPJ || d.pelaksanaNama || "-";
+      if (h.indexOf("petugas pj") !== -1 || h.indexOf("pj monitoring") !== -1 || h.indexOf("petugas monitoring") !== -1) {
+        return d.petugasPJMonitoring || d["Petugas PJ Monitoring"] || d.petugasPJ || d.pelaksanaNama || "-";
       }
-      if (h === "nip pj monitoring" || h === "nip monitoring" || h === "nippjmonitoring") {
-        return d.nipPJMonitoring || d.nipPJ || d.pelaksanaNIP || "-";
+      if (h.indexOf("nip pj") !== -1 || h.indexOf("nip monitoring") !== -1) {
+        return d.nipPJMonitoring || d["NIP PJ Monitoring"] || d.nipPJ || d.pelaksanaNIP || "-";
       }
-      if (h === "terakhir diperbarui" || h === "last updated" || h === "terakhirdiperbarui" || h === "lastupdated") {
-        return d.lastUpdated || Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
+      if (h.indexOf("terakhir") !== -1 || h.indexOf("updated") !== -1 || h.indexOf("diperbarui") !== -1 || h.indexOf("diupdate") !== -1) {
+        return d.lastUpdated || d["Terakhir Diperbarui"] || Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
       }
 
       // 4. Positional fallback from rowValues array jika dikirim dari aplikasi frontend
@@ -1734,7 +1734,23 @@ export async function sendToAppsScript(
   const waktuKejadianVal = (payload.waktuKejadian || payload["Waktu Kejadian"] || new Date().toISOString().slice(0, 16)).trim();
   const tglPelaksanaanVal = (payload.tanggalPelaksanaan || payload["Tanggal Pelaksanaan"] || new Date().toISOString().slice(0, 10)).trim();
 
+  // Data pemantauan tambahan (kolom 37-46)
+  const pAny = payload as any;
+  const statusPemantauanVal = (pAny.statusPemantauan || pAny["Status Pemantauan"] || "Dalam Pemantauan (Aktif)").trim();
+  const hariObservasiVal = pAny.hariObservasi !== undefined && pAny.hariObservasi !== null && String(pAny.hariObservasi).trim() !== ""
+    ? pAny.hariObservasi
+    : (pAny["Hari Observasi"] !== undefined ? pAny["Hari Observasi"] : (pAny.hariObservasiKe !== undefined ? pAny.hariObservasiKe : "1"));
+  const statusHewanObservasiVal = (pAny.statusHewanObservasi || pAny["Status Hewan Observasi"] || "Sehat / Normal (Observasi)").trim();
+  const jadwalVAR_0Val = (pAny.jadwalVAR_0 || pAny["Jadwal VAR Dosis 0"] || pAny.jadwalVARDosis0 || pAny.dosis0 || "-").trim();
+  const jadwalVAR_3Val = (pAny.jadwalVAR_3 || pAny["Jadwal VAR Dosis 3"] || pAny.jadwalVARDosis3 || pAny.dosis3 || "-").trim();
+  const jadwalVAR_7Val = (pAny.jadwalVAR_7 || pAny["Jadwal VAR Dosis 7"] || pAny.jadwalVARDosis7 || pAny.dosis7 || "-").trim();
+  const jadwalVAR_21Val = (pAny.jadwalVAR_21 || pAny["Jadwal VAR Dosis 21"] || pAny.jadwalVARDosis21 || pAny.dosis21 || "-").trim();
+  const catatanPerkembanganHarianVal = (pAny.catatanPerkembanganHarian || pAny["Catatan Perkembangan Harian"] || pAny.catatanLogHarian || pAny.riwayatLogHarian || "-").trim();
+  const petugasPJMonitoringVal = (pAny.petugasPJMonitoring || pAny["Petugas PJ Monitoring"] || pAny.petugasPJ || (pAny.pelaksanaNama || "Petugas Puskesmas")).trim();
+  const lastUpdatedVal = (pAny.lastUpdated || pAny["Terakhir Diperbarui"] || new Date().toLocaleString("id-ID")).trim();
+
   const orderedRowValues = mapPayloadToRowValues({
+    ...payload,
     id_kasus: payload.id_kasus || "",
     timestamp_submit: payload.timestamp_submit || new Date().toISOString(),
     waktuKejadian: waktuKejadianVal,
@@ -1780,7 +1796,17 @@ export async function sendToAppsScript(
     timAnggota: payload.timAnggota || "",
     tanggalPelaksanaan: tglPelaksanaanVal,
     pelaksanaNama: payload.pelaksanaNama || "",
-    pelaksanaNIP: payload.pelaksanaNIP || ""
+    pelaksanaNIP: payload.pelaksanaNIP || "",
+    statusPemantauan: statusPemantauanVal,
+    hariObservasi: hariObservasiVal,
+    statusHewanObservasi: statusHewanObservasiVal,
+    jadwalVAR_0: jadwalVAR_0Val,
+    jadwalVAR_3: jadwalVAR_3Val,
+    jadwalVAR_7: jadwalVAR_7Val,
+    jadwalVAR_21: jadwalVAR_21Val,
+    catatanPerkembanganHarian: catatanPerkembanganHarianVal,
+    petugasPJMonitoring: petugasPJMonitoringVal,
+    lastUpdated: lastUpdatedVal
   } as any);
 
   const enhancedPayload: Record<string, any> = {
@@ -1810,6 +1836,18 @@ export async function sendToAppsScript(
     umurPasien: umurKorbanVal,
     alamatPasien: alamatKorbanVal,
     jkPasien: jkKorbanVal,
+    // Field Pemantauan Tambahan (Kolom 37-46)
+    statusPemantauan: statusPemantauanVal,
+    hariObservasi: hariObservasiVal,
+    hariObservasiKe: hariObservasiVal,
+    statusHewanObservasi: statusHewanObservasiVal,
+    jadwalVAR_0: jadwalVAR_0Val,
+    jadwalVAR_3: jadwalVAR_3Val,
+    jadwalVAR_7: jadwalVAR_7Val,
+    jadwalVAR_21: jadwalVAR_21Val,
+    catatanPerkembanganHarian: catatanPerkembanganHarianVal,
+    petugasPJMonitoring: petugasPJMonitoringVal,
+    lastUpdated: lastUpdatedVal,
     // Alias Header Resmi Google Spreadsheet
     "ID Kasus": payload.id_kasus || "",
     "Waktu Submit": payload.timestamp_submit || new Date().toISOString(),
@@ -1846,7 +1884,17 @@ export async function sendToAppsScript(
     "Anggota Tim PE": payload.timAnggota || "",
     "Tanggal Pelaksanaan": tglPelaksanaanVal,
     "Pelaksana (Petugas)": payload.pelaksanaNama || "",
-    "NIP Pelaksana": payload.pelaksanaNIP || ""
+    "NIP Pelaksana": payload.pelaksanaNIP || "",
+    "Status Pemantauan": statusPemantauanVal,
+    "Hari Observasi": hariObservasiVal,
+    "Status Hewan Observasi": statusHewanObservasiVal,
+    "Jadwal VAR Dosis 0": jadwalVAR_0Val,
+    "Jadwal VAR Dosis 3": jadwalVAR_3Val,
+    "Jadwal VAR Dosis 7": jadwalVAR_7Val,
+    "Jadwal VAR Dosis 21": jadwalVAR_21Val,
+    "Catatan Perkembangan Harian": catatanPerkembanganHarianVal,
+    "Petugas PJ Monitoring": petugasPJMonitoringVal,
+    "Terakhir Diperbarui": lastUpdatedVal
   };
 
   const jsonStr = JSON.stringify(enhancedPayload);

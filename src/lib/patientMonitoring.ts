@@ -5,7 +5,8 @@ import {
   MonitoringDailyLog,
   FormGHPRData,
   SubmissionPayload,
-  StatusPemantauanPasien
+  StatusPemantauanPasien,
+  StatusHewanObservasi
 } from "../types";
 import { hashPassword, verifyPassword } from "./cryptoAuth";
 import {
@@ -1417,9 +1418,21 @@ export async function syncPatientsFromGoogleSheets(
           statusPemantauan = getFieldFromRow(rd, [
             "Status Pemantauan",
             "statusPemantauan",
-            "Status"
+            "Status",
+            "col_36"
           ], "Dalam Pemantauan (Aktif)");
         }
+
+        // Ekstraksi data pemantauan kolom 37-46
+        const rawHariObs = Number(getFieldFromRow(rd, ["Hari Observasi", "hariObservasi", "hariObservasiKe", "col_37"], "1")) || 1;
+        const rawStatusHewanObs = getFieldFromRow(rd, ["Status Hewan Observasi", "statusHewanObservasi", "col_38"], "Sehat / Normal (Observasi)");
+        const rawVar0 = getFieldFromRow(rd, ["Jadwal VAR Dosis 0", "jadwalVAR_0", "col_39"], "");
+        const rawVar3 = getFieldFromRow(rd, ["Jadwal VAR Dosis 3", "jadwalVAR_3", "col_40"], "");
+        const rawVar7 = getFieldFromRow(rd, ["Jadwal VAR Dosis 7", "jadwalVAR_7", "col_41"], "");
+        const rawVar21 = getFieldFromRow(rd, ["Jadwal VAR Dosis 21", "jadwalVAR_21", "col_42"], "");
+        const rawCatatanLog = getFieldFromRow(rd, ["Catatan Perkembangan Harian", "catatanPerkembanganHarian", "col_43"], "");
+        const rawPJMonitoring = getFieldFromRow(rd, ["Petugas PJ Monitoring", "petugasPJMonitoring", "col_44"], petugasPJ);
+        const rawLastUpd = getFieldFromRow(rd, ["Terakhir Diperbarui", "lastUpdated", "col_45"], waktuSubmit);
 
         const sIdLower = sId.toLowerCase();
         const sNamaLower = nama.toLowerCase();
@@ -1456,9 +1469,13 @@ export async function syncPatientsFromGoogleSheets(
             kondisiLuka: kondisiLuka !== "-" ? kondisiLuka : ex.kondisiLuka,
             kondisiHewan: kondisiHewan !== "-" ? kondisiHewan : ex.kondisiHewan,
             spesiesHPR: spesiesHPR || ex.spesiesHPR,
-            petugasPJ: petugasPJ !== "-" ? petugasPJ : ex.petugasPJ,
+            petugasPJ: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : (petugasPJ !== "-" ? petugasPJ : ex.petugasPJ),
             nipPJ: nipPJ !== "-" ? nipPJ : ex.nipPJ,
-            rekomendasi: rekomendasi !== "-" ? rekomendasi : ex.rekomendasi
+            rekomendasi: rekomendasi !== "-" ? rekomendasi : ex.rekomendasi,
+            statusPemantauan: (statusPemantauan as StatusPemantauanPasien) || ex.statusPemantauan,
+            hariObservasiKe: rawHariObs > 1 ? rawHariObs : ex.hariObservasiKe,
+            statusHewanObservasi: (rawStatusHewanObs && rawStatusHewanObs !== "-" ? rawStatusHewanObs : ex.statusHewanObservasi) as StatusHewanObservasi,
+            lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : ex.lastUpdated
           };
 
           if (alreadyInSyncedIdx >= 0) {
@@ -1494,33 +1511,33 @@ export async function syncPatientsFromGoogleSheets(
             tindakanHPR: String(getFieldFromRow(rd, ["Tindakan terhadap HPR", "tindakanHPR"], "Observasi 14 Hari")),
             rekomendasi: rekomendasi,
             statusPemantauan: (statusPemantauan as StatusPemantauanPasien) || "Dalam Pemantauan (Aktif)",
-            statusHewanObservasi: "Sehat / Normal (Observasi)",
-            hariObservasiKe: 1,
+            statusHewanObservasi: (rawStatusHewanObs && rawStatusHewanObs !== "-" ? rawStatusHewanObs : "Sehat / Normal (Observasi)") as StatusHewanObservasi,
+            hariObservasiKe: rawHariObs || 1,
             tglMulaiObservasi: tglKejadian,
             tglSelesaiObservasi: tglSelesai,
             jadwalVAR: {
-              dosis0: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
-              dosis3: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
-              dosis7: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
-              dosis21: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" }
+              dosis0: { tanggal: "", status: rawVar0 && rawVar0.includes("Sudah") ? "Sudah Diberikan" : "Belum Diberikan", lokasiPemberian: "", keterangan: rawVar0 },
+              dosis3: { tanggal: "", status: rawVar3 && rawVar3.includes("Sudah") ? "Sudah Diberikan" : "Belum Diberikan", lokasiPemberian: "", keterangan: rawVar3 },
+              dosis7: { tanggal: "", status: rawVar7 && rawVar7.includes("Sudah") ? "Sudah Diberikan" : "Belum Diberikan", lokasiPemberian: "", keterangan: rawVar7 },
+              dosis21: { tanggal: "", status: rawVar21 && rawVar21.includes("Sudah") ? "Sudah Diberikan" : "Belum Diberikan", lokasiPemberian: "", keterangan: rawVar21 }
             },
             riwayatLog: [
               {
                 id: `log-import-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
                 tanggal: tglKejadian,
-                hariKe: 1,
-                petugasNama: petugasPJ,
+                hariKe: rawHariObs || 1,
+                petugasNama: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : petugasPJ,
                 kelurahan: kelurahan,
                 kondisiKorban: kondisiLuka || "Dalam Perawatan",
                 statusLuka: kondisiLuka,
                 kondisiHewan: kondisiHewan,
                 tindakanDilakukan: "Penyelidikan Epidemiologi",
-                catatanKhusus: `Data disinkronkan dari ${sourceNote || "Google Spreadsheet"}.`
+                catatanKhusus: rawCatatanLog && rawCatatanLog !== "-" ? rawCatatanLog : `Data disinkronkan dari ${sourceNote || "Google Spreadsheet"}.`
               }
             ],
-            petugasPJ: petugasPJ,
+            petugasPJ: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : petugasPJ,
             nipPJ: nipPJ,
-            lastUpdated: new Date().toLocaleString("id-ID")
+            lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : new Date().toLocaleString("id-ID")
           };
 
           if (alreadyInSyncedIdx >= 0) {

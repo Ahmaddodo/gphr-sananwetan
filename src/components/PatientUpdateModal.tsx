@@ -213,6 +213,18 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
     // 2. Siapkan Payload Update Komprehensif untuk Google Spreadsheet
     const rawData: Record<string, any> = patient.fullData || {};
+
+    // Format Data Pemantauan Tambahan (Kolom 37 - 46)
+    const catatanLogText = updatedLogs.length > 0
+      ? updatedLogs.map((log: any, idx: number) => `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] ${log.petugasNama ? `(${log.petugasNama})` : ""} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${log.suhuTubuh ? `${log.suhuTubuh}` : "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`).join("\n\n")
+      : "-";
+
+    const var0Text = jadwalVAR?.dosis0?.status ? `${jadwalVAR.dosis0.status}${jadwalVAR.dosis0.tanggal ? ` (${jadwalVAR.dosis0.tanggal})` : ""}${jadwalVAR.dosis0.lokasiPemberian ? ` - ${jadwalVAR.dosis0.lokasiPemberian}` : ""}` : "-";
+    const var3Text = jadwalVAR?.dosis3?.status ? `${jadwalVAR.dosis3.status}${jadwalVAR.dosis3.tanggal ? ` (${jadwalVAR.dosis3.tanggal})` : ""}${jadwalVAR.dosis3.lokasiPemberian ? ` - ${jadwalVAR.dosis3.lokasiPemberian}` : ""}` : "-";
+    const var7Text = jadwalVAR?.dosis7?.status ? `${jadwalVAR.dosis7.status}${jadwalVAR.dosis7.tanggal ? ` (${jadwalVAR.dosis7.tanggal})` : ""}${jadwalVAR.dosis7.lokasiPemberian ? ` - ${jadwalVAR.dosis7.lokasiPemberian}` : ""}` : "-";
+    const var21Text = jadwalVAR?.dosis21?.status ? `${jadwalVAR.dosis21.status}${jadwalVAR.dosis21.tanggal ? ` (${jadwalVAR.dosis21.tanggal})` : ""}${jadwalVAR.dosis21.lokasiPemberian ? ` - ${jadwalVAR.dosis21.lokasiPemberian}` : ""}` : "-";
+    const lastUpdateTimestamp = new Date().toLocaleString("id-ID");
+
     const updatePayload: SubmissionPayload = {
       id_kasus: patient.id_kasus,
       timestamp_submit: patient.timestamp_submit || new Date().toISOString(),
@@ -268,9 +280,32 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       tanggalPelaksanaan: rawData.tanggalPelaksanaan || new Date().toISOString().slice(0, 10),
       pelaksanaNama: DEFAULT_PELAKSANA_NAMA,
       pelaksanaNIP: DEFAULT_PELAKSANA_NIP,
+      statusPemantauan,
+      hariObservasi: Number(hariObservasi),
+      hariObservasiKe: Number(hariObservasi),
+      statusHewanObservasi: statusHewan,
+      jadwalVAR_0: var0Text,
+      jadwalVAR_3: var3Text,
+      jadwalVAR_7: var7Text,
+      jadwalVAR_21: var21Text,
+      catatanPerkembanganHarian: catatanLogText,
+      petugasPJMonitoring: currentUser.nama ? `${currentUser.nama}${currentUser.nip ? ` (${currentUser.nip})` : ""}` : (patient.petugasPJ || DEFAULT_PELAKSANA_NAMA),
+      nipPJMonitoring: currentUser.nip || patient.nipPJ || DEFAULT_PELAKSANA_NIP,
+      lastUpdated: lastUpdateTimestamp,
+      // Header names
+      "Status Pemantauan": statusPemantauan,
+      "Hari Observasi": Number(hariObservasi),
+      "Status Hewan Observasi": statusHewan,
+      "Jadwal VAR Dosis 0": var0Text,
+      "Jadwal VAR Dosis 3": var3Text,
+      "Jadwal VAR Dosis 7": var7Text,
+      "Jadwal VAR Dosis 21": var21Text,
+      "Catatan Perkembangan Harian": catatanLogText,
+      "Petugas PJ Monitoring": currentUser.nama ? `${currentUser.nama}${currentUser.nip ? ` (${currentUser.nip})` : ""}` : (patient.petugasPJ || DEFAULT_PELAKSANA_NAMA),
+      "Terakhir Diperbarui": lastUpdateTimestamp,
       action: "update",
       is_update: true
-    };
+    } as any;
 
     // 3. Update Riwayat Pengiriman Lokal
     try {
