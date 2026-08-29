@@ -330,10 +330,17 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
               ) : (
                 patient.riwayatLog.map((log, idx) => (
                   <div key={log.id || idx} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-1.5">
-                    <div className="flex items-center justify-between text-slate-700">
-                      <span className="font-bold text-slate-900">
-                        Hari ke-{log.hariKe} • Tanggal: {log.tanggal}
-                      </span>
+                    <div className="flex items-center justify-between text-slate-700 flex-wrap gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">
+                          Hari ke-{log.hariKe} • Tanggal: {log.tanggal}
+                        </span>
+                        {log.suhuTubuh && (
+                          <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+                            🌡️ {log.suhuTubuh}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
                         Petugas: {log.petugasNama}
                       </span>

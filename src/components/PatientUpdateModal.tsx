@@ -15,6 +15,8 @@ import {
   FileText,
   Shield,
   Edit3,
+  Trash2,
+  Check,
   Dog,
   HeartPulse,
   History,
@@ -78,8 +80,12 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     dosis21: { tanggal: "", status: "Belum Diberikan" as const, lokasiPemberian: "", keterangan: "" }
   });
 
-  // New Daily Log Form State
+  // Daily Logs state
+  const [logsList, setLogsList] = useState<MonitoringDailyLog[]>(patient?.riwayatLog || []);
   const [showAddLog, setShowAddLog] = useState<boolean>(false);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+
+  // Sub-form input states
   const [logTanggal, setLogTanggal] = useState<string>(new Date().toISOString().slice(0, 10));
   const [logHariKe, setLogHariKe] = useState<number>(patient?.hariObservasiKe || 1);
   const [logKondisiKorban, setLogKondisiKorban] = useState<string>("Kondisi umum baik, tidak demam.");
@@ -108,6 +114,9 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
         dosis7: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
         dosis21: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" }
       });
+      setLogsList(patient.riwayatLog ? [...patient.riwayatLog] : []);
+      setShowAddLog(false);
+      setEditingLogId(null);
       setLogHariKe(patient.hariObservasiKe || 1);
       setSaveSuccessMsg("");
       setSaveErrorMsg("");
@@ -149,6 +158,102 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     }));
   };
 
+  // Handler untuk Buka Form Catatan Baru (Membersihkan Form dari data sebelumnya)
+  const handleOpenNewLogForm = () => {
+    setEditingLogId(null);
+    setLogTanggal(new Date().toISOString().slice(0, 10));
+    setLogHariKe(hariObservasi || 1);
+    setLogKondisiKorban("Kondisi umum baik, tidak demam.");
+    setLogStatusLuka(kondisiLuka || "Luka bersih dan mulai mengering.");
+    setLogKondisiHewan(kondisiHewanText || "Hewan sehat, aktif, nafsu makan baik.");
+    setLogSuhu("36.5");
+    setLogTindakan("Pemantauan berkala & edukasi perawatan luka.");
+    setLogCatatan("");
+    setShowAddLog(true);
+  };
+
+  // Handler untuk Memulai Edit Catatan yang Sudah Ada
+  const handleStartEditLog = (log: MonitoringDailyLog) => {
+    const targetId = log.id || `log-${log.tanggal}-${log.hariKe}`;
+    setEditingLogId(targetId);
+    setLogTanggal(log.tanggal || new Date().toISOString().slice(0, 10));
+    setLogHariKe(log.hariKe || 1);
+    setLogKondisiKorban(log.kondisiKorban || "");
+    setLogStatusLuka(log.statusLuka || "");
+    setLogKondisiHewan(log.kondisiHewan || "");
+    setLogSuhu((log.suhuTubuh || "").replace(" °C", "").replace("°C", "").trim() || "36.5");
+    setLogTindakan(log.tindakanDilakukan || "");
+    setLogCatatan(log.catatanKhusus || "");
+    setShowAddLog(true);
+  };
+
+  // Handler untuk Menyimpan Catatan Baru atau Perubahan Edit ke logsList
+  const handleSaveLogItem = () => {
+    if (!patient) return;
+
+    if (editingLogId) {
+      // Update item yang sedang diedit
+      setLogsList((prev) =>
+        prev.map((item) => {
+          const itemId = item.id || `log-${item.tanggal}-${item.hariKe}`;
+          if (itemId === editingLogId) {
+            return {
+              ...item,
+              tanggal: logTanggal,
+              hariKe: Number(logHariKe),
+              petugasNama: currentUser.nama || item.petugasNama,
+              petugasNIP: currentUser.nip || item.petugasNIP,
+              kondisiKorban: logKondisiKorban,
+              statusLuka: logStatusLuka,
+              kondisiHewan: logKondisiHewan,
+              suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
+              tindakanDilakukan: logTindakan,
+              catatanKhusus: logCatatan
+            };
+          }
+          return item;
+        })
+      );
+    } else {
+      // Tambah item catatan baru
+      const newLog: MonitoringDailyLog = {
+        id: `log-${Date.now()}`,
+        tanggal: logTanggal,
+        hariKe: Number(logHariKe),
+        petugasNama: currentUser.nama,
+        petugasNIP: currentUser.nip,
+        kelurahan: patient.kelurahan,
+        kondisiKorban: logKondisiKorban,
+        statusLuka: logStatusLuka || kondisiLuka,
+        kondisiHewan: logKondisiHewan,
+        suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
+        tindakanDilakukan: logTindakan,
+        catatanKhusus: logCatatan
+      };
+      setLogsList((prev) => [...prev, newLog]);
+    }
+
+    // Reset dan tutup form catatan
+    setEditingLogId(null);
+    setShowAddLog(false);
+    setLogCatatan("");
+  };
+
+  // Handler untuk Menghapus Catatan
+  const handleDeleteLogItem = (targetLog: MonitoringDailyLog, index: number) => {
+    const targetId = targetLog.id || `log-${targetLog.tanggal}-${targetLog.hariKe}`;
+    if (window.confirm(`Apakah Anda yakin ingin menghapus catatan hari ke-${targetLog.hariKe} (${targetLog.tanggal})?`)) {
+      setLogsList((prev) => prev.filter((item, idx) => {
+        const itemId = item.id || `log-${item.tanggal}-${item.hariKe}`;
+        return itemId !== targetId && idx !== index;
+      }));
+      if (editingLogId === targetId) {
+        setEditingLogId(null);
+        setShowAddLog(false);
+      }
+    }
+  };
+
   const handleSaveAllUpdates = async () => {
     if (!patient || isSaving) return;
 
@@ -172,25 +277,47 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     setValidationErrors({});
     setIsSaving(true);
 
-    let updatedLogs = [...(patient.riwayatLog || [])];
+    let updatedLogs = [...logsList];
 
-    // Jika form log baru diisi / dibuka
+    // Jika form log baru sedang terbuka dan belum sempat klik tombol 'Simpan ke Daftar Catatan'
     if (showAddLog && logCatatan.trim()) {
-      const newLog: MonitoringDailyLog = {
-        id: `log-${Date.now()}`,
-        tanggal: logTanggal,
-        hariKe: logHariKe,
-        petugasNama: currentUser.nama,
-        petugasNIP: currentUser.nip,
-        kelurahan: patient.kelurahan,
-        kondisiKorban: logKondisiKorban,
-        statusLuka: logStatusLuka || kondisiLuka,
-        kondisiHewan: logKondisiHewan,
-        suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
-        tindakanDilakukan: logTindakan,
-        catatanKhusus: logCatatan
-      };
-      updatedLogs.push(newLog);
+      if (editingLogId) {
+        updatedLogs = updatedLogs.map((item) => {
+          const itemId = item.id || `log-${item.tanggal}-${item.hariKe}`;
+          if (itemId === editingLogId) {
+            return {
+              ...item,
+              tanggal: logTanggal,
+              hariKe: Number(logHariKe),
+              petugasNama: currentUser.nama || item.petugasNama,
+              petugasNIP: currentUser.nip || item.petugasNIP,
+              kondisiKorban: logKondisiKorban,
+              statusLuka: logStatusLuka,
+              kondisiHewan: logKondisiHewan,
+              suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
+              tindakanDilakukan: logTindakan,
+              catatanKhusus: logCatatan
+            };
+          }
+          return item;
+        });
+      } else {
+        const newLog: MonitoringDailyLog = {
+          id: `log-${Date.now()}`,
+          tanggal: logTanggal,
+          hariKe: Number(logHariKe),
+          petugasNama: currentUser.nama,
+          petugasNIP: currentUser.nip,
+          kelurahan: patient.kelurahan,
+          kondisiKorban: logKondisiKorban,
+          statusLuka: logStatusLuka || kondisiLuka,
+          kondisiHewan: logKondisiHewan,
+          suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
+          tindakanDilakukan: logTindakan,
+          catatanKhusus: logCatatan
+        };
+        updatedLogs.push(newLog);
+      }
     }
 
     const updatedItem: PatientMonitoringItem = {
@@ -366,11 +493,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     onPatientUpdated(updatedItem);
 
     if (sheetSyncSuccess) {
-      setSaveSuccessMsg(`Data pasien & kolom Kondisi Luka ("${kondisiLuka}") berhasil disinkronkan ke Google Spreadsheet!`);
+      setSaveSuccessMsg(`Data pasien & catatan pemantauan berhasil disinkronkan ke Google Spreadsheet!`);
     } else if (!onlineNow) {
       setSaveSuccessMsg(`Mode Offline: Pembaruan pasien disimpan ke memori lokal & antrean sinkronisasi. Otomatis terkirim saat online!`);
     } else {
-      setSaveSuccessMsg(`Data pasien dan kondisi luka berhasil diperbarui di sistem pemantauan lokal!`);
+      setSaveSuccessMsg(`Data pasien dan catatan harian berhasil diperbarui di sistem pemantauan lokal!`);
     }
 
     setIsSaving(false);
@@ -880,117 +1007,255 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
               <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <History size={14} className="text-indigo-600" />
                 3. Log Catatan Perkembangan Harian
+                <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">
+                  {logsList.length} Catatan
+                </span>
               </h4>
               <button
                 type="button"
-                onClick={() => setShowAddLog((prev) => !prev)}
-                className="text-xs font-bold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                id="btn-toggle-add-log"
+                onClick={() => {
+                  if (showAddLog && !editingLogId) {
+                    setShowAddLog(false);
+                  } else {
+                    handleOpenNewLogForm();
+                  }
+                }}
+                className="text-xs font-bold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 transition cursor-pointer"
               >
-                <PlusCircle size={13} />
-                <span>{showAddLog ? "Tutup Form Catatan" : "+ Tambah Catatan Baru"}</span>
+                <PlusCircle size={14} />
+                <span>{showAddLog && !editingLogId ? "Tutup Form" : "+ Tambah Catatan Baru"}</span>
               </button>
             </div>
 
-            {/* Sub-form input catatan perkembangan baru */}
+            {/* Sub-form input catatan perkembangan baru / edit catatan */}
             {showAddLog && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-3 animate-in fade-in">
-                <div className="flex items-center justify-between text-xs font-bold text-blue-900">
-                  <span>Input Catatan Perkembangan Baru</span>
-                  <span className="text-[11px] font-normal text-blue-700">Petugas: {currentUser.nama}</span>
+              <div className="rounded-2xl border-2 border-blue-300 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 p-4 sm:p-5 space-y-4 shadow-sm animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between text-xs font-bold text-blue-950 border-b border-blue-200/70 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                      {editingLogId ? <Edit3 size={13} /> : <PlusCircle size={13} />}
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-blue-900">
+                        {editingLogId ? `Edit Catatan Perkembangan (Hari ke-${logHariKe})` : "Input Catatan Perkembangan Baru"}
+                      </span>
+                      <p className="text-[10px] font-normal text-blue-700">
+                        {editingLogId ? "Perbarui informasi observasi log ini" : "Form bersih siap untuk diisi catatan hari ini"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-blue-800 bg-blue-100/80 px-2.5 py-0.5 rounded-md border border-blue-200">
+                      Petugas: {currentUser.nama}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddLog(false);
+                        setEditingLogId(null);
+                      }}
+                      className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-white/60 transition"
+                      title="Batal"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Tanggal Pemantauan</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Tanggal Pemantauan</label>
                     <input
                       type="date"
                       value={logTanggal}
                       onChange={(e) => setLogTanggal(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Observasi Hari Ke</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Observasi Hari Ke (1-14)</label>
                     <input
                       type="number"
                       min={1}
                       max={14}
                       value={logHariKe}
                       onChange={(e) => setLogHariKe(Number(e.target.value))}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Suhu Tubuh Korban (°C)</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Suhu Tubuh Korban (°C)</label>
                     <input
                       type="text"
                       value={logSuhu}
                       onChange={(e) => setLogSuhu(e.target.value)}
                       placeholder="Contoh: 36.5"
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Kondisi Korban & Luka</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Kondisi Korban & Luka</label>
                     <input
                       type="text"
                       value={logKondisiKorban}
                       onChange={(e) => setLogKondisiKorban(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs"
+                      placeholder="Contoh: Kondisi baik, luka mengering"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Kondisi Hewan (HPR)</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Kondisi Hewan (HPR)</label>
                     <input
                       type="text"
                       value={logKondisiHewan}
                       onChange={(e) => setLogKondisiHewan(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs"
+                      placeholder="Contoh: Hewan sehat, nafsu makan baik"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Catatan Khusus / Tindakan Petugas</label>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Tindakan / Edukasi yang Diberikan</label>
+                  <input
+                    type="text"
+                    value={logTindakan}
+                    onChange={(e) => setLogTindakan(e.target.value)}
+                    placeholder="Contoh: Pembersihan luka berkala & edukasi rabies"
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Catatan Khusus Perkembangan Korban / Hewan</label>
                   <textarea
                     rows={2}
                     value={logCatatan}
                     onChange={(e) => setLogCatatan(e.target.value)}
-                    placeholder="Tuliskan catatan evaluasi, keluhan korban, atau pesan edukasi..."
-                    className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs"
+                    placeholder="Tuliskan evaluasi perkembangan luka, keluhan korban, atau keterangan observasi hewan..."
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                   />
+                </div>
+
+                {/* Tombol Simpan / Batal Form Catatan */}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddLog(false);
+                      setEditingLogId(null);
+                      setLogCatatan("");
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-save-log-item"
+                    onClick={handleSaveLogItem}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                  >
+                    <Check size={14} />
+                    <span>{editingLogId ? "Simpan Perubahan Catatan" : "Tambahkan ke Daftar Catatan"}</span>
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Riwayat Logs Sebelumnya */}
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {(!patient.riwayatLog || patient.riwayatLog.length === 0) ? (
-                <p className="text-xs text-slate-400 italic py-2">Belum ada riwayat catatan harian yang dicatat.</p>
+            {/* Riwayat Logs dengan Tombol Edit ditiap Catatan */}
+            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+              {logsList.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-center">
+                  <p className="text-xs text-slate-500 font-medium">Belum ada riwayat catatan harian yang tersimpan.</p>
+                  <button
+                    type="button"
+                    onClick={handleOpenNewLogForm}
+                    className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800 underline"
+                  >
+                    + Buat Catatan Pertama Sekarang
+                  </button>
+                </div>
               ) : (
-                patient.riwayatLog.map((log, idx) => (
-                  <div key={log.id || idx} className="rounded-xl border border-slate-200 bg-white p-3 text-xs space-y-1">
-                    <div className="flex items-center justify-between text-slate-600">
-                      <span className="font-bold text-slate-800">
-                        Hari ke-{log.hariKe} • {log.tanggal}
-                      </span>
-                      <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                        {log.petugasNama}
-                      </span>
+                logsList.map((log, idx) => {
+                  const targetId = log.id || `log-${log.tanggal}-${log.hariKe}`;
+                  const isCurrentEditing = editingLogId === targetId;
+
+                  return (
+                    <div
+                      key={targetId}
+                      className={`rounded-xl border p-3 text-xs space-y-1.5 transition ${
+                        isCurrentEditing
+                          ? "border-blue-400 bg-blue-50/60 ring-2 ring-blue-500/20"
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                            Hari ke-{log.hariKe} • {log.tanggal}
+                          </span>
+                          {log.suhuTubuh && (
+                            <span className="text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                              🌡️ {log.suhuTubuh}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                            Petugas: {log.petugasNama || "-"}
+                          </span>
+                        </div>
+
+                        {/* Kolom Tombol Edit & Hapus ditiap Catatan */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            id={`btn-edit-log-${idx}`}
+                            onClick={() => handleStartEditLog(log)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition cursor-pointer"
+                            title="Edit catatan observasi ini"
+                          >
+                            <Edit3 size={12} />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            id={`btn-delete-log-${idx}`}
+                            onClick={() => handleDeleteLogItem(log, idx)}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-200 transition cursor-pointer"
+                            title="Hapus catatan ini"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-slate-600 pt-0.5">
+                        <div>
+                          <span className="font-semibold text-slate-700">Korban & Luka:</span> {log.kondisiKorban || log.statusLuka || "-"}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-slate-700">Kondisi HPR:</span> {log.kondisiHewan || "-"}
+                        </div>
+                      </div>
+
+                      {log.tindakanDilakukan && (
+                        <div className="text-slate-600 text-[11px]">
+                          <span className="font-semibold text-slate-700">Tindakan:</span> {log.tindakanDilakukan}
+                        </div>
+                      )}
+
+                      {log.catatanKhusus && (
+                        <p className="text-slate-700 italic bg-slate-50 border border-slate-100 p-2 rounded-lg text-[11px]">
+                          "{log.catatanKhusus}"
+                        </p>
+                      )}
                     </div>
-                    <p className="text-slate-600">
-                      <b>Korban:</b> {log.kondisiKorban} | <b>Hewan:</b> {log.kondisiHewan}
-                    </p>
-                    {log.catatanKhusus && (
-                      <p className="text-slate-500 italic bg-slate-50 p-1.5 rounded">
-                        "{log.catatanKhusus}"
-                      </p>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
