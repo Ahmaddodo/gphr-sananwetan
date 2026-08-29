@@ -688,11 +688,11 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
                 ⚡
               </span>
               <h4 className="font-bold text-amber-950 text-xs uppercase tracking-wide">
-                Solusi Kolom Bergeser & Pemulihan Spreadsheet Otomatis (36 Kolom Resmi)
+                Solusi Kolom Bergeser & Pemulihan Spreadsheet Otomatis (46 Kolom Resmi Lengkap)
               </h4>
             </div>
             <p className="text-xs text-amber-900 leading-relaxed max-w-3xl">
-              Jika data yang masuk ke Google Sheet Anda sebelumnya bergeser (misal: kolom terisi tidak pas karena ada kolom ganda seperti <code>kelurahan</code> dan <code>Kelurahan</code>), gunakan fitur ini untuk menata ulang 36 kolom resmi secara otomatis.
+              Jika data yang masuk ke Google Sheet Anda sebelumnya bergeser atau Anda telah memperluas hingga kolom 46 (mencakup status pemantauan harian, suhu tubuh, dan jadwal vaksinasi VAR dosis 0, 3, 7, 21), gunakan fitur ini untuk menata ulang 46 kolom resmi secara otomatis.
             </p>
           </div>
 

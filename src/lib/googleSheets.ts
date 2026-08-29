@@ -172,7 +172,17 @@ export const SHEET_HEADERS = [
   "Anggota Tim PE",
   "Tanggal Pelaksanaan",
   "Pelaksana (Petugas)",
-  "NIP Pelaksana"
+  "NIP Pelaksana",
+  "Status Pemantauan",
+  "Hari Observasi",
+  "Status Hewan Observasi",
+  "Jadwal VAR Dosis 0",
+  "Jadwal VAR Dosis 3",
+  "Jadwal VAR Dosis 7",
+  "Jadwal VAR Dosis 21",
+  "Catatan Perkembangan Harian",
+  "Petugas PJ Monitoring",
+  "Terakhir Diperbarui"
 ];
 
 export function mapPayloadToRowValues(payload: SubmissionPayload): (string | number)[] {
@@ -187,6 +197,18 @@ export function mapPayloadToRowValues(payload: SubmissionPayload): (string | num
   const umurHewan = payload.umurHewan ? `${payload.umurHewan} ${payload.satuanUmur || "Tahun"}`.trim() : "-";
   const waktuKejadian = payload.waktuKejadian || "-";
   const tglPelaksanaan = payload.tanggalPelaksanaan || new Date().toISOString().slice(0, 10);
+
+  // Data pemantauan tambahan (kolom 37 s/d 46)
+  const statusPemantauan = pAny.statusPemantauan || "-";
+  const hariObservasi = pAny.hariObservasi !== undefined && pAny.hariObservasi !== null ? pAny.hariObservasi : (pAny.hariObservasiKe || "-");
+  const statusHewanObservasi = pAny.statusHewanObservasi || "-";
+  const jadwalVAR_0 = pAny.jadwalVAR_0 || pAny.jadwalVARDosis0 || pAny.dosis0 || "-";
+  const jadwalVAR_3 = pAny.jadwalVAR_3 || pAny.jadwalVARDosis3 || pAny.dosis3 || "-";
+  const jadwalVAR_7 = pAny.jadwalVAR_7 || pAny.jadwalVARDosis7 || pAny.dosis7 || "-";
+  const jadwalVAR_21 = pAny.jadwalVAR_21 || pAny.jadwalVARDosis21 || pAny.dosis21 || "-";
+  const catatanPerkembanganHarian = pAny.catatanPerkembanganHarian || pAny.catatanLogHarian || pAny.riwayatLogHarian || "-";
+  const petugasPJMonitoring = pAny.petugasPJMonitoring || pAny.petugasPJ || (pAny.nipPJMonitoring ? `${payload.pelaksanaNama || "Petugas"} (${pAny.nipPJMonitoring})` : (payload.pelaksanaNama || "-"));
+  const lastUpdated = pAny.lastUpdated || new Date().toLocaleString("id-ID");
 
   return [
     payload.id_kasus || "",
@@ -224,7 +246,17 @@ export function mapPayloadToRowValues(payload: SubmissionPayload): (string | num
     payload.timAnggota || "-",
     tglPelaksanaan,
     payload.pelaksanaNama || "-",
-    payload.pelaksanaNIP || "-"
+    payload.pelaksanaNIP || "-",
+    statusPemantauan,
+    hariObservasi,
+    statusHewanObservasi,
+    jadwalVAR_0,
+    jadwalVAR_3,
+    jadwalVAR_7,
+    jadwalVAR_21,
+    catatanPerkembanganHarian,
+    petugasPJMonitoring,
+    lastUpdated
   ];
 }
 
@@ -360,7 +392,7 @@ function getTargetSpreadsheet() {
   return null;
 }
 
-// 1. DAFTAR 36 HEADER RESMI SPREADSHEET PUSKESMAS SANANWETAN
+// 1. DAFTAR 46 HEADER RESMI SPREADSHEET PUSKESMAS SANANWETAN
 var OFFICIAL_HEADERS = [
   "ID Kasus",
   "Waktu Submit",
@@ -397,7 +429,17 @@ var OFFICIAL_HEADERS = [
   "Anggota Tim PE",
   "Tanggal Pelaksanaan",
   "Pelaksana (Petugas)",
-  "NIP Pelaksana"
+  "NIP Pelaksana",
+  "Status Pemantauan",
+  "Hari Observasi",
+  "Status Hewan Observasi",
+  "Jadwal VAR Dosis 0",
+  "Jadwal VAR Dosis 3",
+  "Jadwal VAR Dosis 7",
+  "Jadwal VAR Dosis 21",
+  "Catatan Perkembangan Harian",
+  "Petugas PJ Monitoring",
+  "Terakhir Diperbarui"
 ];
 
 // 2. KAMUS PEMETAAN DINAMIS (Mencocokkan nama kolom di Sheet ke field JSON)
@@ -616,6 +658,60 @@ var FIELD_MAP = {
   "pelaksananip": "pelaksanaNIP",
   "nip": "pelaksanaNIP",
   "nip petugas": "pelaksanaNIP",
+  "status pemantauan": "statusPemantauan",
+  "status pemantauan korban": "statusPemantauan",
+  "status_pemantauan": "statusPemantauan",
+  "statuspemantauan": "statusPemantauan",
+  "hari observasi": "hariObservasi",
+  "hari observasi ke": "hariObservasi",
+  "hari_observasi": "hariObservasi",
+  "hariobservasi": "hariObservasi",
+  "status hewan observasi": "statusHewanObservasi",
+  "status_hewan_observasi": "statusHewanObservasi",
+  "statushewanobservasi": "statusHewanObservasi",
+  "status observasi hewan": "statusHewanObservasi",
+  "jadwal var dosis 0": "jadwalVAR_0",
+  "jadwal var 0": "jadwalVAR_0",
+  "var dosis 0": "jadwalVAR_0",
+  "dosis 0": "jadwalVAR_0",
+  "dosis0": "jadwalVAR_0",
+  "jadwal var dosis 3": "jadwalVAR_3",
+  "jadwal var 3": "jadwalVAR_3",
+  "var dosis 3": "jadwalVAR_3",
+  "dosis 3": "jadwalVAR_3",
+  "dosis3": "jadwalVAR_3",
+  "jadwal var dosis 7": "jadwalVAR_7",
+  "jadwal var 7": "jadwalVAR_7",
+  "var dosis 7": "jadwalVAR_7",
+  "dosis 7": "jadwalVAR_7",
+  "dosis7": "jadwalVAR_7",
+  "jadwal var dosis 21": "jadwalVAR_21",
+  "jadwal var 21": "jadwalVAR_21",
+  "var dosis 21": "jadwalVAR_21",
+  "dosis 21": "jadwalVAR_21",
+  "dosis21": "jadwalVAR_21",
+  "catatan perkembangan harian": "catatanPerkembanganHarian",
+  "catatan harian": "catatanPerkembanganHarian",
+  "catatan perkembangan": "catatanPerkembanganHarian",
+  "log perkembangan": "catatanPerkembanganHarian",
+  "riwayat pemantauan": "catatanPerkembanganHarian",
+  "catatanperkembanganharian": "catatanPerkembanganHarian",
+  "suhu tubuh terkini": "suhuTubuhTerkini",
+  "suhu tubuh": "suhuTubuhTerkini",
+  "suhu badan": "suhuTubuhTerkini",
+  "suhutubuh": "suhuTubuhTerkini",
+  "suhutubuhterkini": "suhuTubuhTerkini",
+  "petugas pj monitoring": "petugasPJMonitoring",
+  "pj monitoring": "petugasPJMonitoring",
+  "petugas monitoring": "petugasPJMonitoring",
+  "petugaspjmonitoring": "petugasPJMonitoring",
+  "nip pj monitoring": "nipPJMonitoring",
+  "nip monitoring": "nipPJMonitoring",
+  "nippjmonitoring": "nipPJMonitoring",
+  "terakhir diperbarui": "lastUpdated",
+  "last updated": "lastUpdated",
+  "terakhirdiperbarui": "lastUpdated",
+  "lastupdated": "lastUpdated",
   "tandatanganurl": "tandaTanganUrl",
   "tandatanganotomatis": "tandaTanganOtomatis",
   "jenistandatangan": "jenisTandaTangan"
@@ -868,9 +964,19 @@ function rapikanDanFormatSheet() {
         obj.tanggalPelaksanaan = String(row[34] || Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd"));
         obj.pelaksanaNama = String(row[35] || "-");
         obj.pelaksanaNIP = String(row[36] || "-");
+        obj.statusPemantauan = String(row[37] || "-");
+        obj.hariObservasi = String(row[38] || "-");
+        obj.statusHewanObservasi = String(row[39] || "-");
+        obj.jadwalVAR_0 = String(row[40] || "-");
+        obj.jadwalVAR_3 = String(row[41] || "-");
+        obj.jadwalVAR_7 = String(row[42] || "-");
+        obj.jadwalVAR_21 = String(row[43] || "-");
+        obj.catatanPerkembanganHarian = String(row[44] || "-");
+        obj.petugasPJMonitoring = String(row[45] || "-");
+        obj.lastUpdated = String(row[46] || Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss"));
       }
       
-      var row36 = [
+      var row46 = [
         obj.id_kasus || "-",
         obj.timestamp_submit || "-",
         obj.waktuKejadian || "-",
@@ -906,12 +1012,22 @@ function rapikanDanFormatSheet() {
         obj.timAnggota || "-",
         obj.tanggalPelaksanaan || "-",
         obj.pelaksanaNama || "-",
-        obj.pelaksanaNIP || "-"
+        obj.pelaksanaNIP || "-",
+        obj.statusPemantauan || "-",
+        obj.hariObservasi || "-",
+        obj.statusHewanObservasi || "-",
+        obj.jadwalVAR_0 || "-",
+        obj.jadwalVAR_3 || "-",
+        obj.jadwalVAR_7 || "-",
+        obj.jadwalVAR_21 || "-",
+        obj.catatanPerkembanganHarian || "-",
+        obj.petugasPJMonitoring || "-",
+        obj.lastUpdated || "-"
       ];
-      cleanedRows.push(row36);
+      cleanedRows.push(row46);
     }
     
-    // Hapus sheet yang lama dan set ulang 36 Header Resmi yang bersih
+    // Hapus sheet yang lama dan set ulang 46 Header Resmi yang bersih
     sheet.clear();
     sheet.appendRow(OFFICIAL_HEADERS);
     var headerRange = sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length);
@@ -928,7 +1044,7 @@ function rapikanDanFormatSheet() {
     
     return {
       status: "success",
-      message: "Struktur spreadsheet berhasil dirapikan! 36 kolom resmi telah distandarkan dan " + cleanedRows.length + " baris data telah diposisikan ke kolom yang tepat.",
+      message: "Struktur spreadsheet berhasil dirapikan! 46 kolom resmi telah distandarkan dan " + cleanedRows.length + " baris data telah diposisikan ke kolom yang tepat.",
       count: cleanedRows.length
     };
   } catch(err) {
@@ -1373,6 +1489,42 @@ function prosesDataMasuk(data, action) {
       }
       if (h === "nip pelaksana" || h === "nip" || h === "nip petugas") {
         return d.pelaksanaNIP || "-";
+      }
+      if (h === "status pemantauan" || h === "status pemantauan korban" || h === "status_pemantauan") {
+        return d.statusPemantauan || "-";
+      }
+      if (h === "hari observasi" || h === "hari observasi ke" || h === "hari_observasi") {
+        return d.hariObservasi !== undefined && d.hariObservasi !== null ? String(d.hariObservasi) : (d.hariObservasiKe ? String(d.hariObservasiKe) : "-");
+      }
+      if (h === "status hewan observasi" || h === "status_hewan_observasi" || h === "status observasi hewan") {
+        return d.statusHewanObservasi || "-";
+      }
+      if (h === "jadwal var dosis 0" || h === "var dosis 0" || h === "dosis 0" || h === "dosis0") {
+        return d.jadwalVAR_0 || d.jadwalVARDosis0 || d.dosis0 || "-";
+      }
+      if (h === "jadwal var dosis 3" || h === "var dosis 3" || h === "dosis 3" || h === "dosis3") {
+        return d.jadwalVAR_3 || d.jadwalVARDosis3 || d.dosis3 || "-";
+      }
+      if (h === "jadwal var dosis 7" || h === "var dosis 7" || h === "dosis 7" || h === "dosis7") {
+        return d.jadwalVAR_7 || d.jadwalVARDosis7 || d.dosis7 || "-";
+      }
+      if (h === "jadwal var dosis 21" || h === "var dosis 21" || h === "dosis 21" || h === "dosis21") {
+        return d.jadwalVAR_21 || d.jadwalVARDosis21 || d.dosis21 || "-";
+      }
+      if (h === "catatan perkembangan harian" || h === "catatan harian" || h === "catatan perkembangan" || h === "log perkembangan" || h === "riwayat pemantauan") {
+        return d.catatanPerkembanganHarian || d.catatanLogHarian || d.riwayatLogHarian || "-";
+      }
+      if (h === "suhu tubuh terkini" || h === "suhu tubuh" || h === "suhu badan" || h === "suhutubuh") {
+        return d.suhuTubuhTerkini || d.suhuTubuh || "-";
+      }
+      if (h === "petugas pj monitoring" || h === "pj monitoring" || h === "petugas monitoring") {
+        return d.petugasPJMonitoring || d.petugasPJ || d.pelaksanaNama || "-";
+      }
+      if (h === "nip pj monitoring" || h === "nip monitoring" || h === "nippjmonitoring") {
+        return d.nipPJMonitoring || d.nipPJ || d.pelaksanaNIP || "-";
+      }
+      if (h === "terakhir diperbarui" || h === "last updated" || h === "terakhirdiperbarui" || h === "lastupdated") {
+        return d.lastUpdated || Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
       }
 
       // 4. Positional fallback from rowValues array jika dikirim dari aplikasi frontend
@@ -2445,7 +2597,23 @@ export async function pushAllPatientsToAppsScript(
       timAnggota: full.timAnggota || "Petugas Surveilans Rabies",
       tanggalPelaksanaan: full.tanggalPelaksanaan || String(p.waktuKejadian || "").slice(0, 10) || new Date().toISOString().slice(0, 10),
       pelaksanaNama: p.petugasPJ || full.pelaksanaNama || "Widodo Suprianto A.Md.Kep",
-      pelaksanaNIP: p.nipPJ || full.pelaksanaNIP || "197606252009011007"
+      pelaksanaNIP: p.nipPJ || full.pelaksanaNIP || "197606252009011007",
+      statusPemantauan: p.statusPemantauan || "Dalam Pemantauan (Aktif)",
+      hariObservasi: p.hariObservasiKe !== undefined && p.hariObservasiKe !== null ? p.hariObservasiKe : (p.hariObservasi || 1),
+      statusHewanObservasi: p.statusHewanObservasi || "Sehat / Normal (Observasi)",
+      jadwalVAR_0: p.jadwalVAR?.dosis0 ? `${p.jadwalVAR.dosis0.status}${p.jadwalVAR.dosis0.tanggal ? ` (${p.jadwalVAR.dosis0.tanggal})` : ""}${p.jadwalVAR.dosis0.lokasiPemberian ? ` - ${p.jadwalVAR.dosis0.lokasiPemberian}` : ""}` : "-",
+      jadwalVAR_3: p.jadwalVAR?.dosis3 ? `${p.jadwalVAR.dosis3.status}${p.jadwalVAR.dosis3.tanggal ? ` (${p.jadwalVAR.dosis3.tanggal})` : ""}${p.jadwalVAR.dosis3.lokasiPemberian ? ` - ${p.jadwalVAR.dosis3.lokasiPemberian}` : ""}` : "-",
+      jadwalVAR_7: p.jadwalVAR?.dosis7 ? `${p.jadwalVAR.dosis7.status}${p.jadwalVAR.dosis7.tanggal ? ` (${p.jadwalVAR.dosis7.tanggal})` : ""}${p.jadwalVAR.dosis7.lokasiPemberian ? ` - ${p.jadwalVAR.dosis7.lokasiPemberian}` : ""}` : "-",
+      jadwalVAR_21: p.jadwalVAR?.dosis21 ? `${p.jadwalVAR.dosis21.status}${p.jadwalVAR.dosis21.tanggal ? ` (${p.jadwalVAR.dosis21.tanggal})` : ""}${p.jadwalVAR.dosis21.lokasiPemberian ? ` - ${p.jadwalVAR.dosis21.lokasiPemberian}` : ""}` : "-",
+      catatanPerkembanganHarian: p.riwayatLog && p.riwayatLog.length > 0
+        ? p.riwayatLog.map((log: any, idx: number) => `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] ${log.petugasNama ? `(${log.petugasNama})` : ""} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${log.suhuTubuh ? `${log.suhuTubuh}°C` : "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`).join("\n\n")
+        : "-",
+      suhuTubuhTerkini: p.riwayatLog && p.riwayatLog.length > 0 && p.riwayatLog[p.riwayatLog.length - 1]?.suhuTubuh
+        ? `${p.riwayatLog[p.riwayatLog.length - 1].suhuTubuh} °C`
+        : "-",
+      petugasPJMonitoring: p.petugasPJ || "Widodo Suprianto A.Md.Kep",
+      nipPJMonitoring: p.nipPJ || "197606252009011007",
+      lastUpdated: p.lastUpdated || new Date().toLocaleString("id-ID")
     };
   });
 
