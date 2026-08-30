@@ -190,6 +190,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   // Handler untuk Memulai Edit Catatan yang Sudah Ada
   const handleStartEditLog = (log: MonitoringDailyLog) => {
     const targetId = log.id || `log-${log.tanggal}-${log.hariKe}`;
+    log.id = targetId;
     setEditingLogId(targetId);
     setLogTanggal(log.tanggal || new Date().toISOString().slice(0, 10));
     setLogHariKe(log.hariKe || 1);
@@ -206,22 +207,25 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const handleSaveLogItem = () => {
     if (!patient) return;
 
+    const formattedSuhu = logSuhu.trim() ? (logSuhu.includes("°C") ? logSuhu.trim() : `${logSuhu.trim()} °C`) : "36.5 °C";
+
     if (editingLogId) {
       // Update item yang sedang diedit
       setLogsList((prev) =>
         prev.map((item) => {
           const itemId = item.id || `log-${item.tanggal}-${item.hariKe}`;
-          if (itemId === editingLogId) {
+          if (itemId === editingLogId || item.id === editingLogId) {
             return {
               ...item,
+              id: item.id || editingLogId,
               tanggal: logTanggal,
-              hariKe: Number(logHariKe),
+              hariKe: Number(logHariKe) || 1,
               petugasNama: currentUser.nama || item.petugasNama,
               petugasNIP: currentUser.nip || item.petugasNIP,
               kondisiKorban: logKondisiKorban,
               statusLuka: logStatusLuka,
               kondisiHewan: logKondisiHewan,
-              suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
+              suhuTubuh: formattedSuhu,
               tindakanDilakukan: logTindakan,
               catatanKhusus: logCatatan
             };
@@ -232,21 +236,25 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     } else {
       // Tambah item catatan baru
       const newLog: MonitoringDailyLog = {
-        id: `log-${Date.now()}`,
+        id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         tanggal: logTanggal,
-        hariKe: Number(logHariKe),
+        hariKe: Number(logHariKe) || 1,
         petugasNama: currentUser.nama,
         petugasNIP: currentUser.nip,
         kelurahan: patient.kelurahan,
         kondisiKorban: logKondisiKorban,
         statusLuka: logStatusLuka || kondisiLuka,
         kondisiHewan: logKondisiHewan,
-        suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
+        suhuTubuh: formattedSuhu,
         tindakanDilakukan: logTindakan,
         catatanKhusus: logCatatan
       };
       setLogsList((prev) => [...prev, newLog]);
     }
+
+    if (logStatusLuka && !kondisiLuka) setKondisiLuka(logStatusLuka);
+    if (logKondisiHewan && !kondisiHewanText) setKondisiHewanText(logKondisiHewan);
+    if (Number(logHariKe) > Number(hariObservasi)) setHariObservasi(Number(logHariKe));
 
     // Reset dan tutup form catatan secara bersih
     resetLogSubForm();
@@ -259,7 +267,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     if (window.confirm(`Apakah Anda yakin ingin menghapus catatan hari ke-${targetLog.hariKe} (${targetLog.tanggal})?`)) {
       setLogsList((prev) => prev.filter((item, idx) => {
         const itemId = item.id || `log-${item.tanggal}-${item.hariKe}`;
-        return itemId !== targetId && idx !== index;
+        return itemId !== targetId && item.id !== targetId && idx !== index;
       }));
       if (editingLogId === targetId) {
         resetLogSubForm();
@@ -293,40 +301,42 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
     let updatedLogs = [...logsList];
 
-    // Jika form log baru sedang terbuka dan belum sempat klik tombol 'Simpan ke Daftar Catatan'
-    if (showAddLog && logCatatan.trim()) {
+    // Jika form log baru atau edit sedang terbuka saat menekan tombol Simpan Utama
+    if (showAddLog) {
+      const formattedSuhu = logSuhu.trim() ? (logSuhu.includes("°C") ? logSuhu.trim() : `${logSuhu.trim()} °C`) : "36.5 °C";
       if (editingLogId) {
         updatedLogs = updatedLogs.map((item) => {
           const itemId = item.id || `log-${item.tanggal}-${item.hariKe}`;
-          if (itemId === editingLogId) {
+          if (itemId === editingLogId || item.id === editingLogId) {
             return {
               ...item,
+              id: item.id || editingLogId,
               tanggal: logTanggal,
-              hariKe: Number(logHariKe),
+              hariKe: Number(logHariKe) || 1,
               petugasNama: currentUser.nama || item.petugasNama,
               petugasNIP: currentUser.nip || item.petugasNIP,
               kondisiKorban: logKondisiKorban,
               statusLuka: logStatusLuka,
               kondisiHewan: logKondisiHewan,
-              suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
+              suhuTubuh: formattedSuhu,
               tindakanDilakukan: logTindakan,
               catatanKhusus: logCatatan
             };
           }
           return item;
         });
-      } else {
+      } else if (logCatatan.trim() || logKondisiKorban.trim() || logTindakan.trim()) {
         const newLog: MonitoringDailyLog = {
-          id: `log-${Date.now()}`,
+          id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           tanggal: logTanggal,
-          hariKe: Number(logHariKe),
+          hariKe: Number(logHariKe) || 1,
           petugasNama: currentUser.nama,
           petugasNIP: currentUser.nip,
           kelurahan: patient.kelurahan,
           kondisiKorban: logKondisiKorban,
           statusLuka: logStatusLuka || kondisiLuka,
           kondisiHewan: logKondisiHewan,
-          suhuTubuh: logSuhu ? `${logSuhu} °C` : undefined,
+          suhuTubuh: formattedSuhu,
           tindakanDilakukan: logTindakan,
           catatanKhusus: logCatatan
         };

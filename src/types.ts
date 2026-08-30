@@ -184,6 +184,7 @@ export interface PatientMonitoringItem {
     dosis21?: VarDoseItem;
   };
   riwayatLog: MonitoringDailyLog[];
+  catatanPerkembanganHarian?: string;
   petugasPJ: string;
   nipPJ: string;
   lastUpdated?: string;

@@ -236,9 +236,9 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
 
   const handleDeleteConfirmed = async (id_kasus: string) => {
     try {
-      await deletePatientById(id_kasus);
+      await deletePatientById(id_kasus, webAppUrl);
       onRefreshPatients();
-      setToastMessage(`Data pasien ${id_kasus} telah dibersihkan dari layar pemantauan aktif. Arsip di Google Spreadsheet tetap tersimpan.`);
+      setToastMessage(`Data kasus ${id_kasus} berhasil dihapus dari sistem pemantauan dan disinkronkan ke Google Spreadsheet.`);
       setTimeout(() => setToastMessage(""), 5000);
     } catch (err) {
       console.error("Gagal menghapus pasien dari layar:", err);
