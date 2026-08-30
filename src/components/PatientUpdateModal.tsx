@@ -93,14 +93,14 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const [showAddLog, setShowAddLog] = useState<boolean>(false);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
 
-  // Sub-form input states
-  const [logTanggal, setLogTanggal] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [logHariKe, setLogHariKe] = useState<number>(patient?.hariObservasiKe || 1);
-  const [logKondisiKorban, setLogKondisiKorban] = useState<string>("Kondisi umum baik, tidak demam.");
-  const [logStatusLuka, setLogStatusLuka] = useState<string>("Luka bersih dan mulai mengering.");
-  const [logKondisiHewan, setLogKondisiHewan] = useState<string>("Hewan sehat, aktif, nafsu makan baik.");
-  const [logSuhu, setLogSuhu] = useState<string>("36.5");
-  const [logTindakan, setLogTindakan] = useState<string>("Pemantauan berkala & edukasi perawatan luka.");
+  // Sub-form input states (Kosong saat pertama kali atau saat tambah baru)
+  const [logTanggal, setLogTanggal] = useState<string>("");
+  const [logHariKe, setLogHariKe] = useState<string>("");
+  const [logKondisiKorban, setLogKondisiKorban] = useState<string>("");
+  const [logStatusLuka, setLogStatusLuka] = useState<string>("");
+  const [logKondisiHewan, setLogKondisiHewan] = useState<string>("");
+  const [logSuhu, setLogSuhu] = useState<string>("");
+  const [logTindakan, setLogTindakan] = useState<string>("");
   const [logCatatan, setLogCatatan] = useState<string>("");
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -108,16 +108,16 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // Helper reset seluruh inputan sub-form catatan harian
+  // Helper reset seluruh inputan sub-form catatan harian menjadi benar-benar kosong/bersih
   const resetLogSubForm = () => {
     setEditingLogId(null);
-    setLogTanggal(new Date().toISOString().slice(0, 10));
-    setLogHariKe(hariObservasi || patient?.hariObservasiKe || 1);
-    setLogKondisiKorban("Kondisi umum baik, tidak demam.");
-    setLogStatusLuka(kondisiLuka || "Luka bersih dan mulai mengering.");
-    setLogKondisiHewan(kondisiHewanText || "Hewan sehat, aktif, nafsu makan baik.");
-    setLogSuhu("36.5");
-    setLogTindakan("Pemantauan berkala & edukasi perawatan luka.");
+    setLogTanggal("");
+    setLogHariKe("");
+    setLogKondisiKorban("");
+    setLogStatusLuka("");
+    setLogKondisiHewan("");
+    setLogSuhu("");
+    setLogTindakan("");
     setLogCatatan("");
   };
 
@@ -192,8 +192,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     const targetId = log.id || `log-${log.tanggal}-${log.hariKe}`;
     log.id = targetId;
     setEditingLogId(targetId);
-    setLogTanggal(log.tanggal || new Date().toISOString().slice(0, 10));
-    setLogHariKe(log.hariKe || 1);
+    setLogTanggal(log.tanggal || "");
+    setLogHariKe(log.hariKe ? String(log.hariKe) : "");
     setLogKondisiKorban(log.kondisiKorban || "");
     setLogStatusLuka(log.statusLuka || "");
     setLogKondisiHewan(log.kondisiHewan || "");
@@ -207,6 +207,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const handleSaveLogItem = () => {
     if (!patient) return;
 
+    const chosenDate = logTanggal || new Date().toISOString().slice(0, 10);
+    const chosenHari = Number(logHariKe) > 0 ? Number(logHariKe) : (hariObservasi || 1);
     const formattedSuhu = logSuhu.trim() ? (logSuhu.includes("°C") ? logSuhu.trim() : `${logSuhu.trim()} °C`) : "36.5 °C";
 
     if (editingLogId) {
@@ -218,8 +220,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
             return {
               ...item,
               id: item.id || editingLogId,
-              tanggal: logTanggal,
-              hariKe: Number(logHariKe) || 1,
+              tanggal: chosenDate,
+              hariKe: chosenHari,
               petugasNama: currentUser.nama || item.petugasNama,
               petugasNIP: currentUser.nip || item.petugasNIP,
               kondisiKorban: logKondisiKorban,
@@ -237,8 +239,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       // Tambah item catatan baru
       const newLog: MonitoringDailyLog = {
         id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        tanggal: logTanggal,
-        hariKe: Number(logHariKe) || 1,
+        tanggal: chosenDate,
+        hariKe: chosenHari,
         petugasNama: currentUser.nama,
         petugasNIP: currentUser.nip,
         kelurahan: patient.kelurahan,
@@ -254,7 +256,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
     if (logStatusLuka && !kondisiLuka) setKondisiLuka(logStatusLuka);
     if (logKondisiHewan && !kondisiHewanText) setKondisiHewanText(logKondisiHewan);
-    if (Number(logHariKe) > Number(hariObservasi)) setHariObservasi(Number(logHariKe));
+    if (chosenHari > Number(hariObservasi)) setHariObservasi(chosenHari);
 
     // Reset dan tutup form catatan secara bersih
     resetLogSubForm();
@@ -303,6 +305,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
     // Jika form log baru atau edit sedang terbuka saat menekan tombol Simpan Utama
     if (showAddLog) {
+      const chosenDate = logTanggal || new Date().toISOString().slice(0, 10);
+      const chosenHari = Number(logHariKe) > 0 ? Number(logHariKe) : (hariObservasi || 1);
       const formattedSuhu = logSuhu.trim() ? (logSuhu.includes("°C") ? logSuhu.trim() : `${logSuhu.trim()} °C`) : "36.5 °C";
       if (editingLogId) {
         updatedLogs = updatedLogs.map((item) => {
@@ -311,8 +315,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
             return {
               ...item,
               id: item.id || editingLogId,
-              tanggal: logTanggal,
-              hariKe: Number(logHariKe) || 1,
+              tanggal: chosenDate,
+              hariKe: chosenHari,
               petugasNama: currentUser.nama || item.petugasNama,
               petugasNIP: currentUser.nip || item.petugasNIP,
               kondisiKorban: logKondisiKorban,
@@ -325,11 +329,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
           }
           return item;
         });
-      } else if (logCatatan.trim() || logKondisiKorban.trim() || logTindakan.trim()) {
+      } else if (logCatatan.trim() || logKondisiKorban.trim() || logTindakan.trim() || logStatusLuka.trim()) {
         const newLog: MonitoringDailyLog = {
           id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          tanggal: logTanggal,
-          hariKe: Number(logHariKe) || 1,
+          tanggal: chosenDate,
+          hariKe: chosenHari,
           petugasNama: currentUser.nama,
           petugasNIP: currentUser.nip,
           kelurahan: patient.kelurahan,
@@ -1105,7 +1109,16 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Tanggal Pemantauan</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">Tanggal Pemantauan</label>
+                      <button
+                        type="button"
+                        onClick={() => setLogTanggal(new Date().toISOString().slice(0, 10))}
+                        className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline decoration-dotted"
+                      >
+                        Hari Ini
+                      </button>
+                    </div>
                     <input
                       type="date"
                       value={logTanggal}
@@ -1114,13 +1127,25 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Observasi Hari Ke (1-14)</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">Observasi Hari Ke (1-14)</label>
+                      {hariObservasi > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setLogHariKe(String(hariObservasi))}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline decoration-dotted"
+                        >
+                          Hari ke-{hariObservasi}
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       min={1}
                       max={14}
+                      placeholder="Contoh: 1, 3, 7, 14"
                       value={logHariKe}
-                      onChange={(e) => setLogHariKe(Number(e.target.value))}
+                      onChange={(e) => setLogHariKe(e.target.value)}
                       className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
                   </div>
@@ -1138,14 +1163,26 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Kondisi Korban & Luka</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Kondisi Korban & Status Luka</label>
                     <input
                       type="text"
                       value={logKondisiKorban}
                       onChange={(e) => setLogKondisiKorban(e.target.value)}
-                      placeholder="Contoh: Kondisi baik, luka mengering"
+                      placeholder="Contoh: Kondisi umum baik, luka mengering"
                       className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {["Kondisi umum baik, tidak demam", "Luka bersih & mulai mengering", "Luka sembuh total"].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => setLogKondisiKorban(chip)}
+                          className="text-[10px] px-2 py-0.5 rounded bg-blue-100/60 hover:bg-blue-200 text-blue-800 transition cursor-pointer"
+                        >
+                          + {chip}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-1">Kondisi Hewan (HPR)</label>
@@ -1156,6 +1193,18 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                       placeholder="Contoh: Hewan sehat, nafsu makan baik"
                       className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {["Hewan sehat & aktif", "Nafsu makan baik, tidak agresif", "Mati saat observasi"].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => setLogKondisiHewan(chip)}
+                          className="text-[10px] px-2 py-0.5 rounded bg-emerald-100/60 hover:bg-emerald-200 text-emerald-800 transition cursor-pointer"
+                        >
+                          + {chip}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1165,9 +1214,21 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                     type="text"
                     value={logTindakan}
                     onChange={(e) => setLogTindakan(e.target.value)}
-                    placeholder="Contoh: Pembersihan luka berkala & edukasi rabies"
+                    placeholder="Contoh: Pemantauan berkala & edukasi perawatan luka"
                     className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                   />
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {["Pemantauan berkala & edukasi perawatan luka", "Edukasi jadwal vaksin VAR berikutnya", "KIE pencegahan rabies"].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setLogTindakan(chip)}
+                        className="text-[10px] px-2 py-0.5 rounded bg-indigo-100/60 hover:bg-indigo-200 text-indigo-800 transition cursor-pointer"
+                      >
+                        + {chip}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
