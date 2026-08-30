@@ -3,6 +3,7 @@ import {
   UserAccessProfile,
   KelurahanWilayah,
   MonitoringDailyLog,
+  VarDoseItem,
   FormGHPRData,
   SubmissionPayload,
   StatusPemantauanPasien,
@@ -132,6 +133,279 @@ export function normalizeDateToIso(inputDate: any, fallbackDaysOffset = 0): stri
 
   const target = new Date(now.getTime() + fallbackDaysOffset * 86400000);
   return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+}
+
+/**
+ * Menghitung hari observasi hewan (1-14 hari) secara akurat dan dinamis
+ * berdasarkan selisih tanggal kejadian/mulai observasi dengan hari ini, riwayat log, atau status pemantauan.
+ */
+export function calculateObservationDay(patient?: PatientMonitoringItem | null): number {
+  if (!patient) return 1;
+
+  if (patient.statusPemantauan === "Selesai Observasi (14 Hari)") {
+    return 14;
+  }
+
+  // 1. Jika ada nilai eksplisit hariObservasiKe yang telah diinput/disinkronkan
+  const explicitDay = Number(patient.hariObservasiKe);
+  if (!isNaN(explicitDay) && explicitDay > 0) {
+    return Math.min(14, Math.max(1, explicitDay));
+  }
+
+  // 2. Jika ada riwayat log catatan, gunakan hari ke tertinggi dari log
+  let maxLogDay = 0;
+  if (Array.isArray(patient.riwayatLog) && patient.riwayatLog.length > 0) {
+    for (const log of patient.riwayatLog) {
+      const h = Number(log.hariKe);
+      if (!isNaN(h) && h > maxLogDay) {
+        maxLogDay = h;
+      }
+    }
+  }
+  if (maxLogDay > 0) {
+    return Math.min(14, Math.max(1, maxLogDay));
+  }
+
+  // 3. Fallback: Hitung selisih hari kalender dari tanggal kejadian / mulai observasi
+  let elapsedDays = 1;
+  const rawDateStr = patient.waktuKejadian || patient.tglMulaiObservasi;
+  if (rawDateStr) {
+    const cleanDate = normalizeDateToIso(rawDateStr);
+    const dateMatch = cleanDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateMatch) {
+      const y = parseInt(dateMatch[1], 10);
+      const m = parseInt(dateMatch[2], 10);
+      const d = parseInt(dateMatch[3], 10);
+      const startMs = new Date(y, m - 1, d).getTime();
+      const now = new Date();
+      const todayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const diff = Math.floor((todayMs - startMs) / (1000 * 60 * 60 * 24)) + 1;
+      if (diff > 0) {
+        elapsedDays = diff;
+      }
+    }
+  }
+
+  return Math.min(14, Math.max(1, elapsedDays));
+}
+
+/**
+ * Membersihkan dan mendeduplikasi riwayat catatan kronologis agar tidak muncul ganda / berlipat ganda
+ */
+export function deduplicateAndSortLogs(logs: MonitoringDailyLog[]): MonitoringDailyLog[] {
+  if (!Array.isArray(logs) || logs.length === 0) return [];
+
+  const mapByHari = new Map<number, MonitoringDailyLog>();
+
+  for (const log of logs) {
+    if (!log) continue;
+    const hari = Number(log.hariKe) || 1;
+    const existing = mapByHari.get(hari);
+
+    if (!existing) {
+      mapByHari.set(hari, { ...log, hariKe: hari });
+    } else {
+      // Pilih log yang informasinya lebih lengkap
+      const existingScore = (existing.catatanKhusus?.length || 0) + (existing.tindakanDilakukan?.length || 0) + (existing.petugasNama?.length || 0);
+      const currentScore = (log.catatanKhusus?.length || 0) + (log.tindakanDilakukan?.length || 0) + (log.petugasNama?.length || 0);
+      if (currentScore > existingScore) {
+        mapByHari.set(hari, { ...log, hariKe: hari });
+      }
+    }
+  }
+
+  // Urutkan berdasarkan hariKe secara teratur (Hari 1, Hari 2, Hari 7, Hari 14...)
+  return Array.from(mapByHari.values()).sort((a, b) => a.hariKe - b.hariKe);
+}
+
+/**
+ * Mengurai string catatan gabungan dari Google Spreadsheet kolom 'Catatan Perkembangan Harian'
+ */
+export function parseCatatanHarianString(
+  rawText: string,
+  defaultKejadian: string,
+  defaultPetugas: string,
+  defaultKel: string,
+  defaultNip: string = "-"
+): MonitoringDailyLog[] {
+  if (!rawText || rawText === "-" || rawText.trim().length === 0) return [];
+
+  const cleanRaw = rawText.trim();
+  const chunks = cleanRaw.split("\n\n").map((c) => c.trim()).filter(Boolean);
+  const parsedLogs: MonitoringDailyLog[] = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    let tanggal = defaultKejadian;
+    let hariKe = i === 0 ? 1 : (i === 1 ? 7 : (i === 2 ? 14 : i + 1));
+    let petugasNama = defaultPetugas;
+    let suhuTubuh = "36.5 °C";
+    let kondisiKorban = "Kondisi umum baik, tidak demam.";
+    let statusLuka = "Luka bersih dan mulai mengering.";
+    let kondisiHewan = "Sehat & aktif (dikandangkan/diikat)";
+    let tindakanDilakukan = "Pemantauan berkala & edukasi perawatan luka.";
+    let catatanKhusus = "";
+
+    // 1. Tanggal [YYYY-MM-DD]
+    const dateMatch = chunk.match(/\[(\d{4}-\d{2}-\d{2})\]/) || chunk.match(/(\d{4}-\d{2}-\d{2})/);
+    if (dateMatch) tanggal = dateMatch[1];
+
+    // 2. Hari ke-X
+    const hariMatch = chunk.match(/Hari ke-(\d+)/i) || chunk.match(/Hari:?\s*(\d+)/i);
+    if (hariMatch) {
+      hariKe = parseInt(hariMatch[1], 10);
+    }
+
+    // 3. Petugas (Nama Petugas)
+    const petMatch = chunk.match(/\(([^)]+)\)/);
+    if (petMatch && petMatch[1].length > 3 && !petMatch[1].includes("°C") && !petMatch[1].includes("Hari ke")) {
+      petugasNama = petMatch[1].trim();
+    } else {
+      const petMatch2 = chunk.match(/Petugas:?\s*([^,\n]+)/i);
+      if (petMatch2) petugasNama = petMatch2[1].trim();
+    }
+
+    // 4. Suhu: 36.5 °C
+    const suhuMatch = chunk.match(/Suhu:?\s*([\d.,]+\s*°?C?)/i) || chunk.match(/🌡️?\s*([\d.,]+\s*°C)/i);
+    if (suhuMatch) {
+      const rawSuhu = suhuMatch[1].trim();
+      suhuTubuh = rawSuhu.includes("°C") ? rawSuhu : `${rawSuhu} °C`;
+    }
+
+    // 5. Kondisi: ...
+    const kondMatch = chunk.match(/Kondisi(?: Korban & Luka)?:?\s*([^,\n]+)/i);
+    if (kondMatch && kondMatch[1].trim() && kondMatch[1].trim() !== "-") {
+      kondisiKorban = kondMatch[1].trim();
+      statusLuka = kondMatch[1].trim();
+    }
+
+    // 6. Hewan: ...
+    const hewMatch = chunk.match(/Hewan(?: HPR)?:?\s*([^,\n]+)/i) || chunk.match(/Kondisi Hewan:?\s*([^,\n]+)/i);
+    if (hewMatch && hewMatch[1].trim() && hewMatch[1].trim() !== "-") {
+      kondisiHewan = hewMatch[1].trim();
+    }
+
+    // 7. Tindakan: ...
+    const tindMatch = chunk.match(/Tindakan(?: \/ Edukasi)?:?\s*([^,\n]+)/i);
+    if (tindMatch && tindMatch[1].trim() && tindMatch[1].trim() !== "-") {
+      tindakanDilakukan = tindMatch[1].trim();
+    }
+
+    // 8. Catatan Khusus: ...
+    const catMatch = chunk.match(/Catatan(?: Khusus)?:?\s*([^,\n]+)/i);
+    if (catMatch && catMatch[1].trim() && catMatch[1].trim() !== "-") {
+      catatanKhusus = catMatch[1].trim();
+    } else if (!chunk.includes("Kondisi:") && !chunk.includes("Suhu:")) {
+      // Jika string chunk adalah teks catatan bebas
+      catatanKhusus = chunk;
+    }
+
+    parsedLogs.push({
+      id: `log-parsed-${tanggal}-${hariKe}`,
+      tanggal,
+      hariKe,
+      petugasNama,
+      petugasNIP: defaultNip,
+      kelurahan: defaultKel,
+      kondisiKorban,
+      statusLuka,
+      kondisiHewan,
+      suhuTubuh,
+      tindakanDilakukan,
+      catatanKhusus: catatanKhusus && catatanKhusus !== "-" ? catatanKhusus : ""
+    });
+  }
+
+  return deduplicateAndSortLogs(parsedLogs);
+}
+
+/**
+ * Mengurai dan menyusun riwayat catatan kronologis pemantauan harian dalam format terstruktur
+ * (Hari ke-X • Tanggal, Suhu, Petugas, Kondisi Korban & Luka, Kondisi Hewan HPR, Tindakan/Edukasi)
+ * sehingga tidak tampil ganda atau sebagai narasi teks panjang tidak beraturan.
+ */
+export function parseChronologicalLogs(patient: PatientMonitoringItem): MonitoringDailyLog[] {
+  const defaultPetugas = patient.petugasPJ || "Widodo Suprianto A.Md.Kep";
+  const defaultKel = patient.kelurahan || "Sananwetan";
+  const defaultKejadian = normalizeDateToIso(patient.waktuKejadian || patient.tglMulaiObservasi || new Date().toISOString().slice(0, 10));
+  const defaultNip = patient.nipPJ || "-";
+
+  const rawLogs: MonitoringDailyLog[] = [];
+
+  if (Array.isArray(patient.riwayatLog) && patient.riwayatLog.length > 0) {
+    for (let i = 0; i < patient.riwayatLog.length; i++) {
+      const log = patient.riwayatLog[i];
+      if (!log) continue;
+
+      // Jika catatanKhusus berisi teks gabungan multi-log yang terlanjur tersimpan
+      if (log.catatanKhusus && (log.catatanKhusus.includes("\n\n") || (log.catatanKhusus.startsWith("[") && log.catatanKhusus.includes("Kondisi:")))) {
+        const subParsed = parseCatatanHarianString(log.catatanKhusus, defaultKejadian, defaultPetugas, defaultKel, defaultNip);
+        rawLogs.push(...subParsed);
+      } else {
+        let cleanKondisi = log.kondisiKorban || log.statusLuka || patient.kondisiLuka || "Kondisi umum baik, tidak demam.";
+        if (cleanKondisi.startsWith("[")) {
+          const subParsed = parseCatatanHarianString(cleanKondisi, defaultKejadian, defaultPetugas, defaultKel, defaultNip);
+          rawLogs.push(...subParsed);
+          continue;
+        }
+
+        let cleanHewan = log.kondisiHewan || patient.kondisiHewan || "Sehat & aktif (dikandangkan/diikat)";
+        let cleanTindakan = log.tindakanDilakukan || "Pemantauan berkala & edukasi perawatan luka.";
+        let cleanSuhu = log.suhuTubuh || "36.5 °C";
+        if (!cleanSuhu.includes("°C")) cleanSuhu = `${cleanSuhu} °C`;
+
+        rawLogs.push({
+          id: log.id || `log-${log.hariKe || i + 1}`,
+          tanggal: log.tanggal || defaultKejadian,
+          hariKe: Number(log.hariKe) || (i === 0 ? 1 : (i === 1 ? 7 : 14)),
+          petugasNama: log.petugasNama || defaultPetugas,
+          petugasNIP: log.petugasNIP || defaultNip,
+          kelurahan: log.kelurahan || defaultKel,
+          kondisiKorban: cleanKondisi,
+          statusLuka: log.statusLuka || cleanKondisi,
+          kondisiHewan: cleanHewan,
+          suhuTubuh: cleanSuhu,
+          tindakanDilakukan: cleanTindakan,
+          catatanKhusus: log.catatanKhusus && log.catatanKhusus !== "-" ? log.catatanKhusus : ""
+        });
+      }
+    }
+  }
+
+  // Jika pasien memiliki kolom fullData.catatanPerkembanganHarian tetapi riwayatLog kosong
+  if (rawLogs.length === 0 && (patient as any).catatanPerkembanganHarian) {
+    const fromSheetString = parseCatatanHarianString(
+      (patient as any).catatanPerkembanganHarian,
+      defaultKejadian,
+      defaultPetugas,
+      defaultKel,
+      defaultNip
+    );
+    rawLogs.push(...fromSheetString);
+  }
+
+  // Deduplikasi ketat
+  const deduplicated = deduplicateAndSortLogs(rawLogs);
+
+  // Jika benar-benar kosong (kasus baru tanpa log sama sekali), buat 1 entri default Hari ke-1
+  if (deduplicated.length === 0) {
+    deduplicated.push({
+      id: `log-default-1`,
+      tanggal: defaultKejadian,
+      hariKe: 1,
+      petugasNama: defaultPetugas,
+      petugasNIP: defaultNip,
+      kelurahan: defaultKel,
+      kondisiKorban: patient.kondisiLuka && patient.kondisiLuka !== "-" ? patient.kondisiLuka : "Kondisi umum baik, tidak demam.",
+      statusLuka: patient.kondisiLuka && patient.kondisiLuka !== "-" ? patient.kondisiLuka : "Luka bersih dan mulai mengering.",
+      kondisiHewan: patient.kondisiHewan && patient.kondisiHewan !== "-" ? patient.kondisiHewan : "Sehat & aktif (dikandangkan/diikat)",
+      suhuTubuh: "36.5 °C",
+      tindakanDilakukan: "Pemantauan berkala & edukasi perawatan luka.",
+      catatanKhusus: ""
+    });
+  }
+
+  return deduplicated;
 }
 
 export const KELURAHAN_LIST: KelurahanWilayah[] = [
@@ -861,7 +1135,7 @@ export function getAllPatients(): PatientMonitoringItem[] {
     list = list.filter((p) => !dismissedSet.has((p.id_kasus || "").trim().toLowerCase()));
   }
 
-  // Deduplikasi ketat berdasarkan ID Kasus (unique identifier kasus)
+  // Deduplikasi ketat berdasarkan ID Kasus dan sanitasi riwayatLog agar tidak duplikat
   const uniqueList: PatientMonitoringItem[] = [];
   const seenIds = new Set<string>();
 
@@ -871,7 +1145,12 @@ export function getAllPatients(): PatientMonitoringItem[] {
       if (seenIds.has(idClean)) continue;
       seenIds.add(idClean);
     }
-    uniqueList.push(p);
+    // Normalisasi log agar tidak menduplikasi catatan kronologis
+    const cleanLogs = parseChronologicalLogs(p);
+    uniqueList.push({
+      ...p,
+      riwayatLog: cleanLogs
+    });
   }
 
   return uniqueList;
@@ -1424,15 +1703,43 @@ export async function syncPatientsFromGoogleSheets(
         }
 
         // Ekstraksi data pemantauan kolom 37-46
-        const rawHariObs = Number(getFieldFromRow(rd, ["Hari Observasi", "hariObservasi", "hariObservasiKe", "col_37"], "1")) || 1;
+        const rawHariObs = Number(getFieldFromRow(rd, [
+          "Hari Observasi",
+          "Hari Pemantauan",
+          "Hari Ke",
+          "Hari ke-",
+          "hariObservasi",
+          "hariPemantauan",
+          "hariObservasiKe",
+          "hari_observasi",
+          "hari_pemantauan",
+          "col_37"
+        ], "0")) || 0;
         const rawStatusHewanObs = getFieldFromRow(rd, ["Status Hewan Observasi", "statusHewanObservasi", "col_38"], "Sehat / Normal (Observasi)");
         const rawVar0 = getFieldFromRow(rd, ["Jadwal VAR Dosis 0", "jadwalVAR_0", "col_39"], "");
         const rawVar3 = getFieldFromRow(rd, ["Jadwal VAR Dosis 3", "jadwalVAR_3", "col_40"], "");
         const rawVar7 = getFieldFromRow(rd, ["Jadwal VAR Dosis 7", "jadwalVAR_7", "col_41"], "");
         const rawVar21 = getFieldFromRow(rd, ["Jadwal VAR Dosis 21", "jadwalVAR_21", "col_42"], "");
-        const rawCatatanLog = getFieldFromRow(rd, ["Catatan Perkembangan Harian", "catatanPerkembanganHarian", "col_43"], "");
+        const rawCatatanLog = getFieldFromRow(rd, [
+          "Catatan Perkembangan Harian",
+          "catatanPerkembanganHarian",
+          "Catatan Harian",
+          "Riwayat Pemantauan",
+          "Catatan Kronologis",
+          "col_43"
+        ], "");
         const rawPJMonitoring = getFieldFromRow(rd, ["Petugas PJ Monitoring", "petugasPJMonitoring", "col_44"], petugasPJ);
-        const rawLastUpd = getFieldFromRow(rd, ["Terakhir Diperbarui", "lastUpdated", "col_45"], waktuSubmit);
+        const rawTanggalPemantauan = getFieldFromRow(rd, [
+          "Tanggal Pemantauan",
+          "Tanggal Observasi",
+          "Tanggal Terakhir Pemantauan",
+          "Tgl Pemantauan",
+          "Tanggal Laporan",
+          "Tanggal Pelaksanaan",
+          "col_33",
+          "col_45"
+        ], "");
+        const rawLastUpd = getFieldFromRow(rd, ["Terakhir Diperbarui", "lastUpdated", "col_45"], rawTanggalPemantauan || waktuSubmit);
 
         const sIdLower = sId.toLowerCase();
         const sNamaLower = nama.toLowerCase();
@@ -1443,6 +1750,40 @@ export async function syncPatientsFromGoogleSheets(
         if (sNamaLower && sNamaLower !== "tanpa nama") {
           rowNameSet.add(sNamaLower);
         }
+
+        // Helper fungsi parsing dosis VAR dari spreadsheet
+        const parseSpreadsheetVarDose = (
+          rawText: string,
+          existingDose?: VarDoseItem,
+          defaultDate?: string
+        ): VarDoseItem => {
+          const clean = (rawText || "").trim();
+          if (!clean || clean === "-") {
+            return existingDose || { tanggal: defaultDate || "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" };
+          }
+
+          const lower = clean.toLowerCase();
+          let status: "Belum Diberikan" | "Terjadwal" | "Sudah Diberikan" | "Tidak Perlu" = "Belum Diberikan";
+          if (lower.includes("sudah") || lower.includes("diberikan")) {
+            status = "Sudah Diberikan";
+          } else if (lower.includes("terjadwal") || lower.includes("jadwal")) {
+            status = "Terjadwal";
+          } else if (lower.includes("tidak perlu") || lower.includes("batal")) {
+            status = "Tidak Perlu";
+          } else if (existingDose?.status) {
+            status = existingDose.status;
+          }
+
+          const dateMatch = clean.match(/\d{4}-\d{2}-\d{2}/) || clean.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/);
+          const tanggal = dateMatch ? normalizeDateToIso(dateMatch[0]) : (existingDose?.tanggal || defaultDate || "");
+
+          return {
+            tanggal,
+            status,
+            lokasiPemberian: existingDose?.lokasiPemberian || "Puskesmas Sananwetan",
+            keterangan: clean
+          };
+        };
 
         // Cari apakah pasien sudah pernah tercatat sebelumnya (berdasarkan ID Kasus yang pasti, atau jika ID kosong dicocokkan nama)
         const existingIdx = latestPatients.findIndex((p) => {
@@ -1460,22 +1801,57 @@ export async function syncPatientsFromGoogleSheets(
 
         if (existingIdx >= 0) {
           const ex = latestPatients[existingIdx];
+
+          const mergedVar0 = parseSpreadsheetVarDose(rawVar0, ex.jadwalVAR?.dosis0, tglKejadian);
+          const mergedVar3 = parseSpreadsheetVarDose(rawVar3, ex.jadwalVAR?.dosis3, normalizeDateToIso(tglKejadian, 3));
+          const mergedVar7 = parseSpreadsheetVarDose(rawVar7, ex.jadwalVAR?.dosis7, normalizeDateToIso(tglKejadian, 7));
+          const mergedVar21 = parseSpreadsheetVarDose(rawVar21, ex.jadwalVAR?.dosis21, normalizeDateToIso(tglKejadian, 21));
+
+          let mergedLogs = Array.isArray(ex.riwayatLog) ? [...ex.riwayatLog] : [];
+          if (rawCatatanLog && rawCatatanLog !== "-" && rawCatatanLog.trim().length > 0) {
+            const parsedFromSheet = parseCatatanHarianString(
+              rawCatatanLog,
+              tglKejadian,
+              rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : (ex.petugasPJ || "Petugas Puskesmas"),
+              kelurahan && kelurahan !== "-" ? kelurahan : (ex.kelurahan || "Sananwetan"),
+              nipPJ !== "-" ? nipPJ : (ex.nipPJ || "-")
+            );
+            if (parsedFromSheet.length > 0) {
+              mergedLogs = deduplicateAndSortLogs([...mergedLogs, ...parsedFromSheet]);
+            }
+          } else {
+            mergedLogs = deduplicateAndSortLogs(mergedLogs);
+          }
+
+          const resolvedHariObs = rawHariObs > 0 ? rawHariObs : (ex.hariObservasiKe || 1);
+
           const merged: PatientMonitoringItem = {
             ...ex,
             id_kasus: sId,
             namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
             kelurahan: kelurahan && kelurahan !== "-" ? kelurahan : ex.kelurahan,
             alamatKorban: alamat !== "-" ? alamat : ex.alamatKorban,
+            kontakKorban: noHp !== "-" ? noHp : (ex.kontakKorban || ex.noHpKorban || "-"),
+            noHpKorban: noHp !== "-" ? noHp : (ex.noHpKorban || ex.kontakKorban || "-"),
+            umurKorban: umur !== "-" ? umur : ex.umurKorban,
+            jkKorban: jk || ex.jkKorban,
             kondisiLuka: kondisiLuka !== "-" ? kondisiLuka : ex.kondisiLuka,
             kondisiHewan: kondisiHewan !== "-" ? kondisiHewan : ex.kondisiHewan,
             spesiesHPR: spesiesHPR || ex.spesiesHPR,
             petugasPJ: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : (petugasPJ !== "-" ? petugasPJ : ex.petugasPJ),
             nipPJ: nipPJ !== "-" ? nipPJ : ex.nipPJ,
             rekomendasi: rekomendasi !== "-" ? rekomendasi : ex.rekomendasi,
-            statusPemantauan: (statusPemantauan as StatusPemantauanPasien) || ex.statusPemantauan,
-            hariObservasiKe: rawHariObs > 1 ? rawHariObs : ex.hariObservasiKe,
+            statusPemantauan: (statusPemantauan as StatusPemantauanPasien) || ex.statusPemantauan || "Dalam Pemantauan (Aktif)",
+            hariObservasiKe: resolvedHariObs,
             statusHewanObservasi: (rawStatusHewanObs && rawStatusHewanObs !== "-" ? rawStatusHewanObs : ex.statusHewanObservasi) as StatusHewanObservasi,
-            lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : ex.lastUpdated
+            jadwalVAR: {
+              dosis0: mergedVar0,
+              dosis3: mergedVar3,
+              dosis7: mergedVar7,
+              dosis21: mergedVar21
+            },
+            riwayatLog: mergedLogs,
+            lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : (ex.lastUpdated || new Date().toLocaleString("id-ID"))
           };
 
           if (alreadyInSyncedIdx >= 0) {
@@ -1485,6 +1861,36 @@ export async function syncPatientsFromGoogleSheets(
             sheetUpdated++;
           }
         } else {
+          let initialLogs: MonitoringDailyLog[] = [];
+          if (rawCatatanLog && rawCatatanLog !== "-" && rawCatatanLog.trim().length > 0) {
+            initialLogs = parseCatatanHarianString(
+              rawCatatanLog,
+              tglKejadian,
+              rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : petugasPJ,
+              kelurahan,
+              nipPJ
+            );
+          }
+
+          if (initialLogs.length === 0) {
+            initialLogs = [
+              {
+                id: `log-import-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                tanggal: tglKejadian,
+                hariKe: rawHariObs || 1,
+                petugasNama: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : petugasPJ,
+                petugasNIP: nipPJ,
+                kelurahan: kelurahan,
+                kondisiKorban: kondisiLuka || "Dalam Perawatan",
+                statusLuka: kondisiLuka,
+                kondisiHewan: kondisiHewan,
+                suhuTubuh: "36.5 °C",
+                tindakanDilakukan: "Penyelidikan Epidemiologi",
+                catatanKhusus: ""
+              }
+            ];
+          }
+
           const newPatient: PatientMonitoringItem = {
             id_kasus: sId,
             timestamp_submit: waktuSubmit || new Date().toLocaleString("id-ID"),
@@ -1516,25 +1922,12 @@ export async function syncPatientsFromGoogleSheets(
             tglMulaiObservasi: tglKejadian,
             tglSelesaiObservasi: tglSelesai,
             jadwalVAR: {
-              dosis0: { tanggal: "", status: rawVar0 && rawVar0.includes("Sudah") ? "Sudah Diberikan" : "Belum Diberikan", lokasiPemberian: "", keterangan: rawVar0 },
-              dosis3: { tanggal: "", status: rawVar3 && rawVar3.includes("Sudah") ? "Sudah Diberikan" : "Belum Diberikan", lokasiPemberian: "", keterangan: rawVar3 },
-              dosis7: { tanggal: "", status: rawVar7 && rawVar7.includes("Sudah") ? "Sudah Diberikan" : "Belum Diberikan", lokasiPemberian: "", keterangan: rawVar7 },
-              dosis21: { tanggal: "", status: rawVar21 && rawVar21.includes("Sudah") ? "Sudah Diberikan" : "Belum Diberikan", lokasiPemberian: "", keterangan: rawVar21 }
+              dosis0: parseSpreadsheetVarDose(rawVar0, undefined, tglKejadian),
+              dosis3: parseSpreadsheetVarDose(rawVar3, undefined, normalizeDateToIso(tglKejadian, 3)),
+              dosis7: parseSpreadsheetVarDose(rawVar7, undefined, normalizeDateToIso(tglKejadian, 7)),
+              dosis21: parseSpreadsheetVarDose(rawVar21, undefined, normalizeDateToIso(tglKejadian, 21))
             },
-            riwayatLog: [
-              {
-                id: `log-import-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-                tanggal: tglKejadian,
-                hariKe: rawHariObs || 1,
-                petugasNama: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : petugasPJ,
-                kelurahan: kelurahan,
-                kondisiKorban: kondisiLuka || "Dalam Perawatan",
-                statusLuka: kondisiLuka,
-                kondisiHewan: kondisiHewan,
-                tindakanDilakukan: "Penyelidikan Epidemiologi",
-                catatanKhusus: rawCatatanLog && rawCatatanLog !== "-" ? rawCatatanLog : `Data disinkronkan dari ${sourceNote || "Google Spreadsheet"}.`
-              }
-            ],
+            riwayatLog: initialLogs,
             petugasPJ: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : petugasPJ,
             nipPJ: nipPJ,
             lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : new Date().toLocaleString("id-ID")

@@ -38,7 +38,8 @@ import {
   deletePatientById,
   canUserDeleteCases,
   syncPatientsFromGoogleSheets,
-  pullAllCloudData
+  pullAllCloudData,
+  calculateObservationDay
 } from "../lib/patientMonitoring";
 import { checkPatientNotificationBadge } from "../lib/notificationService";
 import { PatientUpdateModal } from "./PatientUpdateModal";
@@ -134,17 +135,17 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
     }
   }, [initialTargetPatientId, initialTargetAction, patientsList]);
 
-  // Handler auto-sync saat dashboard dimuat (hanya 1x saat webAppUrl berubah)
+  // Handler auto-sync saat dashboard dimuat & saat kembali aktif ke tab (window focus)
   useEffect(() => {
     let isMounted = true;
     const runAutoSync = async () => {
       if (typeof navigator !== "undefined" && navigator.onLine) {
         try {
-          const res = await syncPatientsFromGoogleSheets(webAppUrl);
+          const res = await pullAllCloudData(webAppUrl || "");
           if (isMounted) {
             onRefreshPatientsRef.current();
-            if (res.added > 0 || res.updated > 0) {
-              setToastMessage(`Sinkronisasi Google Sheets: ${res.total} data pasien selaras dengan spreadsheet.`);
+            if (res.success && res.patientsCount > 0) {
+              setToastMessage(`Sinkronisasi Google Sheets: ${res.patientsCount} data pasien selaras dengan spreadsheet.`);
               setTimeout(() => {
                 if (isMounted) setToastMessage("");
               }, 4000);
@@ -156,8 +157,28 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
       }
     };
     runAutoSync();
+
+    const handleDataEvent = () => {
+      if (isMounted) onRefreshPatientsRef.current();
+    };
+
+    const handleWindowFocus = () => {
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        pullAllCloudData(webAppUrl || "")
+          .then(() => {
+            if (isMounted) onRefreshPatientsRef.current();
+          })
+          .catch(() => {});
+      }
+    };
+
+    window.addEventListener("ghpr_patient_data_updated", handleDataEvent);
+    window.addEventListener("focus", handleWindowFocus);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("ghpr_patient_data_updated", handleDataEvent);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, [webAppUrl]);
 
@@ -227,11 +248,25 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
     }
   };
 
-  const handlePatientUpdated = () => {
+  const handlePatientUpdated = (updated?: PatientMonitoringItem) => {
     onRefreshPatients();
-    setToastMessage("Pembaruan status pemantauan pasien berhasil disimpan.");
+    if (updated) {
+      if (selectedPatientForDetail && selectedPatientForDetail.id_kasus === updated.id_kasus) {
+        setSelectedPatientForDetail(updated);
+      }
+      if (selectedPatientForUpdate && selectedPatientForUpdate.id_kasus === updated.id_kasus) {
+        setSelectedPatientForUpdate(updated);
+      }
+    }
+    setToastMessage("Pembaruan status pemantauan pasien berhasil disimpan dan disinkronkan.");
     setTimeout(() => setToastMessage(""), 3500);
   };
+
+  // Selalu gunakan data pasien paling baru (terupdate) saat modal detail dibuka
+  const currentDetailPatient = useMemo(() => {
+    if (!selectedPatientForDetail) return null;
+    return patientsList.find((p) => p.id_kasus === selectedPatientForDetail.id_kasus) || selectedPatientForDetail;
+  }, [selectedPatientForDetail, patientsList]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -734,20 +769,30 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
 
                       {/* Observasi 14 Hari Progress */}
                       <td className="py-3.5 px-4 align-top">
-                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mb-1">
-                          <span>Hari ke-{patient.hariObservasiKe || 1} / 14</span>
-                          <span className="text-[10px] text-slate-400">
-                            {Math.round(((patient.hariObservasiKe || 1) / 14) * 100)}%
-                          </span>
-                        </div>
-                        <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              (patient.hariObservasiKe || 1) >= 14 ? "bg-emerald-500" : "bg-blue-600"
-                            }`}
-                            style={{ width: `${Math.min(100, ((patient.hariObservasiKe || 1) / 14) * 100)}%` }}
-                          />
-                        </div>
+                        {(() => {
+                          const obsDay = calculateObservationDay(patient);
+                          const percent = Math.min(100, Math.round((obsDay / 14) * 100));
+                          return (
+                            <>
+                              <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mb-1">
+                                <span>Hari ke-{obsDay} / 14</span>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {percent}%
+                                </span>
+                              </div>
+                              <div className="w-28 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60 shadow-inner">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-300 ${
+                                    obsDay >= 14 || patient.statusPemantauan === "Selesai Observasi (14 Hari)"
+                                      ? "bg-emerald-500"
+                                      : "bg-blue-600"
+                                  }`}
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                            </>
+                          );
+                        })()}
                       </td>
 
                       {/* Status Pemantauan Badge */}
@@ -889,18 +934,28 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
                   </div>
 
                   {/* Progress Observasi */}
-                  <div className="bg-slate-50 rounded-xl p-2.5 space-y-1">
-                    <div className="flex justify-between text-[11px] font-bold text-slate-700">
-                      <span>Observasi Hari ke-{patient.hariObservasiKe || 1} / 14</span>
-                      <span>{Math.round(((patient.hariObservasiKe || 1) / 14) * 100)}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-600 rounded-full"
-                        style={{ width: `${Math.min(100, ((patient.hariObservasiKe || 1) / 14) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
+                  {(() => {
+                    const obsDay = calculateObservationDay(patient);
+                    const percent = Math.min(100, Math.round((obsDay / 14) * 100));
+                    return (
+                      <div className="bg-slate-50 rounded-xl p-2.5 space-y-1.5 border border-slate-100">
+                        <div className="flex justify-between text-[11px] font-bold text-slate-700">
+                          <span>Observasi Hari ke-{obsDay} / 14</span>
+                          <span className="text-slate-500 font-mono">{percent}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              obsDay >= 14 || patient.statusPemantauan === "Selesai Observasi (14 Hari)"
+                                ? "bg-emerald-500"
+                                : "bg-blue-600"
+                            }`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Action Buttons Mobile */}
                   <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
@@ -979,7 +1034,7 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
       <PatientDetailModal
         isOpen={!!selectedPatientForDetail}
         onClose={() => setSelectedPatientForDetail(null)}
-        patient={selectedPatientForDetail}
+        patient={currentDetailPatient}
         currentUser={currentUser}
         onOpenUpdateModal={(p) => setSelectedPatientForUpdate(p)}
         onOpenFullFormEdit={onEditFullFormCase}

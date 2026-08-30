@@ -544,6 +544,16 @@ export default function App() {
       } catch (e) {}
       setResetSuccessMessage(`Berhasil masuk sebagai ${user.nama} (${user.role}). Menampilkan Daftar Pasien Dipantau.`);
     }
+
+    // Segarkan data dari Google Sheets / Cloud seketika setelah login berhasil
+    pullAllCloudData(webAppUrl)
+      .then(() => {
+        handleRefreshPatients();
+      })
+      .catch((err) => {
+        console.warn("Login cloud sync notice:", err);
+      });
+
     setTimeout(() => setResetSuccessMessage(""), 4000);
   };
 
@@ -554,6 +564,15 @@ export default function App() {
     setSessionExpiredNotice("");
     setActiveTab("monitoring");
     setIsAdminMode(false);
+
+    // Segarkan ulang data dari Google Sheets / Cloud saat logout
+    pullAllCloudData(webAppUrl)
+      .then(() => {
+        handleRefreshPatients();
+      })
+      .catch((err) => {
+        console.warn("Logout cloud sync notice:", err);
+      });
   };
 
   const handleSwitchTab = (tab: ActiveAppTab) => {
@@ -579,6 +598,12 @@ export default function App() {
       }
       localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, tab);
     } catch (e) {}
+
+    if (tab === "monitoring") {
+      pullAllCloudData(webAppUrl)
+        .then(() => handleRefreshPatients())
+        .catch(() => {});
+    }
   };
 
   const handleStartNewPatientInput = () => {

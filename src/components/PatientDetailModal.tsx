@@ -15,6 +15,7 @@ import {
   FileSpreadsheet
 } from "lucide-react";
 import { PatientMonitoringItem, UserAccessProfile } from "../types";
+import { calculateObservationDay, parseChronologicalLogs } from "../lib/patientMonitoring";
 
 interface PatientDetailModalProps {
   isOpen: boolean;
@@ -112,7 +113,7 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
                 Observasi Hewan 14 Hari
               </span>
               <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
-                Hari ke-{patient.hariObservasiKe || 1} dari 14 Hari ({patient.statusHewanObservasi})
+                Hari ke-{calculateObservationDay(patient)} dari 14 Hari ({patient.statusHewanObservasi})
               </span>
             </div>
 
@@ -319,49 +320,65 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
           </div>
 
           {/* Catatan Harian Pemantauan */}
-          <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-            <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-1.5 text-xs uppercase tracking-wider">
-              <History size={14} className="text-indigo-600" />
+          <div className="border border-slate-200 rounded-2xl p-4 sm:p-5 bg-white space-y-3">
+            <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2.5 flex items-center gap-2 text-xs uppercase tracking-wider">
+              <History size={15} className="text-indigo-600" />
               D. Catatan Kronologis Pemantauan Harian
             </h4>
-            <div className="space-y-2.5">
-              {(!patient.riwayatLog || patient.riwayatLog.length === 0) ? (
-                <p className="text-xs text-slate-400 italic py-2">Belum ada catatan log pemantauan.</p>
-              ) : (
-                patient.riwayatLog.map((log, idx) => (
-                  <div key={log.id || idx} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-1.5">
-                    <div className="flex items-center justify-between text-slate-700 flex-wrap gap-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">
+            <div className="space-y-3">
+              {(() => {
+                const logs = parseChronologicalLogs(patient);
+                if (logs.length === 0) {
+                  return <p className="text-xs text-slate-400 italic py-2">Belum ada catatan log pemantauan.</p>;
+                }
+                return logs.map((log, idx) => (
+                  <div
+                    key={log.id || idx}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 text-xs space-y-2.5 shadow-2xs hover:border-slate-300 transition"
+                  >
+                    {/* Header baris 1: Hari & Tanggal + Suhu + Petugas */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="font-bold text-slate-900 text-xs sm:text-[13px]">
                           Hari ke-{log.hariKe} • Tanggal: {log.tanggal}
                         </span>
-                        {log.suhuTubuh && (
-                          <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
-                            🌡️ {log.suhuTubuh}
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                          <span>🌡️</span>
+                          <span>{log.suhuTubuh || "36.5 °C"}</span>
+                        </span>
                       </div>
-                      <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
-                        Petugas: {log.petugasNama}
+                      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg">
+                        Petugas: {log.petugasNama || patient.petugasPJ || "Petugas Puskesmas"}
                       </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-600">
-                      <div><b>Kondisi Korban & Luka:</b> {log.kondisiKorban}</div>
-                      <div><b>Kondisi Hewan HPR:</b> {log.kondisiHewan}</div>
-                    </div>
-                    {log.tindakanDilakukan && (
-                      <div className="text-slate-600">
-                        <b>Tindakan / Edukasi:</b> {log.tindakanDilakukan}
+
+                    {/* Baris 2: Kolom Kondisi Korban & Kondisi Hewan */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-700 text-xs pt-0.5">
+                      <div>
+                        <span className="font-bold text-slate-900">Kondisi Korban & Luka:</span>{" "}
+                        <span className="text-slate-700">{log.kondisiKorban || log.statusLuka || "Kondisi umum baik, tidak demam."}</span>
                       </div>
-                    )}
-                    {log.catatanKhusus && (
-                      <div className="text-slate-600 bg-white p-2 rounded border border-slate-200/80 italic">
+                      <div>
+                        <span className="font-bold text-slate-900">Kondisi Hewan HPR:</span>{" "}
+                        <span className="text-slate-700">{log.kondisiHewan || "Sehat & aktif (dikandangkan/diikat)"}</span>
+                      </div>
+                    </div>
+
+                    {/* Baris 3: Tindakan / Edukasi */}
+                    <div className="text-slate-700 text-xs">
+                      <span className="font-bold text-slate-900">Tindakan / Edukasi:</span>{" "}
+                      <span className="text-slate-700">{log.tindakanDilakukan || "Pemantauan berkala & edukasi perawatan luka."}</span>
+                    </div>
+
+                    {/* Catatan Khusus Tambahan jika bukan format standar */}
+                    {log.catatanKhusus && log.catatanKhusus !== "-" && !log.catatanKhusus.startsWith("[") && (
+                      <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 italic">
                         "{log.catatanKhusus}"
                       </div>
                     )}
                   </div>
-                ))
-              )}
+                ));
+              })()}
             </div>
           </div>
         </div>

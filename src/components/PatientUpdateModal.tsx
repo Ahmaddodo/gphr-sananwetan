@@ -32,9 +32,17 @@ import {
   MonitoringDailyLog,
   SubmissionPayload
 } from "../types";
-import { addPatientMonitoringLog, upsertPatient, normalizeDateToIso } from "../lib/patientMonitoring";
+import {
+  addPatientMonitoringLog,
+  upsertPatient,
+  normalizeDateToIso,
+  calculateObservationDay,
+  parseChronologicalLogs,
+  deduplicateAndSortLogs
+} from "../lib/patientMonitoring";
 import { sendToAppsScript, DEFAULT_WEB_APP_URL } from "../lib/googleSheets";
 import { addToOfflineQueue, isAppOnline } from "../lib/offlineSyncService";
+import { getWebAppUrl } from "../lib/config";
 import { DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP } from "./SignatureData";
 
 interface PatientUpdateModalProps {
@@ -100,11 +108,25 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const [saveErrorMsg, setSaveErrorMsg] = useState<string>("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
+  // Helper reset seluruh inputan sub-form catatan harian
+  const resetLogSubForm = () => {
+    setEditingLogId(null);
+    setLogTanggal(new Date().toISOString().slice(0, 10));
+    setLogHariKe(hariObservasi || patient?.hariObservasiKe || 1);
+    setLogKondisiKorban("Kondisi umum baik, tidak demam.");
+    setLogStatusLuka(kondisiLuka || "Luka bersih dan mulai mengering.");
+    setLogKondisiHewan(kondisiHewanText || "Hewan sehat, aktif, nafsu makan baik.");
+    setLogSuhu("36.5");
+    setLogTindakan("Pemantauan berkala & edukasi perawatan luka.");
+    setLogCatatan("");
+  };
+
   useEffect(() => {
     if (patient) {
       setStatusPemantauan(patient.statusPemantauan);
       setStatusHewan(patient.statusHewanObservasi);
-      setHariObservasi(patient.hariObservasiKe || 1);
+      const obsDay = calculateObservationDay(patient);
+      setHariObservasi(obsDay);
       setKondisiLuka(patient.kondisiLuka || "");
       setKondisiHewanText(patient.kondisiHewan || "");
       setRekomendasi(patient.rekomendasi || "");
@@ -114,10 +136,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
         dosis7: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
         dosis21: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" }
       });
-      setLogsList(patient.riwayatLog ? [...patient.riwayatLog] : []);
+      const parsedLogs = parseChronologicalLogs(patient);
+      setLogsList(parsedLogs);
       setShowAddLog(false);
       setEditingLogId(null);
-      setLogHariKe(patient.hariObservasiKe || 1);
+      resetLogSubForm();
       setSaveSuccessMsg("");
       setSaveErrorMsg("");
       setValidationErrors({});
@@ -158,17 +181,9 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     }));
   };
 
-  // Handler untuk Buka Form Catatan Baru (Membersihkan Form dari data sebelumnya)
+  // Handler untuk Buka Form Catatan Baru (Membersihkan Form dari data sebelumnya secara tuntas)
   const handleOpenNewLogForm = () => {
-    setEditingLogId(null);
-    setLogTanggal(new Date().toISOString().slice(0, 10));
-    setLogHariKe(hariObservasi || 1);
-    setLogKondisiKorban("Kondisi umum baik, tidak demam.");
-    setLogStatusLuka(kondisiLuka || "Luka bersih dan mulai mengering.");
-    setLogKondisiHewan(kondisiHewanText || "Hewan sehat, aktif, nafsu makan baik.");
-    setLogSuhu("36.5");
-    setLogTindakan("Pemantauan berkala & edukasi perawatan luka.");
-    setLogCatatan("");
+    resetLogSubForm();
     setShowAddLog(true);
   };
 
@@ -233,10 +248,9 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       setLogsList((prev) => [...prev, newLog]);
     }
 
-    // Reset dan tutup form catatan
-    setEditingLogId(null);
+    // Reset dan tutup form catatan secara bersih
+    resetLogSubForm();
     setShowAddLog(false);
-    setLogCatatan("");
   };
 
   // Handler untuk Menghapus Catatan
@@ -248,7 +262,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
         return itemId !== targetId && idx !== index;
       }));
       if (editingLogId === targetId) {
-        setEditingLogId(null);
+        resetLogSubForm();
         setShowAddLog(false);
       }
     }
@@ -320,6 +334,9 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       }
     }
 
+    // Pastikan log bersih, terurut, dan tidak ganda
+    updatedLogs = deduplicateAndSortLogs(updatedLogs);
+
     const updatedItem: PatientMonitoringItem = {
       ...patient,
       statusPemantauan,
@@ -351,6 +368,9 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     const var7Text = jadwalVAR?.dosis7?.status ? `${jadwalVAR.dosis7.status}${jadwalVAR.dosis7.tanggal ? ` (${jadwalVAR.dosis7.tanggal})` : ""}${jadwalVAR.dosis7.lokasiPemberian ? ` - ${jadwalVAR.dosis7.lokasiPemberian}` : ""}` : "-";
     const var21Text = jadwalVAR?.dosis21?.status ? `${jadwalVAR.dosis21.status}${jadwalVAR.dosis21.tanggal ? ` (${jadwalVAR.dosis21.tanggal})` : ""}${jadwalVAR.dosis21.lokasiPemberian ? ` - ${jadwalVAR.dosis21.lokasiPemberian}` : ""}` : "-";
     const lastUpdateTimestamp = new Date().toLocaleString("id-ID");
+    const latestLogDate = updatedLogs.length > 0 && updatedLogs[0].tanggal
+      ? updatedLogs[0].tanggal
+      : new Date().toISOString().slice(0, 10);
 
     const updatePayload: SubmissionPayload = {
       id_kasus: patient.id_kasus,
@@ -410,6 +430,9 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       statusPemantauan,
       hariObservasi: Number(hariObservasi),
       hariObservasiKe: Number(hariObservasi),
+      hariPemantauan: Number(hariObservasi),
+      tanggalPemantauan: latestLogDate || new Date().toISOString().slice(0, 10),
+      tanggalObservasi: latestLogDate || new Date().toISOString().slice(0, 10),
       statusHewanObservasi: statusHewan,
       jadwalVAR_0: var0Text,
       jadwalVAR_3: var3Text,
@@ -419,9 +442,12 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       petugasPJMonitoring: currentUser.nama ? `${currentUser.nama}${currentUser.nip ? ` (${currentUser.nip})` : ""}` : (patient.petugasPJ || DEFAULT_PELAKSANA_NAMA),
       nipPJMonitoring: currentUser.nip || patient.nipPJ || DEFAULT_PELAKSANA_NIP,
       lastUpdated: lastUpdateTimestamp,
-      // Header names
+      // Header names untuk Google Spreadsheet
       "Status Pemantauan": statusPemantauan,
       "Hari Observasi": Number(hariObservasi),
+      "Hari Pemantauan": Number(hariObservasi),
+      "Tanggal Pemantauan": latestLogDate || new Date().toISOString().slice(0, 10),
+      "Tanggal Observasi": latestLogDate || new Date().toISOString().slice(0, 10),
       "Status Hewan Observasi": statusHewan,
       "Jadwal VAR Dosis 0": var0Text,
       "Jadwal VAR Dosis 3": var3Text,
@@ -461,7 +487,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     }
 
     // 4. Sinkronisasi Langsung ke Google Sheets / Google Apps Script atau Masuk Antrean Offline
-    const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+    const targetUrl = (webAppUrl || getWebAppUrl() || DEFAULT_WEB_APP_URL || "").trim();
     let sheetSyncSuccess = false;
     const onlineNow = isAppOnline();
 
@@ -491,6 +517,10 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     }
 
     onPatientUpdated(updatedItem);
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ghpr_patient_data_updated", { detail: { updatedItem } }));
+    }
 
     if (sheetSyncSuccess) {
       setSaveSuccessMsg(`Data pasien & catatan pemantauan berhasil disinkronkan ke Google Spreadsheet!`);
@@ -1052,8 +1082,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        resetLogSubForm();
                         setShowAddLog(false);
-                        setEditingLogId(null);
                       }}
                       className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-white/60 transition"
                       title="Batal"
@@ -1146,9 +1176,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      resetLogSubForm();
                       setShowAddLog(false);
-                      setEditingLogId(null);
-                      setLogCatatan("");
                     }}
                     className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 transition"
                   >
