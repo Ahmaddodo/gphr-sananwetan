@@ -588,6 +588,14 @@ var FIELD_MAP = {
   "kelamin korban": "jkKorban",
   "kelamin pasien": "jkKorban",
   "jenis kelamin": "jkKorban",
+  "kondisi umum korban": "kondisiUmumKorban",
+  "kondisiumumkorban": "kondisiUmumKorban",
+  "kondisi umum": "kondisiUmumKorban",
+  "kondisiumum": "kondisiUmumKorban",
+  "keadaan umum korban": "kondisiUmumKorban",
+  "keadaan umum": "kondisiUmumKorban",
+  "ku korban": "kondisiUmumKorban",
+  "ku": "kondisiUmumKorban",
   "kondisi korban": "kondisiKorban",
   "kondisi luka": "kondisiLuka",
   "kondisiluka": "kondisiLuka",
@@ -610,6 +618,35 @@ var FIELD_MAP = {
   "cuci luka": "pertolonganPertama",
   "pencucian luka": "pertolonganPertama",
   "p3k": "pertolonganPertama",
+  // Multi-Pilihan Pertolongan Pertama
+  "cuci luka < 12 jam": "cuciLukaKurang12Jam",
+  "cuci luka <12 jam": "cuciLukaKurang12Jam",
+  "cuci luka < 12": "cuciLukaKurang12Jam",
+  "cuci luka <12": "cuciLukaKurang12Jam",
+  "cuci luka kurang 12 jam": "cuciLukaKurang12Jam",
+  "cuci luka < 12 jam (segera)": "cuciLukaKurang12Jam",
+  "< 12 jam": "cuciLukaKurang12Jam",
+  "<12 jam": "cuciLukaKurang12Jam",
+  "cucilukakurang12jam": "cuciLukaKurang12Jam",
+  "cuci luka > 12 jam": "cuciLukaLebih12Jam",
+  "cuci luka >12 jam": "cuciLukaLebih12Jam",
+  "cuci luka > 12": "cuciLukaLebih12Jam",
+  "cuci luka >12": "cuciLukaLebih12Jam",
+  "cuci luka lebih 12 jam": "cuciLukaLebih12Jam",
+  "cuci luka > 12 jam (terlambat)": "cuciLukaLebih12Jam",
+  "> 12 jam": "cuciLukaLebih12Jam",
+  ">12 jam": "cuciLukaLebih12Jam",
+  "cucilukalebih12jam": "cuciLukaLebih12Jam",
+  "var dosis 1, 1 dosis dan 1 dosis": "varDosis1",
+  "var dosis 1": "varDosis1",
+  "vardosis1": "varDosis1",
+  "var dosis 1 (1 dosis dan 1 dosis)": "varDosis1",
+  "1 dosis dan 1 dosis": "varDosis1",
+  "var 1": "varDosis1",
+  "dosis 1": "varDosis1",
+  "sar": "sar",
+  "serum anti rabies": "sar",
+  "sar (serum anti rabies)": "sar",
   "detail pertolongan": "detailPertolongan",
   "detailpertolongan": "detailPertolongan",
   "tindakan kasus": "tindakanKasus",
@@ -1322,33 +1359,22 @@ function prosesDataMasuk(data, action) {
     data.umurHewan_formatted = data.umurHewan ? (data.umurHewan + " " + (data.satuanUmur || "Tahun")) : "-";
     data.umurKorban_formatted = data.umurKorban ? (data.umurKorban + " Tahun") : "-";
 
-    // STANDARISASI OTOMATIS BARIS 1 HEADER (Menghapus kolom duplikat seperti kelurahan ganda)
-    var numCols = Math.max(sheet.getLastColumn(), OFFICIAL_HEADERS.length);
-    if (sheet.getMaxColumns() < OFFICIAL_HEADERS.length) {
-      sheet.insertColumnsAfter(sheet.getMaxColumns(), OFFICIAL_HEADERS.length - sheet.getMaxColumns());
-    }
-
-    var existingHeaders = sheet.getLastRow() >= 1 ? sheet.getRange(1, 1, 1, Math.max(numCols, 1)).getValues()[0] : [];
-    var isHeaderMismatched = false;
-
-    if (existingHeaders.length < OFFICIAL_HEADERS.length) {
-      isHeaderMismatched = true;
-    } else {
-      // Deteksi duplikasi header (misal 'kelurahan' di kolom E dan 'Kelurahan' di kolom F)
-      var seenHeaderKeys = {};
-      for (var chk = 0; chk < existingHeaders.length; chk++) {
-        var hClean = String(existingHeaders[chk] || "").toLowerCase().trim();
-        if (hClean) {
-          if (seenHeaderKeys[hClean]) {
-            isHeaderMismatched = true;
-            break;
-          }
-          seenHeaderKeys[hClean] = true;
-        }
+    // STANDARISASI BARIS 1 HEADER & DUKUNGAN PENUH KOLOM BARU / KUSTOM SPREADSHEET
+    var lastCol = sheet.getLastColumn();
+    var existingHeaders = [];
+    if (sheet.getLastRow() >= 1 && lastCol >= 1) {
+      existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      // Hapus kolom trailing kosong di ujung kanan jika ada
+      while (existingHeaders.length > 0 && String(existingHeaders[existingHeaders.length - 1] || "").trim() === "") {
+        existingHeaders.pop();
       }
     }
 
-    if (isHeaderMismatched || sheet.getLastRow() === 0) {
+    // Hanya jika sheet benar-benar kosong (0 baris / belum ada header), inisialisasi dengan OFFICIAL_HEADERS
+    if (existingHeaders.length === 0 || sheet.getLastRow() === 0) {
+      if (sheet.getMaxColumns() < OFFICIAL_HEADERS.length) {
+        sheet.insertColumnsAfter(sheet.getMaxColumns(), OFFICIAL_HEADERS.length - sheet.getMaxColumns());
+      }
       sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length).setValues([OFFICIAL_HEADERS]);
       var headerRange = sheet.getRange(1, 1, 1, OFFICIAL_HEADERS.length);
       headerRange.setBackground("#0F5132"); // Hijau Puskesmas
@@ -1460,6 +1486,12 @@ function prosesDataMasuk(data, action) {
       if (h === "jenis kelamin korban" || h === "jk korban" || h === "jenis kelamin pasien" || h === "jk pasien" || h === "kelamin korban" || h === "jenis kelamin") {
         return d.jkKorban || d.jkPasien || "-";
       }
+      if (h === "kondisi umum korban" || h === "kondisiumumkorban" || h === "kondisi umum" || h === "kondisiumum" || h === "keadaan umum korban" || h === "keadaan umum" || h === "ku korban" || h === "ku") {
+        return d.kondisiUmumKorban || d.kondisiKorban || "-";
+      }
+      if (h === "kondisi korban" || h === "kondisikorban" || h === "kondisi pasien" || h === "keadaan korban") {
+        return d.kondisiKorban || d.kondisiUmumKorban || "-";
+      }
       if (h === "kondisi luka" || h === "kondisi luka korban" || h === "kategori luka" || h === "derajat luka" || h === "luka") {
         return d.kondisiLuka || "Kategori 1";
       }
@@ -1468,6 +1500,27 @@ function prosesDataMasuk(data, action) {
       }
       if (h === "pertolongan pertama" || h === "cuci luka" || h === "pencucian luka" || h === "p3k") {
         return d.pertolonganPertama || d.detailPertolongan || "-";
+      }
+      // Opsi Multi-Pilihan Pertolongan Pertama
+      if (h.indexOf("< 12") !== -1 || h.indexOf("<12") !== -1 || h.indexOf("kurang 12") !== -1) {
+        if (d.cuciLukaKurang12Jam && d.cuciLukaKurang12Jam !== "-") return d.cuciLukaKurang12Jam;
+        var pStr1 = String(d.pertolonganPertama || "").toLowerCase();
+        return (pStr1.indexOf("< 12") !== -1 || pStr1.indexOf("<12") !== -1 || pStr1.indexOf("kurang 12") !== -1) ? "Ya" : "-";
+      }
+      if (h.indexOf("> 12") !== -1 || h.indexOf(">12") !== -1 || h.indexOf("lebih 12") !== -1) {
+        if (d.cuciLukaLebih12Jam && d.cuciLukaLebih12Jam !== "-") return d.cuciLukaLebih12Jam;
+        var pStr2 = String(d.pertolonganPertama || "").toLowerCase();
+        return (pStr2.indexOf("> 12") !== -1 || pStr2.indexOf(">12") !== -1 || pStr2.indexOf("lebih 12") !== -1) ? "Ya" : "-";
+      }
+      if (h.indexOf("var dosis 1") !== -1 || h.indexOf("1 dosis dan 1 dosis") !== -1 || (h.indexOf("var") !== -1 && h.indexOf("dosis 1") !== -1) || h === "var 1" || h === "vardosis1") {
+        if (d.varDosis1 && d.varDosis1 !== "-") return d.varDosis1;
+        var pStr3 = String(d.pertolonganPertama || "").toLowerCase();
+        return (pStr3.indexOf("var dosis 1") !== -1 || pStr3.indexOf("1 dosis dan 1 dosis") !== -1 || (pStr3.indexOf("var") !== -1 && pStr3.indexOf("1 dosis") !== -1) || (pStr3.indexOf("var") !== -1 && pStr3.indexOf("dosis 1") !== -1)) ? "Ya" : "-";
+      }
+      if (h === "sar" || h.indexOf("serum anti rabies") !== -1 || h === "sar (serum anti rabies)" || (h.indexOf("sar") !== -1 && h.indexOf("pasar") === -1)) {
+        if (d.sar && d.sar !== "-") return d.sar;
+        var pStr4 = String(d.pertolonganPertama || "");
+        return (/\bSAR\b/i.test(pStr4) || pStr4.toLowerCase().indexOf("serum anti rabies") !== -1) ? "Ya" : "-";
       }
       if (h === "tindakan kasus" || h === "tindakan terhadap kasus" || h === "tindakan terhadap korban" || h === "tindakan korban" || h === "tindakan medis" || h === "pemberian var") {
         return d.tindakanKasus || "-";
@@ -1527,7 +1580,19 @@ function prosesDataMasuk(data, action) {
         return d.lastUpdated || d["Terakhir Diperbarui"] || Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
       }
 
-      // 4. Positional fallback from rowValues array jika dikirim dari aplikasi frontend
+      // 4. Pencarian dinamis ke seluruh properti objek (case-insensitive & pembersihan tanda baca)
+      // Menjamin setiap kolom baru/kustom di spreadsheet otomatis terisi dari data form
+      var cleanHeaderNoPunct = h.replace(/[^a-z0-9]/g, "");
+      var dataKeys = Object.keys(d);
+      for (var dk = 0; dk < dataKeys.length; dk++) {
+        var keyName = dataKeys[dk];
+        var keyClean = keyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (keyClean === cleanHeaderNoPunct && d[keyName] !== undefined && d[keyName] !== null && String(d[keyName]).trim() !== "") {
+          return String(d[keyName]).trim();
+        }
+      }
+
+      // 5. Positional fallback from rowValues array jika dikirim dari aplikasi frontend
       if (d.rowValues && Array.isArray(d.rowValues) && colIdx < d.rowValues.length) {
         var rowVal = d.rowValues[colIdx];
         if (rowVal !== undefined && rowVal !== null && String(rowVal).trim() !== "") {
@@ -1535,7 +1600,7 @@ function prosesDataMasuk(data, action) {
         }
       }
 
-      // 5. Positional fallback dari OFFICIAL_HEADERS index
+      // 6. Positional fallback dari OFFICIAL_HEADERS index
       if (colIdx < OFFICIAL_HEADERS.length) {
         var officialColHeader = OFFICIAL_HEADERS[colIdx].toLowerCase();
         var posKey = FIELD_MAP[officialColHeader];
@@ -1749,8 +1814,56 @@ export async function sendToAppsScript(
   const petugasPJMonitoringVal = (pAny.petugasPJMonitoring || pAny["Petugas PJ Monitoring"] || pAny.petugasPJ || (pAny.pelaksanaNama || "Petugas Puskesmas")).trim();
   const lastUpdatedVal = (pAny.lastUpdated || pAny["Terakhir Diperbarui"] || new Date().toLocaleString("id-ID")).trim();
 
+  const pertolonganStr = String(payload.pertolonganPertama || "").trim();
+  const cuciKurang12Val = (
+    pAny.cuciLukaKurang12Jam === "Ya" ||
+    pertolonganStr.includes("< 12") ||
+    pertolonganStr.includes("<12") ||
+    pertolonganStr.toLowerCase().includes("kurang 12")
+  ) ? "Ya" : "-";
+
+  const cuciLebih12Val = (
+    pAny.cuciLukaLebih12Jam === "Ya" ||
+    pertolonganStr.includes("> 12") ||
+    pertolonganStr.includes(">12") ||
+    pertolonganStr.toLowerCase().includes("lebih 12")
+  ) ? "Ya" : "-";
+
+  const varDosis1Val = (
+    pAny.varDosis1 === "Ya" ||
+    pertolonganStr.toLowerCase().includes("var dosis 1") ||
+    pertolonganStr.toLowerCase().includes("1 dosis dan 1 dosis") ||
+    (pertolonganStr.toLowerCase().includes("var") && pertolonganStr.toLowerCase().includes("1 dosis")) ||
+    (pertolonganStr.toLowerCase().includes("var") && pertolonganStr.toLowerCase().includes("dosis 1"))
+  ) ? "Ya" : "-";
+
+  const sarVal = (
+    pAny.sar === "Ya" ||
+    /\bSAR\b/i.test(pertolonganStr) ||
+    pertolonganStr.toLowerCase().includes("serum anti rabies")
+  ) ? "Ya" : "-";
+
+  const kondisiUmumKorbanVal = (
+    pAny.kondisiUmumKorban ||
+    pAny["Kondisi Umum Korban"] ||
+    pAny["Kondisi Umum"] ||
+    pAny["Keadaan Umum Korban"] ||
+    pAny["Keadaan Umum"] ||
+    pAny["KU Korban"] ||
+    payload.kondisiKorban ||
+    pAny["Kondisi Korban"] ||
+    "Sehat"
+  ).trim();
+
   const orderedRowValues = mapPayloadToRowValues({
     ...payload,
+    kondisiUmumKorban: kondisiUmumKorbanVal,
+    kondisiKorban: payload.kondisiKorban || kondisiUmumKorbanVal,
+    pertolonganPertama: pertolonganStr || payload.pertolonganPertama || "",
+    cuciLukaKurang12Jam: cuciKurang12Val,
+    cuciLukaLebih12Jam: cuciLebih12Val,
+    varDosis1: varDosis1Val,
+    sar: sarVal,
     id_kasus: payload.id_kasus || "",
     timestamp_submit: payload.timestamp_submit || new Date().toISOString(),
     waktuKejadian: waktuKejadianVal,
@@ -1789,7 +1902,6 @@ export async function sendToAppsScript(
     jkPasien: jkKorbanVal,
     kondisiLuka: payload.kondisiLuka || "Kategori 1",
     lokasiLuka: payload.lokasiLuka || "",
-    pertolonganPertama: payload.pertolonganPertama || "",
     tindakanKasus: payload.tindakanKasus || "",
     rekomendasi: payload.rekomendasi || "",
     timKetua: payload.timKetua || "",
@@ -1875,9 +1987,29 @@ export async function sendToAppsScript(
     "Umur Korban": umurKorbanVal ? `${umurKorbanVal} Tahun` : "",
     "Alamat Korban": alamatKorbanVal,
     "Jenis Kelamin Korban": jkKorbanVal,
+    "Kondisi Umum Korban": kondisiUmumKorbanVal,
+    "Kondisi Umum": kondisiUmumKorbanVal,
+    "Keadaan Umum Korban": kondisiUmumKorbanVal,
+    "Keadaan Umum": kondisiUmumKorbanVal,
+    "Kondisi Korban": payload.kondisiKorban || kondisiUmumKorbanVal,
+    kondisiUmumKorban: kondisiUmumKorbanVal,
+    kondisiKorban: payload.kondisiKorban || kondisiUmumKorbanVal,
     "Kondisi Luka": payload.kondisiLuka || "Kategori 1",
     "Lokasi Luka": payload.lokasiLuka || "",
-    "Pertolongan Pertama": payload.pertolonganPertama || "",
+    "Pertolongan Pertama": pertolonganStr || payload.pertolonganPertama || "",
+    "pertolonganPertama": pertolonganStr || payload.pertolonganPertama || "",
+    "cuciLukaKurang12Jam": cuciKurang12Val,
+    "cuciLukaLebih12Jam": cuciLebih12Val,
+    "varDosis1": varDosis1Val,
+    "sar": sarVal,
+    "Cuci luka < 12 jam": cuciKurang12Val,
+    "Cuci Luka < 12 Jam": cuciKurang12Val,
+    "Cuci luka > 12 jam": cuciLebih12Val,
+    "Cuci Luka > 12 Jam": cuciLebih12Val,
+    "Var dosis 1, 1 dosis dan 1 dosis": varDosis1Val,
+    "VAR Dosis 1": varDosis1Val,
+    "SAR": sarVal,
+    "Serum Anti Rabies": sarVal,
     "Tindakan Kasus": payload.tindakanKasus || "",
     "Rekomendasi": payload.rekomendasi || "",
     "Ketua Tim PE": payload.timKetua || "",

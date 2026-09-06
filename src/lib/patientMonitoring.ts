@@ -363,17 +363,9 @@ export function parseChronologicalLogs(patient: PatientMonitoringItem): Monitori
   const defaultKejadian = normalizeDateToIso(patient.waktuKejadian || patient.tglMulaiObservasi || new Date().toISOString().slice(0, 10));
   const defaultNip = patient.nipPJ || "-";
 
-  // 1. Jika pasien memiliki catatanPerkembanganHarian dari Google Spreadsheet, ini adalah representasi paling akurat
-  const sheetCatatan = patient.catatanPerkembanganHarian || (patient as any).catatanPerkembanganHarian;
-  if (sheetCatatan && typeof sheetCatatan === "string" && sheetCatatan.trim().length > 0 && sheetCatatan !== "-") {
-    const fromSheet = parseCatatanHarianString(sheetCatatan, defaultKejadian, defaultPetugas, defaultKel, defaultNip);
-    if (fromSheet.length > 0) {
-      return deduplicateAndSortLogs(fromSheet);
-    }
-  }
-
   const rawLogs: MonitoringDailyLog[] = [];
 
+  // 1. Ekstraksi log dari riwayatLog lokal yang tersimpan
   if (Array.isArray(patient.riwayatLog) && patient.riwayatLog.length > 0) {
     for (let i = 0; i < patient.riwayatLog.length; i++) {
       const log = patient.riwayatLog[i];
@@ -414,7 +406,16 @@ export function parseChronologicalLogs(patient: PatientMonitoringItem): Monitori
     }
   }
 
-  // Deduplikasi ketat
+  // 2. Gabungkan dengan catatan dari Google Spreadsheet jika ada
+  const sheetCatatan = patient.catatanPerkembanganHarian || (patient as any).catatanPerkembanganHarian;
+  if (sheetCatatan && typeof sheetCatatan === "string" && sheetCatatan.trim().length > 0 && sheetCatatan !== "-") {
+    const fromSheet = parseCatatanHarianString(sheetCatatan, defaultKejadian, defaultPetugas, defaultKel, defaultNip);
+    if (fromSheet.length > 0) {
+      rawLogs.push(...fromSheet);
+    }
+  }
+
+  // Deduplikasi ketat dan urutkan kronologis
   const deduplicated = deduplicateAndSortLogs(rawLogs);
 
   // Jika benar-benar kosong (kasus baru tanpa log sama sekali), buat 1 entri default Hari ke-1
@@ -1840,6 +1841,50 @@ export async function syncPatientsFromGoogleSheets(
           };
         };
 
+        // Helper fungsi resolusi Pertolongan Pertama (Mendukung multi-pilihan & kolom baru kustom)
+        const resolvePertolonganPertamaFromRow = (fallback: string = ""): {
+          text: string;
+          cuciKurang: string;
+          cuciLebih: string;
+          varDosis1: string;
+          sar: string;
+        } => {
+          const mainVal = String(getFieldFromRow(rd, ["Pertolongan Pertama", "pertolonganPertama", "col_28"], "")).trim();
+          const cKurang = String(getFieldFromRow(rd, ["Cuci luka < 12 jam", "Cuci Luka < 12 Jam", "cuciLukaKurang12Jam", "< 12 jam"], "")).trim();
+          const cLebih = String(getFieldFromRow(rd, ["Cuci luka > 12 jam", "Cuci Luka > 12 Jam", "cuciLukaLebih12Jam", "> 12 jam"], "")).trim();
+          const cVar1 = String(getFieldFromRow(rd, ["Var dosis 1, 1 dosis dan 1 dosis", "VAR Dosis 1", "Var Dosis 1", "varDosis1"], "")).trim();
+          const cSar = String(getFieldFromRow(rd, ["SAR", "Serum Anti Rabies", "sar"], "")).trim();
+
+          const collected: string[] = [];
+          if ((cKurang && cKurang !== "-" && !cKurang.toLowerCase().startsWith("tidak")) || mainVal.includes("< 12") || mainVal.includes("<12") || mainVal.toLowerCase().includes("kurang 12")) {
+            collected.push("Cuci luka < 12 jam");
+          }
+          if ((cLebih && cLebih !== "-" && !cLebih.toLowerCase().startsWith("tidak")) || mainVal.includes("> 12") || mainVal.includes(">12") || mainVal.toLowerCase().includes("lebih 12")) {
+            collected.push("Cuci luka > 12 jam");
+          }
+          if ((cVar1 && cVar1 !== "-" && !cVar1.toLowerCase().startsWith("tidak")) || mainVal.toLowerCase().includes("var dosis 1") || mainVal.toLowerCase().includes("1 dosis dan 1 dosis") || (mainVal.toLowerCase().includes("var") && mainVal.toLowerCase().includes("1 dosis"))) {
+            collected.push("Var dosis 1, 1 dosis dan 1 dosis");
+          }
+          if ((cSar && cSar !== "-" && !cSar.toLowerCase().startsWith("tidak")) || /\bSAR\b/i.test(mainVal) || mainVal.toLowerCase().includes("serum anti rabies")) {
+            collected.push("SAR");
+          }
+
+          let resText = mainVal;
+          if (collected.length > 0) {
+            resText = collected.join(", ");
+          } else if (!resText || resText === "-") {
+            resText = fallback || "Tidak Dilakukan";
+          }
+
+          return {
+            text: resText,
+            cuciKurang: collected.includes("Cuci luka < 12 jam") ? "Ya" : "-",
+            cuciLebih: collected.includes("Cuci luka > 12 jam") ? "Ya" : "-",
+            varDosis1: collected.includes("Var dosis 1, 1 dosis dan 1 dosis") ? "Ya" : "-",
+            sar: collected.includes("SAR") ? "Ya" : "-"
+          };
+        };
+
         // Cari apakah pasien sudah pernah tercatat sebelumnya (berdasarkan ID Kasus yang pasti, atau jika ID kosong dicocokkan nama)
         const existingIdx = latestPatients.findIndex((p) => {
           const matchId = (p.id_kasus || "").trim().toLowerCase() === sIdLower;
@@ -1862,25 +1907,85 @@ export async function syncPatientsFromGoogleSheets(
           const mergedVar7 = parseSpreadsheetVarDose(rawVar7, ex.jadwalVAR?.dosis7, normalizeDateToIso(tglKejadian, 7));
           const mergedVar21 = parseSpreadsheetVarDose(rawVar21, ex.jadwalVAR?.dosis21, normalizeDateToIso(tglKejadian, 21));
 
-          let mergedLogs: MonitoringDailyLog[] = [];
+          const currentLocalLogs = Array.isArray(ex.riwayatLog) ? ex.riwayatLog : [];
+          let parsedFromSheet: MonitoringDailyLog[] = [];
           if (rawCatatanLog && rawCatatanLog !== "-" && rawCatatanLog.trim().length > 0) {
-            const parsedFromSheet = parseCatatanHarianString(
+            parsedFromSheet = parseCatatanHarianString(
               rawCatatanLog,
               tglKejadian,
               rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : (ex.petugasPJ || "Petugas Puskesmas"),
               kelurahan && kelurahan !== "-" ? kelurahan : (ex.kelurahan || "Sananwetan"),
               nipPJ !== "-" ? nipPJ : (ex.nipPJ || "-")
             );
-            if (parsedFromSheet.length > 0) {
-              mergedLogs = deduplicateAndSortLogs(parsedFromSheet);
-            } else {
-              mergedLogs = deduplicateAndSortLogs(Array.isArray(ex.riwayatLog) ? ex.riwayatLog : []);
-            }
-          } else {
-            mergedLogs = deduplicateAndSortLogs(Array.isArray(ex.riwayatLog) ? ex.riwayatLog : []);
           }
+          // PENTING: Gabungkan riwayat log lokal dan spreadsheet (jangan pernah menghapus data yang baru ditambahkan secara lokal)
+          const mergedLogs = deduplicateAndSortLogs([...currentLocalLogs, ...parsedFromSheet]);
+          const combinedCatatanText = mergedLogs.length > 0
+            ? mergedLogs.map((log: any, idx: number) => `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] ${log.petugasNama ? `(${log.petugasNama})` : ""} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${log.suhuTubuh ? `${log.suhuTubuh}` : "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`).join("\n\n")
+            : (rawCatatanLog || "-");
 
-          const resolvedHariObs = rawHariObs > 0 ? rawHariObs : (ex.hariObservasiKe || 1);
+          const resolvedHariObs = Math.max(rawHariObs || 0, ex.hariObservasiKe || 0, 1);
+
+          // Susun fullData lengkap dari baris spreadsheet agar tampilan PDF 100% mutakhir dengan data spreadsheet
+          const fullDataFromSheet: Partial<FormGHPRData> = {
+            waktuKejadian: tglKejadian || String(getFieldFromRow(rd, ["Waktu Kejadian", "waktuKejadian", "Tanggal Gigitan", "col_2"], ex.waktuKejadian || "")),
+            alamatKejadian: String(getFieldFromRow(rd, ["Alamat Kejadian", "alamatKejadian", "col_3"], alamat !== "-" ? alamat : (ex.alamatKorban || ""))),
+            kelurahan: kelurahan && kelurahan !== "-" ? kelurahan : ex.kelurahan,
+            kelurahanCustom: "",
+            kecamatan: String(getFieldFromRow(rd, ["Kecamatan", "kecamatan", "col_5"], ex.kecamatan || "Sananwetan")),
+            kecamatanCustom: "",
+            kabupatenKota: String(getFieldFromRow(rd, ["Kabupaten/Kota", "kabupatenKota", "col_6"], ex.kabupatenKota || "Kota Blitar")),
+            provinsi: String(getFieldFromRow(rd, ["Provinsi", "provinsi", "col_7"], "Jawa Timur")),
+            sumberInfo: String(getFieldFromRow(rd, ["Sumber Informasi", "sumberInfo", "col_8"], "Laporan Petugas Faskes")),
+            kronologi: String(getFieldFromRow(rd, ["Kronologi Kejadian", "kronologi", "Kronologi", "col_9"], ex.fullData?.kronologi || `Kasus gigitan HPR di wilayah Kel. ${kelurahan}`)),
+            spesiesHPR: spesiesHPR || ex.spesiesHPR,
+            spesiesLain: String(getFieldFromRow(rd, ["Spesies Lain", "spesiesLain"], "")),
+            ras: String(getFieldFromRow(rd, ["Ras Hewan", "rasHewan", "ras", "col_11"], ex.rasHewan || "Lokal")),
+            jkHewan: String(getFieldFromRow(rd, ["Jenis Kelamin Hewan", "jkHewan", "col_12"], ex.fullData?.jkHewan || "Jantan")),
+            umurHewan: String(getFieldFromRow(rd, ["Umur Hewan", "umurHewan", "col_13"], ex.fullData?.umurHewan || "1")),
+            satuanUmur: String(getFieldFromRow(rd, ["Satuan Umur", "satuanUmur"], ex.fullData?.satuanUmur || "Tahun")),
+            metodePelihara: String(getFieldFromRow(rd, ["Metode Pemeliharaan", "metodePelihara", "col_14"], ex.fullData?.metodePelihara || "Diliarkan / Bebas")),
+            asalHewan: String(getFieldFromRow(rd, ["Asal Hewan", "asalHewan"], ex.fullData?.asalHewan || "Lokal")),
+            pakan: String(getFieldFromRow(rd, ["Pakan", "pakan"], ex.fullData?.pakan || "Sisa Makanan Rumah Tangga")),
+            biosekuriti: String(getFieldFromRow(rd, ["Biosekuriti", "biosekuriti"], ex.fullData?.biosekuriti || "Tidak Ada")),
+            sumberAir: String(getFieldFromRow(rd, ["Sumber Air", "sumberAir"], ex.fullData?.sumberAir || "Sumur")),
+            kondisiHewan: kondisiHewan !== "-" ? kondisiHewan : ex.kondisiHewan,
+            pemilikHewan: String(getFieldFromRow(rd, ["Nama Pemilik", "pemilikHewan", "col_18"], ex.pemilikHewan || "-")),
+            alamatPemilik: String(getFieldFromRow(rd, ["Alamat Pemilik", "alamatPemilik", "col_19"], ex.alamatPemilik || "-")),
+            kontakPemilik: String(getFieldFromRow(rd, ["Kontak Pemilik", "kontakPemilik", "col_20"], ex.kontakPemilik || "-")),
+            riwayatVaksin: String(getFieldFromRow(rd, ["Riwayat Vaksinasi", "riwayatVaksin", "col_16"], ex.fullData?.riwayatVaksin || "Tidak Tahu")),
+            tanggalVaksin: String(getFieldFromRow(rd, ["Tanggal Vaksinasi", "tanggalVaksin", "col_17"], ex.fullData?.tanggalVaksin || "")),
+            namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
+            umurKorban: umur !== "-" ? umur : ex.umurKorban,
+            noHpKorban: noHp !== "-" ? noHp : (ex.noHpKorban || ex.kontakKorban || "-"),
+            alamatKorban: alamat !== "-" ? alamat : ex.alamatKorban,
+            jkKorban: jk || ex.jkKorban,
+            kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], ex.fullData?.kondisiKorban || "Sehat")),
+            kondisiUmumKorban: String(getFieldFromRow(rd, ["Kondisi Umum Korban", "kondisiUmumKorban", "Kondisi Umum", "Keadaan Umum Korban", "Kondisi Korban", "kondisiKorban"], ex.fullData?.kondisiUmumKorban || ex.fullData?.kondisiKorban || "Sehat")),
+            pertolonganPertama: resolvePertolonganPertamaFromRow(ex.pertolonganPertama || "Cuci luka sabun air mengalir 15 menit").text,
+            cuciLukaKurang12Jam: resolvePertolonganPertamaFromRow(ex.pertolonganPertama).cuciKurang,
+            cuciLukaLebih12Jam: resolvePertolonganPertamaFromRow(ex.pertolonganPertama).cuciLebih,
+            varDosis1: resolvePertolonganPertamaFromRow(ex.pertolonganPertama).varDosis1,
+            sar: resolvePertolonganPertamaFromRow(ex.pertolonganPertama).sar,
+            detailPertolongan: String(getFieldFromRow(rd, ["Detail Pertolongan", "detailPertolongan"], ex.fullData?.detailPertolongan || "")),
+            kondisiLuka: kondisiLuka !== "-" ? kondisiLuka : ex.kondisiLuka,
+            lokasiLuka: String(getFieldFromRow(rd, ["Lokasi Luka", "lokasiLuka", "col_27"], ex.lokasiLuka || "Tangan")),
+            tindakanHPR: String(getFieldFromRow(rd, ["Tindakan terhadap HPR", "tindakanHPR", "col_30"], ex.tindakanHPR || "Observasi 14 Hari")),
+            tindakanKasus: String(getFieldFromRow(rd, ["Tindakan Kasus", "tindakanKasus", "col_29"], ex.tindakanKasus || "Pemberian VAR")),
+            tindakanMasyarakat: String(getFieldFromRow(rd, ["Tindakan Masyarakat", "tindakanMasyarakat"], ex.fullData?.tindakanMasyarakat || "-")),
+            rekomendasi: rekomendasi !== "-" ? rekomendasi : ex.rekomendasi,
+            sumberLaporan: String(getFieldFromRow(rd, ["Sumber Laporan", "sumberLaporan"], ex.fullData?.sumberLaporan || "Laporan Petugas Faskes")),
+            fotoDokumentasi: String(getFieldFromRow(rd, ["Foto Dokumentasi", "fotoDokumentasi", "foto"], ex.fullData?.fotoDokumentasi || "")),
+            timKetua: String(getFieldFromRow(rd, ["Ketua Tim PE", "timKetua", "col_31"], ex.fullData?.timKetua || petugasPJ)),
+            timAnggota: String(getFieldFromRow(rd, ["Anggota Tim PE", "timAnggota", "col_32"], ex.fullData?.timAnggota || "Kader Kesehatan Kelurahan")),
+            tanggalPelaksanaan: String(getFieldFromRow(rd, ["Tanggal Pelaksanaan", "tanggalPelaksanaan", "col_33"], ex.fullData?.tanggalPelaksanaan || tglKejadian || new Date().toISOString().slice(0, 10))),
+            pelaksanaNama: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : (petugasPJ !== "-" ? petugasPJ : ex.petugasPJ),
+            pelaksanaNIP: nipPJ !== "-" ? nipPJ : ex.nipPJ,
+            statusPemantauan: (statusPemantauan as StatusPemantauanPasien) || ex.statusPemantauan || "Dalam Pemantauan (Aktif)",
+            hariObservasiKe: resolvedHariObs,
+            statusHewanObservasi: (rawStatusHewanObs && rawStatusHewanObs !== "-" ? rawStatusHewanObs : ex.statusHewanObservasi) as StatusHewanObservasi,
+            catatanPerkembanganHarian: combinedCatatanText
+          };
 
           const merged: PatientMonitoringItem = {
             ...ex,
@@ -1890,11 +1995,21 @@ export async function syncPatientsFromGoogleSheets(
             alamatKorban: alamat !== "-" ? alamat : ex.alamatKorban,
             kontakKorban: noHp !== "-" ? noHp : (ex.kontakKorban || ex.noHpKorban || "-"),
             noHpKorban: noHp !== "-" ? noHp : (ex.noHpKorban || ex.kontakKorban || "-"),
+            kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], ex.kondisiKorban || "Sehat")),
+            kondisiUmumKorban: String(getFieldFromRow(rd, ["Kondisi Umum Korban", "kondisiUmumKorban", "Kondisi Umum", "Keadaan Umum Korban", "Kondisi Korban", "kondisiKorban"], ex.kondisiUmumKorban || ex.kondisiKorban || "Sehat")),
             umurKorban: umur !== "-" ? umur : ex.umurKorban,
             jkKorban: jk || ex.jkKorban,
             kondisiLuka: kondisiLuka !== "-" ? kondisiLuka : ex.kondisiLuka,
             kondisiHewan: kondisiHewan !== "-" ? kondisiHewan : ex.kondisiHewan,
             spesiesHPR: spesiesHPR || ex.spesiesHPR,
+            rasHewan: String(fullDataFromSheet.ras || ex.rasHewan || "-"),
+            pemilikHewan: String(fullDataFromSheet.pemilikHewan || ex.pemilikHewan || "-"),
+            alamatPemilik: String(fullDataFromSheet.alamatPemilik || ex.alamatPemilik || "-"),
+            kontakPemilik: String(fullDataFromSheet.kontakPemilik || ex.kontakPemilik || "-"),
+            pertolonganPertama: String(fullDataFromSheet.pertolonganPertama || ex.pertolonganPertama || "-"),
+            tindakanKasus: String(fullDataFromSheet.tindakanKasus || ex.tindakanKasus || "-"),
+            tindakanHPR: String(fullDataFromSheet.tindakanHPR || ex.tindakanHPR || "Observasi 14 Hari"),
+            lokasiLuka: String(fullDataFromSheet.lokasiLuka || ex.lokasiLuka || "-"),
             petugasPJ: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : (petugasPJ !== "-" ? petugasPJ : ex.petugasPJ),
             nipPJ: nipPJ !== "-" ? nipPJ : ex.nipPJ,
             rekomendasi: rekomendasi !== "-" ? rekomendasi : ex.rekomendasi,
@@ -1908,7 +2023,21 @@ export async function syncPatientsFromGoogleSheets(
               dosis21: mergedVar21
             },
             riwayatLog: mergedLogs,
-            catatanPerkembanganHarian: rawCatatanLog,
+            catatanPerkembanganHarian: combinedCatatanText,
+            fullData: {
+              ...(ex.fullData || {}),
+              ...fullDataFromSheet,
+              namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
+              umurKorban: umur !== "-" ? umur : ex.umurKorban,
+              jkKorban: jk || ex.jkKorban,
+              alamatKorban: alamat !== "-" ? alamat : ex.alamatKorban,
+              noHpKorban: noHp !== "-" ? noHp : (ex.noHpKorban || ex.kontakKorban || "-"),
+              kelurahan: kelurahan && kelurahan !== "-" ? kelurahan : ex.kelurahan,
+              kondisiLuka: kondisiLuka !== "-" ? kondisiLuka : ex.kondisiLuka,
+              kondisiHewan: kondisiHewan !== "-" ? kondisiHewan : ex.kondisiHewan,
+              rekomendasi: rekomendasi !== "-" ? rekomendasi : ex.rekomendasi,
+              catatanPerkembanganHarian: combinedCatatanText
+            } as any,
             lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : (ex.lastUpdated || new Date().toLocaleString("id-ID"))
           };
 
@@ -1949,6 +2078,67 @@ export async function syncPatientsFromGoogleSheets(
             ];
           }
 
+          // Susun fullData lengkap untuk kasus baru dari Google Sheets
+          const fullDataNewSheet: Partial<FormGHPRData> = {
+            waktuKejadian: tglKejadian || String(getFieldFromRow(rd, ["Waktu Kejadian", "waktuKejadian", "Tanggal Gigitan", "col_2"], "")),
+            alamatKejadian: String(getFieldFromRow(rd, ["Alamat Kejadian", "alamatKejadian", "col_3"], alamat)),
+            kelurahan: kelurahan,
+            kelurahanCustom: "",
+            kecamatan: String(getFieldFromRow(rd, ["Kecamatan", "kecamatan", "col_5"], "Sananwetan")),
+            kecamatanCustom: "",
+            kabupatenKota: String(getFieldFromRow(rd, ["Kabupaten/Kota", "kabupatenKota", "col_6"], "Kota Blitar")),
+            provinsi: String(getFieldFromRow(rd, ["Provinsi", "provinsi", "col_7"], "Jawa Timur")),
+            sumberInfo: String(getFieldFromRow(rd, ["Sumber Informasi", "sumberInfo", "col_8"], "Laporan Petugas Faskes")),
+            kronologi: String(getFieldFromRow(rd, ["Kronologi Kejadian", "kronologi", "Kronologi", "col_9"], `Kasus gigitan HPR di wilayah Kel. ${kelurahan}`)),
+            spesiesHPR: spesiesHPR,
+            spesiesLain: String(getFieldFromRow(rd, ["Spesies Lain", "spesiesLain"], "")),
+            ras: String(getFieldFromRow(rd, ["Ras Hewan", "rasHewan", "ras", "col_11"], "Lokal")),
+            jkHewan: String(getFieldFromRow(rd, ["Jenis Kelamin Hewan", "jkHewan", "col_12"], "Jantan")),
+            umurHewan: String(getFieldFromRow(rd, ["Umur Hewan", "umurHewan", "col_13"], "1")),
+            satuanUmur: String(getFieldFromRow(rd, ["Satuan Umur", "satuanUmur"], "Tahun")),
+            metodePelihara: String(getFieldFromRow(rd, ["Metode Pemeliharaan", "metodePelihara", "col_14"], "Diliarkan / Bebas")),
+            asalHewan: String(getFieldFromRow(rd, ["Asal Hewan", "asalHewan"], "Lokal")),
+            pakan: String(getFieldFromRow(rd, ["Pakan", "pakan"], "Sisa Makanan Rumah Tangga")),
+            biosekuriti: String(getFieldFromRow(rd, ["Biosekuriti", "biosekuriti"], "Tidak Ada")),
+            sumberAir: String(getFieldFromRow(rd, ["Sumber Air", "sumberAir"], "Sumur")),
+            kondisiHewan: kondisiHewan,
+            pemilikHewan: String(getFieldFromRow(rd, ["Nama Pemilik", "pemilikHewan", "col_18"], "-")),
+            alamatPemilik: String(getFieldFromRow(rd, ["Alamat Pemilik", "alamatPemilik", "col_19"], "-")),
+            kontakPemilik: String(getFieldFromRow(rd, ["Kontak Pemilik", "kontakPemilik", "col_20"], "-")),
+            riwayatVaksin: String(getFieldFromRow(rd, ["Riwayat Vaksinasi", "riwayatVaksin", "col_16"], "Tidak Tahu")),
+            tanggalVaksin: String(getFieldFromRow(rd, ["Tanggal Vaksinasi", "tanggalVaksin", "col_17"], "")),
+            namaKorban: nama,
+            umurKorban: umur,
+            noHpKorban: noHp,
+            alamatKorban: alamat,
+            jkKorban: jk,
+            kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], "Sehat")),
+            kondisiUmumKorban: String(getFieldFromRow(rd, ["Kondisi Umum Korban", "kondisiUmumKorban", "Kondisi Umum", "Keadaan Umum Korban", "Kondisi Korban", "kondisiKorban"], "Sehat")),
+            pertolonganPertama: resolvePertolonganPertamaFromRow("Cuci luka sabun air mengalir 15 menit").text,
+            cuciLukaKurang12Jam: resolvePertolonganPertamaFromRow().cuciKurang,
+            cuciLukaLebih12Jam: resolvePertolonganPertamaFromRow().cuciLebih,
+            varDosis1: resolvePertolonganPertamaFromRow().varDosis1,
+            sar: resolvePertolonganPertamaFromRow().sar,
+            detailPertolongan: String(getFieldFromRow(rd, ["Detail Pertolongan", "detailPertolongan"], "")),
+            kondisiLuka: kondisiLuka,
+            lokasiLuka: String(getFieldFromRow(rd, ["Lokasi Luka", "lokasiLuka", "col_27"], "Tangan")),
+            tindakanHPR: String(getFieldFromRow(rd, ["Tindakan terhadap HPR", "tindakanHPR", "col_30"], "Observasi 14 Hari")),
+            tindakanKasus: String(getFieldFromRow(rd, ["Tindakan Kasus", "tindakanKasus", "col_29"], "Pemberian VAR")),
+            tindakanMasyarakat: String(getFieldFromRow(rd, ["Tindakan Masyarakat", "tindakanMasyarakat"], "-")),
+            rekomendasi: rekomendasi,
+            sumberLaporan: String(getFieldFromRow(rd, ["Sumber Laporan", "sumberLaporan"], "Laporan Petugas Faskes")),
+            fotoDokumentasi: String(getFieldFromRow(rd, ["Foto Dokumentasi", "fotoDokumentasi", "foto"], "")),
+            timKetua: String(getFieldFromRow(rd, ["Ketua Tim PE", "timKetua", "col_31"], petugasPJ)),
+            timAnggota: String(getFieldFromRow(rd, ["Anggota Tim PE", "timAnggota", "col_32"], "Kader Kesehatan Kelurahan")),
+            tanggalPelaksanaan: String(getFieldFromRow(rd, ["Tanggal Pelaksanaan", "tanggalPelaksanaan", "col_33"], tglKejadian || new Date().toISOString().slice(0, 10))),
+            pelaksanaNama: petugasPJ,
+            pelaksanaNIP: nipPJ,
+            statusPemantauan: (statusPemantauan as StatusPemantauanPasien) || "Dalam Pemantauan (Aktif)",
+            hariObservasiKe: rawHariObs || 1,
+            statusHewanObservasi: (rawStatusHewanObs && rawStatusHewanObs !== "-" ? rawStatusHewanObs : "Sehat / Normal (Observasi)") as StatusHewanObservasi,
+            catatanPerkembanganHarian: rawCatatanLog
+          };
+
           const newPatient: PatientMonitoringItem = {
             id_kasus: sId,
             timestamp_submit: waktuSubmit || new Date().toLocaleString("id-ID"),
@@ -1968,6 +2158,8 @@ export async function syncPatientsFromGoogleSheets(
             pemilikHewan: String(getFieldFromRow(rd, ["Nama Pemilik", "pemilikHewan"], "-")),
             alamatPemilik: String(getFieldFromRow(rd, ["Alamat Pemilik", "alamatPemilik"], "-")),
             kontakPemilik: String(getFieldFromRow(rd, ["Kontak Pemilik", "kontakPemilik"], "-")),
+            kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], "Sehat")),
+            kondisiUmumKorban: String(getFieldFromRow(rd, ["Kondisi Umum Korban", "kondisiUmumKorban", "Kondisi Umum", "Keadaan Umum Korban", "Kondisi Korban", "kondisiKorban"], "Sehat")),
             kondisiLuka: kondisiLuka,
             lokasiLuka: String(getFieldFromRow(rd, ["Lokasi Luka", "lokasiLuka"], "-")),
             pertolonganPertama: String(getFieldFromRow(rd, ["Pertolongan Pertama", "pertolonganPertama"], "-")),
@@ -1989,6 +2181,19 @@ export async function syncPatientsFromGoogleSheets(
             catatanPerkembanganHarian: rawCatatanLog,
             petugasPJ: rawPJMonitoring && rawPJMonitoring !== "-" ? rawPJMonitoring : petugasPJ,
             nipPJ: nipPJ,
+            fullData: {
+              ...fullDataNewSheet,
+              namaKorban: nama,
+              umurKorban: umur,
+              jkKorban: jk,
+              alamatKorban: alamat,
+              noHpKorban: noHp,
+              kelurahan: kelurahan,
+              kondisiLuka: kondisiLuka,
+              kondisiHewan: kondisiHewan,
+              rekomendasi: rekomendasi,
+              catatanPerkembanganHarian: rawCatatanLog
+            } as any,
             lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : new Date().toLocaleString("id-ID")
           };
 

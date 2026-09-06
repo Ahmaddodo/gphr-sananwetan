@@ -33,7 +33,13 @@ export interface FormGHPRData {
   noHpKorban: string;
   jkKorban: string;
   kondisiKorban: string;
+  kondisiUmumKorban?: string;
   pertolonganPertama: string;
+  pertolonganPertamaList?: string[];
+  cuciLukaKurang12Jam?: string;
+  cuciLukaLebih12Jam?: string;
+  varDosis1?: string;
+  sar?: string;
   detailPertolongan: string;
   kondisiLuka: string;
   lokasiLuka: string;
@@ -51,6 +57,13 @@ export interface FormGHPRData {
   tandaTanganUrl?: string;
   tandaTanganOtomatis?: boolean;
   jenisTandaTangan?: "otomatis" | "gambar" | "pad";
+  id_kasus?: string;
+  statusPemantauan?: string;
+  hariObservasiKe?: number | string;
+  statusHewanObservasi?: string;
+  jadwalVAR?: Record<string, any>;
+  catatanPerkembanganHarian?: string;
+  riwayatLog?: any[];
 }
 
 export type FormErrors = Partial<Record<keyof FormGHPRData, string>>;
@@ -123,6 +136,7 @@ export interface MonitoringDailyLog {
   petugasNIP?: string;
   kelurahan: string;
   kondisiKorban: string;
+  kondisiUmumKorban?: string;
   statusLuka: string;
   kondisiHewan: string;
   suhuTubuh?: string;
@@ -156,6 +170,8 @@ export interface PatientMonitoringItem {
   alamatKorban: string;
   kontakKorban: string;
   noHpKorban?: string;
+  kondisiKorban?: string;
+  kondisiUmumKorban?: string;
   kelurahan: string;
   kecamatan: string;
   kabupatenKota: string;
@@ -168,6 +184,11 @@ export interface PatientMonitoringItem {
   kondisiLuka: string;
   lokasiLuka: string;
   pertolonganPertama: string;
+  pertolonganPertamaList?: string[];
+  cuciLukaKurang12Jam?: string;
+  cuciLukaLebih12Jam?: string;
+  varDosis1?: string;
+  sar?: string;
   detailPertolongan?: string;
   tindakanKasus: string;
   tindakanHPR?: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Printer, X, Download, FileText, Sparkles, Loader2, Layers, CheckCircle2, AlertCircle } from "lucide-react";
-import { FormGHPRData } from "../types";
+import { Printer, X, Download, FileText, Sparkles, Loader2, Layers, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { FormGHPRData, PatientMonitoringItem } from "../types";
 import { GHPRPdfDocument } from "./GHPRPdfDocument";
 import { OFFICIAL_SIGNATURE_STAMP_URL, DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP, getOfficialSignatureUrl } from "./SignatureData";
 import {
@@ -8,6 +8,7 @@ import {
   estimateFormContentHeight,
   FormMeasurementResult
 } from "../lib/pdfMeasurement";
+import { pullAllCloudData, getAllPatients } from "../lib/patientMonitoring";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas-pro";
 
@@ -19,6 +20,10 @@ interface PrintPDFModalProps {
   getFinalKelurahan: () => string;
   getFinalKecamatan: () => string;
   getFinalKabKota: () => string;
+  patientsList?: PatientMonitoringItem[];
+  onRefreshPatients?: () => void;
+  webAppUrl?: string;
+  onSelectPatient?: (patient: PatientMonitoringItem) => void;
 }
 
 export const samplePdfData: FormGHPRData = {
@@ -121,13 +126,46 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
   getFinalKelurahan,
   getFinalKecamatan,
   getFinalKabKota,
+  patientsList,
+  onRefreshPatients,
+  webAppUrl,
+  onSelectPatient,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isSyncingFromCloud, setIsSyncingFromCloud] = useState(false);
+  const [cloudSyncMsg, setCloudSyncMsg] = useState<string | null>(null);
   const [paperSize, setPaperSize] = useState<"legal" | "f4" | "a4">("legal");
   const [measurement, setMeasurement] = useState<FormMeasurementResult>(() =>
     estimateFormContentHeight(formData)
   );
+
+  const handleSyncFromSpreadsheet = async () => {
+    setIsSyncingFromCloud(true);
+    setCloudSyncMsg(null);
+    try {
+      const res = await pullAllCloudData(webAppUrl);
+      if (onRefreshPatients) {
+        onRefreshPatients();
+      }
+      // Ambil data pasien mutakhir yang baru diunduh dari spreadsheet
+      const latestList = getAllPatients();
+      const currentId = (formData.id_kasus || "").trim().toLowerCase();
+      if (currentId) {
+        const freshPatient = latestList.find(p => (p.id_kasus || "").trim().toLowerCase() === currentId);
+        if (freshPatient && onSelectPatient) {
+          onSelectPatient(freshPatient);
+        }
+      }
+      setCloudSyncMsg(`✓ Data PDF berhasil dimutakhirkan langsung dari spreadsheet (${res.patientsCount} pasien)!`);
+      setTimeout(() => setCloudSyncMsg(null), 5000);
+    } catch (e: any) {
+      setCloudSyncMsg(`Gagal memuat data spreadsheet: ${e?.message || "Koneksi bermasalah"}`);
+      setTimeout(() => setCloudSyncMsg(null), 5000);
+    } finally {
+      setIsSyncingFromCloud(false);
+    }
+  };
 
   useEffect(() => {
     if (showPdfModal) {
@@ -488,9 +526,49 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Pemilih Kasus Pasien Terdaftar / Dari Spreadsheet */}
+          <div className="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700 text-xs">
+            <span className="text-slate-400 px-1 text-[11px] font-medium hidden lg:inline-flex">
+              Pilih Pasien:
+            </span>
+            <select
+              value={(formData.id_kasus || "").trim()}
+              onChange={(e) => {
+                const chosenId = e.target.value.trim().toLowerCase();
+                if (!chosenId) return;
+                const pool = (patientsList && patientsList.length > 0 ? patientsList : getAllPatients());
+                const targetPatient = pool.find(p => (p.id_kasus || "").trim().toLowerCase() === chosenId);
+                if (targetPatient && onSelectPatient) {
+                  onSelectPatient(targetPatient);
+                }
+              }}
+              className="bg-slate-900 text-white text-xs rounded px-2 py-1 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[190px] sm:max-w-[240px] truncate cursor-pointer"
+              title="Pilih data pasien dari hasil sinkronisasi spreadsheet untuk dicetak"
+            >
+              <option value="">{formData.id_kasus ? `Kasus: ${formData.id_kasus}` : "-- Pilih Data Pasien --"}</option>
+              {(patientsList && patientsList.length > 0 ? patientsList : getAllPatients()).map((p) => (
+                <option key={p.id_kasus} value={p.id_kasus}>
+                  {p.id_kasus} • {p.namaKorban || "Tanpa Nama"} ({p.kelurahan || "-"})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tombol Segarkan Data dari Spreadsheet */}
+          <button
+            type="button"
+            onClick={handleSyncFromSpreadsheet}
+            disabled={isSyncingFromCloud}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 active:scale-95 disabled:opacity-50 text-xs font-bold text-cyan-300 px-3 py-1.5 transition cursor-pointer shadow-xs"
+            title="Tarik data terbaru dari Google Spreadsheet ke dalam pratinjau PDF"
+          >
+            <RefreshCw size={13} className={isSyncingFromCloud ? "animate-spin text-cyan-400" : ""} />
+            <span>{isSyncingFromCloud ? "Sinkron..." : "Tarik Spreadsheet"}</span>
+          </button>
+
           {/* Pilihan Ukuran Kertas */}
           <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 text-xs">
-            <span className="text-slate-400 px-2 flex items-center gap-1 text-[11px] font-medium hidden md:inline-flex">
+            <span className="text-slate-400 px-2 flex items-center gap-1 text-[11px] font-medium hidden xl:inline-flex">
               <Layers size={12} /> Kertas:
             </span>
             <button
@@ -534,10 +612,10 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
           <button
             type="button"
             onClick={handleLoadSample}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-300 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1.5 text-xs font-bold text-amber-300 transition cursor-pointer"
             title="Isi form dengan contoh data Jerolin Athariz Wija"
           >
-            <Sparkles size={13} /> Contoh Data
+            <Sparkles size={13} /> Contoh
           </button>
 
           {/* Tombol Unduh PDF */}
@@ -550,15 +628,15 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
           >
             {isGenerating ? (
               <>
-                <Loader2 size={15} className="animate-spin" /> Memproses PDF...
+                <Loader2 size={15} className="animate-spin" /> Memproses...
               </>
             ) : downloadSuccess ? (
               <>
-                <CheckCircle2 size={15} className="text-emerald-200" /> Berhasil Diunduh!
+                <CheckCircle2 size={15} className="text-emerald-200" /> Berhasil!
               </>
             ) : (
               <>
-                <Download size={15} /> Download PDF
+                <Download size={15} /> Unduh PDF
               </>
             )}
           </button>
@@ -570,19 +648,36 @@ export const PrintPDFModal: React.FC<PrintPDFModalProps> = ({
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider transition shadow-sm cursor-pointer"
             title="Buka Dialog Cetak Browser / Simpan PDF"
           >
-            <Printer size={15} /> Dialog Cetak
+            <Printer size={15} /> Cetak
           </button>
 
           <button
             type="button"
             onClick={() => setShowPdfModal(false)}
             className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition ml-1 cursor-pointer"
-            title="Tutup Modal"
+            title="Tutup Modal Pratinjau PDF"
           >
             <X size={18} />
           </button>
         </div>
       </div>
+
+      {/* Status Bar info jika berhasil sync dari spreadsheet */}
+      {cloudSyncMsg && (
+        <div className="bg-cyan-700 text-white text-xs px-4 py-2 flex items-center justify-between print:hidden border-b border-cyan-800 animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={15} className="text-cyan-200 shrink-0" />
+            <span className="font-medium">{cloudSyncMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCloudSyncMsg(null)}
+            className="text-cyan-200 hover:text-white ml-2 cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Status Bar info jika berhasil unduh */}
       {downloadSuccess && (

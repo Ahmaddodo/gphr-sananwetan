@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Clock, Users, User, FileText, ChevronRight, TriangleAlert, Camera, Trash2, Upload, Lock, FileSpreadsheet, ExternalLink, Database, Send, Settings2, UserCheck } from "lucide-react";
 import { FormGHPRData, FormErrors, UserAccessProfile } from "../types";
 import { FormInput } from "./FormInput";
+import { PertolonganPertamaSelector } from "./PertolonganPertamaSelector";
 import { SignaturePad } from "./SignaturePad";
 import { DEFAULT_PELAKSANA_NAMA, DEFAULT_PELAKSANA_NIP } from "./SignatureData";
 import { getOfficerProfiles, getActiveUserProfile } from "../lib/patientMonitoring";
@@ -732,16 +733,17 @@ export const FormSteps: React.FC<FormStepsProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FormInput
-              label="Pertolongan Pertama Dilakukan?"
-              k="pertolonganPertama"
-              options={["Ya", "Tidak"]}
-              formData={formData}
-              errors={errors}
+          {/* Pertolongan Pertama Multi-Pilihan */}
+          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-4 sm:p-5 shadow-2xs">
+            <PertolonganPertamaSelector
+              value={formData.pertolonganPertama}
               updateField={updateField}
+              error={errors.pertolonganPertama}
               showAsterisk={showAsterisk}
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <FormInput
               label="Kondisi Luka"
               k="kondisiLuka"
@@ -757,22 +759,22 @@ export const FormSteps: React.FC<FormStepsProps> = ({
               updateField={updateField}
               showAsterisk={showAsterisk}
             />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <FormInput
-              label="Detail Pertolongan Pertama"
-              k="detailPertolongan"
-              placeholder="Cuci sabun 15 menit, povidone iodine..."
+              label="Lokasi Luka"
+              k="lokasiLuka"
+              placeholder="Tangan kanan, kaki kiri, wajah..."
               formData={formData}
               errors={errors}
               updateField={updateField}
               showAsterisk={showAsterisk}
             />
+          </div>
+
+          <div className="grid grid-cols-1 gap-5">
             <FormInput
-              label="Lokasi Luka"
-              k="lokasiLuka"
-              placeholder="Tangan kanan, kaki kiri, wajah..."
+              label="Detail Pertolongan Pertama (Catatan Tambahan)"
+              k="detailPertolongan"
+              placeholder="Misal: Diberikan povidone iodine, perban steril, antibiotik topikal..."
               formData={formData}
               errors={errors}
               updateField={updateField}

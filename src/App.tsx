@@ -117,6 +117,7 @@ const initialFormState: FormGHPRData = {
   noHpKorban: "",
   jkKorban: "",
   kondisiKorban: "",
+  kondisiUmumKorban: "",
   pertolonganPertama: "",
   detailPertolongan: "",
   kondisiLuka: "",
@@ -660,7 +661,8 @@ export default function App() {
       umurKorban: patient.umurKorban || "",
       alamatKorban: patient.alamatKorban || "",
       jkKorban: patient.jkKorban || "Laki-laki",
-      kondisiKorban: raw.kondisiKorban || "Luka gigitan dalam perawatan",
+      kondisiKorban: raw.kondisiUmumKorban || raw.kondisiKorban || patient.kondisiUmumKorban || patient.kondisiKorban || "Sehat",
+      kondisiUmumKorban: raw.kondisiUmumKorban || raw.kondisiKorban || patient.kondisiUmumKorban || patient.kondisiKorban || "Sehat",
       pertolonganPertama: patient.pertolonganPertama || "Cuci luka sabun air mengalir 15 menit",
       detailPertolongan: patient.detailPertolongan || "",
       kondisiLuka: patient.kondisiLuka || "Luka gigitan",
@@ -700,18 +702,20 @@ export default function App() {
     const raw: Record<string, any> = patient.fullData || {};
     const printForm: FormGHPRData = {
       ...initialFormState,
+      ...(patient.fullData || {}),
+      id_kasus: patient.id_kasus,
       waktuKejadian: patient.waktuKejadian || raw.waktuKejadian || "",
       alamatKejadian: patient.alamatKorban || raw.alamatKejadian || "",
       kelurahan: patient.kelurahan || raw.kelurahan || "",
       kelurahanCustom: patient.kelurahan || "",
-      kecamatan: patient.kecamatan || "Sananwetan",
+      kecamatan: patient.kecamatan || raw.kecamatan || "Sananwetan",
       kecamatanCustom: "",
-      kabupatenKota: patient.kabupatenKota || "Kota Blitar",
+      kabupatenKota: patient.kabupatenKota || raw.kabupatenKota || "Kota Blitar",
       kabupatenKotaCustom: "",
       provinsi: raw.provinsi || "Jawa Timur",
       sumberInfo: raw.sumberInfo || "Laporan Petugas Puskesmas",
       kronologi: raw.kronologi || `Kasus gigitan HPR di wilayah Kel. ${patient.kelurahan || "-"}`,
-      spesiesHPR: patient.spesiesHPR || "Anjing",
+      spesiesHPR: patient.spesiesHPR || raw.spesiesHPR || "Anjing",
       spesiesLain: raw.spesiesLain || "",
       ras: patient.rasHewan || raw.ras || "Lokal",
       jkHewan: raw.jkHewan || "Jantan",
@@ -722,33 +726,39 @@ export default function App() {
       pakan: raw.pakan || "Sisa Makanan Rumah Tangga",
       biosekuriti: raw.biosekuriti || "Tidak Ada",
       sumberAir: raw.sumberAir || "Sumur",
-      kondisiHewan: patient.kondisiHewan || "Dalam Observasi",
-      pemilikHewan: patient.pemilikHewan || "-",
-      alamatPemilik: patient.alamatPemilik || "-",
-      kontakPemilik: patient.kontakPemilik || "-",
+      kondisiHewan: patient.kondisiHewan || raw.kondisiHewan || "Dalam Observasi",
+      pemilikHewan: patient.pemilikHewan || raw.pemilikHewan || "-",
+      alamatPemilik: patient.alamatPemilik || raw.alamatPemilik || "-",
+      kontakPemilik: patient.kontakPemilik || raw.kontakPemilik || "-",
       riwayatVaksin: raw.riwayatVaksin || "Tidak Tahu",
       tanggalVaksin: raw.tanggalVaksin || "",
-      namaKorban: patient.namaKorban || "",
-      umurKorban: patient.umurKorban || "",
-      noHpKorban: patient.noHpKorban || patient.kontakKorban || "-",
-      alamatKorban: patient.alamatKorban || "-",
-      jkKorban: patient.jkKorban || "Laki-laki",
+      namaKorban: patient.namaKorban || raw.namaKorban || "",
+      umurKorban: patient.umurKorban || raw.umurKorban || "",
+      noHpKorban: patient.noHpKorban || patient.kontakKorban || raw.noHpKorban || "-",
+      alamatKorban: patient.alamatKorban || raw.alamatKorban || "-",
+      jkKorban: patient.jkKorban || raw.jkKorban || "Laki-laki",
       kondisiKorban: raw.kondisiKorban || "Luka gigitan dalam perawatan",
-      pertolonganPertama: patient.pertolonganPertama || "Cuci luka sabun air mengalir 15 menit",
-      detailPertolongan: patient.detailPertolongan || patient.pertolonganPertama || "",
-      kondisiLuka: patient.kondisiLuka || "Kategori 2",
-      lokasiLuka: patient.lokasiLuka || "Tangan",
-      tindakanHPR: patient.tindakanHPR || "Observasi 14 Hari",
-      tindakanKasus: patient.tindakanKasus || "Pemberian VAR",
+      pertolonganPertama: patient.pertolonganPertama || raw.pertolonganPertama || "Cuci luka sabun air mengalir 15 menit",
+      detailPertolongan: patient.detailPertolongan || raw.detailPertolongan || patient.pertolonganPertama || "",
+      kondisiLuka: patient.kondisiLuka || raw.kondisiLuka || "Kategori 2",
+      lokasiLuka: patient.lokasiLuka || raw.lokasiLuka || "Tangan",
+      tindakanHPR: patient.tindakanHPR || raw.tindakanHPR || "Observasi 14 Hari",
+      tindakanKasus: patient.tindakanKasus || raw.tindakanKasus || "Pemberian VAR",
       tindakanMasyarakat: raw.tindakanMasyarakat || "-",
-      rekomendasi: patient.rekomendasi || "Observasi harian kondisi hewan dan korban",
+      rekomendasi: patient.rekomendasi || raw.rekomendasi || "Observasi harian kondisi hewan dan korban",
       sumberLaporan: raw.sumberLaporan || "Laporan Petugas Faskes",
       fotoDokumentasi: raw.fotoDokumentasi || "",
-      timKetua: raw.timKetua || currentUser?.nama || "Petugas Puskesmas",
+      timKetua: raw.timKetua || patient.petugasPJ || currentUser?.nama || "Petugas Puskesmas",
       timAnggota: raw.timAnggota || "Kader Kesehatan Kelurahan",
-      tanggalPelaksanaan: raw.tanggalPelaksanaan || new Date().toISOString().slice(0, 10),
-      pelaksanaNama: DEFAULT_PELAKSANA_NAMA,
-      pelaksanaNIP: DEFAULT_PELAKSANA_NIP,
+      tanggalPelaksanaan: raw.tanggalPelaksanaan || patient.waktuKejadian || new Date().toISOString().slice(0, 10),
+      pelaksanaNama: patient.petugasPJ || raw.pelaksanaNama || DEFAULT_PELAKSANA_NAMA,
+      pelaksanaNIP: patient.nipPJ || raw.pelaksanaNIP || DEFAULT_PELAKSANA_NIP,
+      statusPemantauan: patient.statusPemantauan || raw.statusPemantauan,
+      hariObservasiKe: patient.hariObservasiKe || raw.hariObservasiKe,
+      statusHewanObservasi: patient.statusHewanObservasi || raw.statusHewanObservasi,
+      jadwalVAR: patient.jadwalVAR || raw.jadwalVAR,
+      catatanPerkembanganHarian: patient.catatanPerkembanganHarian || raw.catatanPerkembanganHarian,
+      riwayatLog: patient.riwayatLog || raw.riwayatLog,
       tandaTanganUrl: OFFICIAL_SIGNATURE_STAMP_URL,
       tandaTanganOtomatis: false,
       jenisTandaTangan: "gambar"
@@ -834,7 +844,8 @@ export default function App() {
       umurKorban: raw["Umur Korban"] || caseItem.umurKorban || "",
       alamatKorban: raw["Alamat Korban"] || "",
       jkKorban: raw["Jenis Kelamin Korban"] || raw["JK Korban"] || "",
-      kondisiKorban: raw["Kondisi Korban"] || "",
+      kondisiKorban: raw["Kondisi Umum Korban"] || raw["Kondisi Umum"] || raw["Kondisi Korban"] || "",
+      kondisiUmumKorban: raw["Kondisi Umum Korban"] || raw["Kondisi Umum"] || raw["Kondisi Korban"] || "",
       pertolonganPertama: raw["Pertolongan Pertama"] || "",
       detailPertolongan: raw["Detail Pertolongan"] || "",
       kondisiLuka: raw["Kondisi Luka"] || caseItem.kondisiLuka || "",
@@ -908,7 +919,12 @@ export default function App() {
   };
 
   const updateField = (field: keyof FormGHPRData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+      ...(field === "kondisiKorban" ? { kondisiUmumKorban: value } : {}),
+      ...(field === "kondisiUmumKorban" ? { kondisiKorban: value } : {})
+    }));
     if (errors[field]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -1840,6 +1856,10 @@ export default function App() {
         getFinalKelurahan={getFinalKelurahan}
         getFinalKecamatan={getFinalKecamatan}
         getFinalKabKota={getFinalKabKota}
+        patientsList={patientsList}
+        onRefreshPatients={handleRefreshPatients}
+        webAppUrl={webAppUrl}
+        onSelectPatient={handleOpenPatientPdfPrint}
       />
 
       {/* Login Petugas Modal */}

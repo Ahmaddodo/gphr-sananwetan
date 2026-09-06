@@ -351,6 +351,13 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     // Pastikan log bersih, terurut, dan tidak ganda
     updatedLogs = deduplicateAndSortLogs(updatedLogs);
 
+    // Format Data Pemantauan Tambahan (Kolom 37 - 46)
+    const catatanLogText = updatedLogs.length > 0
+      ? updatedLogs.map((log: any, idx: number) => `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] ${log.petugasNama ? `(${log.petugasNama})` : ""} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${log.suhuTubuh ? `${log.suhuTubuh}` : "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`).join("\n\n")
+      : "-";
+
+    const lastUpdateTimestamp = new Date().toLocaleString("id-ID");
+
     const updatedItem: PatientMonitoringItem = {
       ...patient,
       statusPemantauan,
@@ -361,9 +368,20 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       rekomendasi,
       jadwalVAR,
       riwayatLog: updatedLogs,
+      catatanPerkembanganHarian: catatanLogText,
       petugasPJ: currentUser.nama,
       nipPJ: currentUser.nip,
-      lastUpdated: new Date().toLocaleString("id-ID")
+      lastUpdated: lastUpdateTimestamp,
+      fullData: {
+        ...(patient.fullData || {}),
+        kondisiLuka,
+        kondisiHewan: kondisiHewanText,
+        rekomendasi,
+        statusPemantauan,
+        hariObservasiKe: Number(hariObservasi),
+        statusHewanObservasi: statusHewan,
+        catatanPerkembanganHarian: catatanLogText,
+      } as any
     };
 
     // 1. Simpan ke Local Storage Monitoring
@@ -372,16 +390,10 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     // 2. Siapkan Payload Update Komprehensif untuk Google Spreadsheet
     const rawData: Record<string, any> = patient.fullData || {};
 
-    // Format Data Pemantauan Tambahan (Kolom 37 - 46)
-    const catatanLogText = updatedLogs.length > 0
-      ? updatedLogs.map((log: any, idx: number) => `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] ${log.petugasNama ? `(${log.petugasNama})` : ""} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${log.suhuTubuh ? `${log.suhuTubuh}` : "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`).join("\n\n")
-      : "-";
-
     const var0Text = jadwalVAR?.dosis0?.status ? `${jadwalVAR.dosis0.status}${jadwalVAR.dosis0.tanggal ? ` (${jadwalVAR.dosis0.tanggal})` : ""}${jadwalVAR.dosis0.lokasiPemberian ? ` - ${jadwalVAR.dosis0.lokasiPemberian}` : ""}` : "-";
     const var3Text = jadwalVAR?.dosis3?.status ? `${jadwalVAR.dosis3.status}${jadwalVAR.dosis3.tanggal ? ` (${jadwalVAR.dosis3.tanggal})` : ""}${jadwalVAR.dosis3.lokasiPemberian ? ` - ${jadwalVAR.dosis3.lokasiPemberian}` : ""}` : "-";
     const var7Text = jadwalVAR?.dosis7?.status ? `${jadwalVAR.dosis7.status}${jadwalVAR.dosis7.tanggal ? ` (${jadwalVAR.dosis7.tanggal})` : ""}${jadwalVAR.dosis7.lokasiPemberian ? ` - ${jadwalVAR.dosis7.lokasiPemberian}` : ""}` : "-";
     const var21Text = jadwalVAR?.dosis21?.status ? `${jadwalVAR.dosis21.status}${jadwalVAR.dosis21.tanggal ? ` (${jadwalVAR.dosis21.tanggal})` : ""}${jadwalVAR.dosis21.lokasiPemberian ? ` - ${jadwalVAR.dosis21.lokasiPemberian}` : ""}` : "-";
-    const lastUpdateTimestamp = new Date().toLocaleString("id-ID");
     const latestLogDate = updatedLogs.length > 0 && updatedLogs[0].tanggal
       ? updatedLogs[0].tanggal
       : new Date().toISOString().slice(0, 10);

@@ -475,13 +475,25 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
                 </td>
               </tr>
 
-              {/* SECTION XI - Keterangan Lain */}
+              {/* SECTION XI - Keterangan Lain & Catatan Pemantauan */}
               <tr className="border-b border-black">
                 <td className="border-r border-black p-1 font-bold align-top">
                   XI. Keterangan Lain
                 </td>
                 <td className="p-1 align-top">
-                  {formData.sumberLaporan || "-"}
+                  <div>{formData.sumberLaporan || "Laporan Petugas Puskesmas"}</div>
+                  {(formData.catatanPerkembanganHarian || formData.statusPemantauan) && (
+                    <div className="mt-1 pt-1 border-t border-slate-300 text-[10px] space-y-0.5">
+                      <div className="font-semibold text-slate-800">
+                        Status Pemantauan: {formData.statusPemantauan || "Dalam Pemantauan"} {formData.hariObservasiKe ? `(Observasi Hari Ke-${formData.hariObservasiKe})` : ""} | Kondisi Hewan: {formData.statusHewanObservasi || formData.kondisiHewan || "-"}
+                      </div>
+                      {formData.catatanPerkembanganHarian && formData.catatanPerkembanganHarian !== "-" && (
+                        <div className="bg-slate-50 p-1 rounded border border-slate-200 text-[9px] whitespace-pre-line leading-relaxed text-slate-700 font-mono">
+                          {formData.catatanPerkembanganHarian}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
 

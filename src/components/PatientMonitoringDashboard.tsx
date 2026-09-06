@@ -162,7 +162,12 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
       if (isMounted) onRefreshPatientsRef.current();
     };
 
+    let lastFocusSync = 0;
     const handleWindowFocus = () => {
+      const now = Date.now();
+      // Mencegah spam sync saat kembali dari dialog cetak/tutup jendela
+      if (now - lastFocusSync < 15000) return;
+      lastFocusSync = now;
       if (typeof navigator !== "undefined" && navigator.onLine) {
         pullAllCloudData(webAppUrl || "")
           .then(() => {
