@@ -81,12 +81,27 @@ export function normalizeDateToIso(inputDate: any, fallbackDaysOffset = 0): stri
   }
 
   const str = String(inputDate).trim();
-  if (!str) {
+  if (!str || str === "-") {
     const target = new Date(now.getTime() + fallbackDaysOffset * 86400000);
     return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
   }
 
-  // Cek jika format YYYY-MM-DD
+  // 1. Cek jika format serial number spreadsheet (misal 45500 - 47000)
+  if (/^\d{5}(\.\d+)?$/.test(str)) {
+    const num = parseFloat(str);
+    if (num > 30000 && num < 60000) {
+      // Excel/Sheets serial epoch: 1899-12-30
+      const epoch = new Date(1899, 11, 30).getTime();
+      const ms = epoch + num * 86400000;
+      const dateObj = new Date(ms);
+      if (!isNaN(dateObj.getTime())) {
+        const target = new Date(dateObj.getTime() + fallbackDaysOffset * 86400000);
+        return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+      }
+    }
+  }
+
+  // 2. Cek jika format YYYY-MM-DD
   const ymdMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
   if (ymdMatch) {
     const y = parseInt(ymdMatch[1], 10);
@@ -99,12 +114,13 @@ export function normalizeDateToIso(inputDate: any, fallbackDaysOffset = 0): stri
     }
   }
 
-  // Cek jika format Indonesia DD/MM/YYYY atau DD-MM-YYYY
-  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  // 3. Cek jika format Indonesia DD/MM/YYYY atau DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
   if (dmyMatch) {
     const d = parseInt(dmyMatch[1], 10);
     const m = parseInt(dmyMatch[2], 10);
-    const y = parseInt(dmyMatch[3], 10);
+    let y = parseInt(dmyMatch[3], 10);
+    if (y < 100) y += 2000; // Normalisasi 2 digit tahun (misal 26 -> 2026)
     const dateObj = new Date(y, m - 1, d);
     if (!isNaN(dateObj.getTime())) {
       const target = new Date(dateObj.getTime() + fallbackDaysOffset * 86400000);
@@ -112,7 +128,38 @@ export function normalizeDateToIso(inputDate: any, fallbackDaysOffset = 0): stri
     }
   }
 
-  // Cek jika format GViz Date(yyyy, m, d)
+  // 4. Cek jika teks memuat nama bulan bahasa Indonesia (contoh: "14 Agustus 2026" atau "14-Agt-2026")
+  const idMonths: Record<string, number> = {
+    jan: 1, januari: 1, january: 1,
+    feb: 2, februari: 2, february: 2,
+    mar: 3, maret: 3, march: 3,
+    apr: 4, april: 4,
+    mei: 5, may: 5,
+    jun: 6, juni: 6, june: 6,
+    jul: 7, juli: 7, july: 7,
+    agu: 8, ags: 8, agustus: 8, august: 8,
+    sep: 9, september: 9,
+    okt: 10, oktober: 10, october: 10,
+    nov: 11, november: 11,
+    des: 12, desember: 12, december: 12
+  };
+
+  const idTextMatch = str.match(/(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
+  if (idTextMatch) {
+    const d = parseInt(idTextMatch[1], 10);
+    const mName = idTextMatch[2].toLowerCase();
+    const y = parseInt(idTextMatch[3], 10);
+    const m = idMonths[mName];
+    if (m) {
+      const dateObj = new Date(y, m - 1, d);
+      if (!isNaN(dateObj.getTime())) {
+        const target = new Date(dateObj.getTime() + fallbackDaysOffset * 86400000);
+        return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+      }
+    }
+  }
+
+  // 5. Cek jika format GViz Date(yyyy, m, d)
   const gvizMatch = str.match(/Date\((\d+),(\d+),(\d+)/i);
   if (gvizMatch) {
     const y = parseInt(gvizMatch[1], 10);
@@ -125,7 +172,7 @@ export function normalizeDateToIso(inputDate: any, fallbackDaysOffset = 0): stri
     }
   }
 
-  // Fallback standar JS Date parse
+  // 6. Fallback standar JS Date parse
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
     const target = new Date(parsed.getTime() + fallbackDaysOffset * 86400000);
@@ -1103,12 +1150,91 @@ export function getFieldFromRow(row: Record<string, any>, candidateKeys: string[
     }
   }
 
-  // 3. Substring / alias search
+  // 3. Substring / alias search cerdas & terisolasi
   for (const cand of candidateKeys) {
     const candLower = cand.toLowerCase();
+    const isSearchingDate = candLower.includes("tanggal") || candLower.includes("waktu") || candLower.includes("tgl");
+    const isSearchingDomisili = candLower.includes("domisili");
+    const isSearchingKejadian = candLower.includes("kejadian") && !isSearchingDomisili;
+
     for (const rk of rowKeys) {
       const rkLower = rk.toLowerCase();
-      // Khusus pencarian nama korban/pasien (hindari nama pemilik / pelaksana / petugas)
+      const rawVal = row[rk] !== undefined && row[rk] !== null ? String(row[rk]).trim() : "";
+      if (!rawVal) continue;
+
+      // KHUSUS PENCARIAN TANGGAL / WAKTU:
+      // Sangat krusial: hindari kolom alamat, tempat kejadian, kelurahan, kronologi, dll.
+      if (isSearchingDate) {
+        const isExcludedCol =
+          rkLower.includes("alamat") ||
+          rkLower.includes("tempat") ||
+          rkLower.includes("lokasi") ||
+          rkLower.includes("kelurahan") ||
+          rkLower.includes("desa") ||
+          rkLower.includes("kecamatan") ||
+          rkLower.includes("kabupaten") ||
+          rkLower.includes("kota") ||
+          rkLower.includes("provinsi") ||
+          rkLower.includes("kronologi") ||
+          rkLower.includes("foto") ||
+          rkLower.includes("luka") ||
+          rkLower.includes("hewan") ||
+          rkLower.includes("nama") ||
+          rkLower.includes("pemilik") ||
+          rkLower.includes("petugas");
+
+        if (!isExcludedCol) {
+          if (
+            rkLower.includes("tanggal kejadian") ||
+            rkLower.includes("tgl kejadian") ||
+            rkLower.includes("waktu kejadian") ||
+            rkLower.includes("tanggal gigitan") ||
+            rkLower.includes("waktu gigitan") ||
+            rkLower.includes("waktukejadian") ||
+            rkLower.includes("tanggalkejadian")
+          ) {
+            // Pastikan nilai memiliki angka (tanggal)
+            if (/\d/.test(rawVal)) return rawVal;
+          } else if (
+            (candLower.includes("tanggal") && (rkLower.includes("tanggal") || rkLower.includes("tgl"))) ||
+            (candLower.includes("waktu") && (rkLower.includes("waktu") || rkLower.includes("timestamp")))
+          ) {
+            if (/\d/.test(rawVal)) return rawVal;
+          }
+        }
+        continue;
+      }
+
+      // KHUSUS PENCARIAN DOMISILI KORBAN (Kelurahan/Kecamatan/KabKota Domisili):
+      if (isSearchingDomisili) {
+        if (candLower.includes("kelurahan") && (rkLower.includes("domisili") || rkLower.includes("korban")) && (rkLower.includes("kelurahan") || rkLower.includes("desa"))) {
+          return rawVal;
+        }
+        if (candLower.includes("kecamatan") && (rkLower.includes("domisili") || rkLower.includes("korban")) && rkLower.includes("kecamatan")) {
+          return rawVal;
+        }
+        if ((candLower.includes("kab") || candLower.includes("kota")) && (rkLower.includes("domisili") || rkLower.includes("korban")) && (rkLower.includes("kab") || rkLower.includes("kota"))) {
+          return rawVal;
+        }
+        if (rkLower.includes("domisili") && rkLower.includes(candLower.replace("domisili", "").trim())) {
+          return rawVal;
+        }
+        continue;
+      }
+
+      // KHUSUS PENCARIAN ALAMAT / TEMPAT KEJADIAN:
+      if (isSearchingKejadian) {
+        // Jangan ambil kolom domisili korban
+        if (rkLower.includes("domisili")) continue;
+        if (candLower.includes("alamat") && (rkLower.includes("kejadian") || rkLower.includes("tempat") || rkLower.includes("lokasi"))) {
+          return rawVal;
+        }
+        if (candLower.includes("kelurahan") && (rkLower.includes("kejadian") || rkLower.includes("lokasi") || rkLower === "kelurahan")) {
+          return rawVal;
+        }
+      }
+
+      // Khusus pencarian nama korban/pasien (hindari nama pemilik / pelaksana / petugas / hewan)
       if (candLower.includes("nama") && candLower.includes("korban")) {
         if (
           rkLower.includes("nama") &&
@@ -1117,24 +1243,20 @@ export function getFieldFromRow(row: Record<string, any>, candidateKeys: string[
           !rkLower.includes("pelaksana") &&
           !rkLower.includes("hewan")
         ) {
-          const val = String(row[rk] ?? "").trim();
-          if (val !== "") return val;
+          return rawVal;
         }
       }
-      // Khusus kelurahan
-      if (candLower.includes("kelurahan") && (rkLower.includes("kelurahan") || rkLower.includes("desa") || rkLower === "wilayah")) {
-        const val = String(row[rk] ?? "").trim();
-        if (val !== "") return val;
-      }
+
       // Khusus ID kasus
       if (candLower.includes("id_kasus") && (rkLower.includes("id") || rkLower.includes("kode") || rkLower.includes("register") || rkLower === "no")) {
-        const val = String(row[rk] ?? "").trim();
-        if (val !== "") return val;
+        return rawVal;
       }
-      // Khusus Waktu/Tanggal Kejadian
-      if (candLower.includes("kejadian") && (rkLower.includes("kejadian") || rkLower.includes("gigitan") || rkLower.includes("tanggal") || rkLower.includes("waktu"))) {
-        const val = String(row[rk] ?? "").trim();
-        if (val !== "") return val;
+
+      // Khusus Kelurahan umum (fallback)
+      if (candLower.includes("kelurahan") && !isSearchingDomisili && !isSearchingKejadian) {
+        if (rkLower.includes("kelurahan") || rkLower.includes("desa") || rkLower === "wilayah") {
+          return rawVal;
+        }
       }
     }
   }
@@ -1207,7 +1329,7 @@ export function normalizeKelurahanName(str: string): string {
     .trim();
 }
 
-// Filter Pasien Berdasarkan Hak Akses Pengguna & Filter Kelurahan
+// Filter Pasien Berdasarkan Hak Akses Pengguna & Filter Kelurahan Domisili Korban
 export function getFilteredPatientsByAccess(
   user: UserAccessProfile,
   selectedKelurahanFilter?: string,
@@ -1218,20 +1340,21 @@ export function getFilteredPatientsByAccess(
   const all = sourcePatients && sourcePatients.length > 0 ? sourcePatients : getAllPatients();
 
   return all.filter((item) => {
-    // 1. Hak Akses Kelurahan Pengguna
+    // 1. Hak Akses Kelurahan Pengguna - Mengacu pada Kelurahan Domisili Korban
+    const domisiliKorban = item.kelurahanDomisili || item.kelurahan || "Sananwetan";
+    const itemKelDomisili = normalizeKelurahanName(domisiliKorban);
+
     if (!user.isKoordinator && user.kelurahan !== "Semua") {
-      // Petugas hanya boleh melihat pasien di kelurahannya
+      // Petugas hanya memantau pasien di kelurahan domisilinya
       const userKel = normalizeKelurahanName(user.kelurahan);
-      const itemKel = normalizeKelurahanName(item.kelurahan);
-      if (itemKel !== userKel && !itemKel.includes(userKel) && !userKel.includes(itemKel)) {
+      if (itemKelDomisili !== userKel && !itemKelDomisili.includes(userKel) && !userKel.includes(itemKelDomisili)) {
         return false;
       }
     } else {
-      // Koordinator / Admin bisa filter kelurahan secara bebas
+      // Koordinator / Admin bisa filter kelurahan domisili secara bebas
       if (selectedKelurahanFilter && selectedKelurahanFilter !== "Semua") {
         const selKel = normalizeKelurahanName(selectedKelurahanFilter);
-        const itemKel = normalizeKelurahanName(item.kelurahan);
-        if (itemKel !== selKel && !itemKel.includes(selKel) && !selKel.includes(itemKel)) {
+        if (itemKelDomisili !== selKel && !itemKelDomisili.includes(selKel) && !selKel.includes(itemKelDomisili)) {
           return false;
         }
       }
@@ -1250,18 +1373,22 @@ export function getFilteredPatientsByAccess(
       const nama = (item.namaKorban || "").toLowerCase();
       const id = (item.id_kasus || "").toLowerCase();
       const alamat = (item.alamatKorban || "").toLowerCase();
+      const alamatTKP = (item.alamatKejadian || "").toLowerCase();
       const hpr = (item.spesiesHPR || "").toLowerCase();
       const nik = (item.nikKorban || "").toLowerCase();
-      const kel = (item.kelurahan || "").toLowerCase();
+      const kelDom = (item.kelurahanDomisili || item.kelurahan || "").toLowerCase();
+      const kelTKP = (item.kelurahanKejadian || "").toLowerCase();
       const pet = (item.petugasPJ || "").toLowerCase();
 
       const match =
         nama.includes(q) ||
         id.includes(q) ||
         alamat.includes(q) ||
+        alamatTKP.includes(q) ||
         hpr.includes(q) ||
         nik.includes(q) ||
-        kel.includes(q) ||
+        kelDom.includes(q) ||
+        kelTKP.includes(q) ||
         pet.includes(q);
 
       if (!match) return false;
@@ -1427,6 +1554,20 @@ export function syncPatientFromFormSubmission(
     ? formData.kabupatenKotaCustom
     : formData.kabupatenKota || "";
 
+  const finalKelDomisili = formData.kelurahanDomisiliCustom && formData.kelurahanDomisili?.toLowerCase().includes("lainnya")
+    ? formData.kelurahanDomisiliCustom
+    : (formData.kelurahanDomisili || finalKel);
+
+  const finalKecDomisili = formData.kecamatanDomisiliCustom && formData.kecamatanDomisili?.toLowerCase().includes("lainnya")
+    ? formData.kecamatanDomisiliCustom
+    : (formData.kecamatanDomisili || finalKec);
+
+  const finalKabDomisili = formData.kabupatenKotaDomisiliCustom && formData.kabupatenKotaDomisili?.toLowerCase().includes("lainnya")
+    ? formData.kabupatenKotaDomisiliCustom
+    : (formData.kabupatenKotaDomisili || finalKab);
+
+  const finalProvDomisili = formData.provinsiDomisili || "Jawa Timur";
+
   const finalHpr = formData.spesiesLain && formData.spesiesHPR === "Lainnya"
     ? formData.spesiesLain
     : formData.spesiesHPR || "";
@@ -1435,15 +1576,26 @@ export function syncPatientFromFormSubmission(
     id_kasus,
     timestamp_submit: new Date().toLocaleString("id-ID"),
     waktuKejadian: formData.waktuKejadian || "",
+    tanggalKejadian: formData.tanggalKejadian || tglKejadian,
+    jamKejadian: formData.jamKejadian || "",
+    alamatKejadian: formData.alamatKejadian || "",
+    kelurahanKejadian: finalKel,
+    kecamatanKejadian: finalKec,
+    kabupatenKotaKejadian: finalKab,
+    provinsiKejadian: formData.provinsi || "Jawa Timur",
+    kelurahanDomisili: finalKelDomisili,
+    kecamatanDomisili: finalKecDomisili,
+    kabupatenKotaDomisili: finalKabDomisili,
+    provinsiDomisili: finalProvDomisili,
     namaKorban: formData.namaKorban || "",
     umurKorban: formData.umurKorban || "",
     jkKorban: formData.jkKorban || "",
     alamatKorban: formData.alamatKorban || formData.alamatKejadian || "",
     kontakKorban: formData.noHpKorban || formData.kontakPemilik || "",
     noHpKorban: formData.noHpKorban || "",
-    kelurahan: finalKel,
-    kecamatan: finalKec,
-    kabupatenKota: finalKab,
+    kelurahan: finalKelDomisili || finalKel,
+    kecamatan: finalKecDomisili || finalKec,
+    kabupatenKota: finalKabDomisili || finalKab,
     spesiesHPR: finalHpr,
     rasHewan: formData.ras || "",
     kondisiHewan: formData.kondisiHewan || "",
@@ -1592,6 +1744,17 @@ export async function syncPatientsFromGoogleSheets(
         let nipPJ = "197606252009011007";
         let rekomendasi = "Observasi harian kondisi korban dan hewan.";
         let rawId = "";
+        let rawJam = "";
+        let alamatKejadian = "";
+        let kelurahanKejadian = "Sananwetan";
+        let kecamatanKejadian = "Sananwetan";
+        let kabupatenKotaKejadian = "Kota Blitar";
+        let provinsiKejadian = "Jawa Timur";
+        let rawAlamatKorban = "";
+        let kelurahanDomisili = "";
+        let kecamatanDomisili = "";
+        let kabupatenKotaDomisili = "";
+        let provinsiDomisili = "Jawa Timur";
 
         if (isShiftedRow) {
           // Format shifted 12-kolom: [0: Waktu, 1: ID, 2: Nama, 3: AlamatKejadian, 4: Umur, 5: JK, 6: AlamatKorban, 7: NoHP, 8: Kelurahan, 9: Spesies, 10: Luka, 11: Status]
@@ -1609,6 +1772,16 @@ export async function syncPatientsFromGoogleSheets(
           spesiesHPR = String(rd["Sumber Informasi"] || rd["col_9"] || "Anjing").trim();
           kondisiLuka = String(rd["Kronologi Kejadian"] || rd["col_10"] || "Kategori 2").trim();
           statusPemantauan = String(rd["spesiesHPR"] || rd["col_11"] || "Dalam Pemantauan (Aktif)").trim();
+          alamatKejadian = alamat;
+          kelurahanKejadian = kelurahan;
+          kecamatanKejadian = "Sananwetan";
+          kabupatenKotaKejadian = "Kota Blitar";
+          provinsiKejadian = "Jawa Timur";
+          rawAlamatKorban = alamat;
+          kelurahanDomisili = kelurahan;
+          kecamatanDomisili = "Sananwetan";
+          kabupatenKotaDomisili = "Kota Blitar";
+          provinsiDomisili = "Jawa Timur";
         } else {
           // Ekstraksi multi-kolom cerdas & toleran menggunakan getFieldFromRow
           rawId = getFieldFromRow(rd, [
@@ -1640,13 +1813,34 @@ export async function syncPatientsFromGoogleSheets(
           if ((!nama || nama === "Tanpa Nama") && !rawId) continue;
 
           const rawTgl = getFieldFromRow(rd, [
+            "Tanggal Kejadian",
+            "tanggalKejadian",
+            "Tanggal kejadian",
+            "tanggal kejadian",
             "Waktu Kejadian",
             "waktuKejadian",
+            "Waktu kejadian",
             "Tanggal Gigitan",
-            "Tanggal Kejadian",
+            "tanggal gigitan",
+            "Tgl Kejadian",
+            "tgl kejadian",
+            "Tgl Gigitan",
+            "Waktu / Tanggal Kejadian",
+            "Waktu dan Tempat Kejadian",
+            "Waktu & Tempat Kejadian",
             "Tanggal",
+            "tanggal",
             "Waktu Submit",
-            "Timestamp"
+            "Timestamp",
+            "col_2"
+          ], "");
+
+          rawJam = getFieldFromRow(rd, [
+            "Jam Kejadian",
+            "jamKejadian",
+            "Jam",
+            "Pukul",
+            "Waktu"
           ], "");
 
           tglKejadian = normalizeDateToIso(rawTgl);
@@ -1665,22 +1859,112 @@ export async function syncPatientsFromGoogleSheets(
             getFieldFromRow(rd, ["Waktu Submit", "timestamp_submit", "Timestamp"], r.waktuSubmit || new Date().toLocaleString("id-ID"))
           );
 
-          kelurahan = getFieldFromRow(rd, [
-            "Kelurahan",
-            "kelurahan",
-            "Desa",
-            "Wilayah",
-            "Kelurahan/Desa",
-            "kelurahan_final"
-          ], "Sananwetan").trim();
-
-          alamat = getFieldFromRow(rd, [
-            "Alamat Korban",
+          // 1. Lokasi Tempat Kejadian (TKP)
+          alamatKejadian = String(getFieldFromRow(rd, [
             "Alamat Kejadian",
-            "alamatKorban",
             "alamatKejadian",
-            "Alamat"
-          ], "-");
+            "Lokasi Kejadian",
+            "Tempat Kejadian",
+            "Alamat Lokasi Kejadian",
+            "col_3"
+          ], "")).trim();
+
+          kelurahanKejadian = String(getFieldFromRow(rd, [
+            "Kelurahan Kejadian",
+            "kelurahanKejadian",
+            "Kelurahan TKP",
+            "Kelurahan Lokasi Kejadian",
+            "Kelurahan Tempat Kejadian",
+            "Kelurahan",
+            "col_4"
+          ], "Sananwetan")).trim();
+
+          kecamatanKejadian = String(getFieldFromRow(rd, [
+            "Kecamatan Kejadian",
+            "kecamatanKejadian",
+            "Kecamatan TKP",
+            "Kecamatan Lokasi Kejadian",
+            "Kecamatan",
+            "col_5"
+          ], "Sananwetan")).trim();
+
+          kabupatenKotaKejadian = String(getFieldFromRow(rd, [
+            "Kabupaten/Kota Kejadian",
+            "kabupatenKotaKejadian",
+            "Kab/Kota Kejadian",
+            "Kabupaten Kejadian",
+            "Kota Kejadian",
+            "Kabupaten/Kota",
+            "col_6"
+          ], "Kota Blitar")).trim();
+
+          provinsiKejadian = String(getFieldFromRow(rd, [
+            "Provinsi Kejadian",
+            "provinsiKejadian",
+            "Provinsi",
+            "col_7"
+          ], "Jawa Timur")).trim();
+
+          // 2. Alamat & Wilayah Domisili Korban (Diutamakan untuk filter user/petugas)
+          rawAlamatKorban = String(getFieldFromRow(rd, [
+            "Alamat Korban",
+            "alamatKorban",
+            "Alamat Domisili Korban",
+            "Alamat Domisili",
+            "Alamat Tempat Tinggal",
+            "Alamat",
+            "col_24"
+          ], "-")).trim();
+
+          kelurahanDomisili = String(getFieldFromRow(rd, [
+            "Kelurahan domisili korban",
+            "kelurahanDomisili",
+            "Kelurahan Domisili Korban",
+            "Kelurahan Domisili",
+            "Kelurahan Korban",
+            "Kelurahan Tempat Tinggal",
+            "Kelurahan domisili",
+            "Desa Domisili",
+            "kelurahan_domisili"
+          ], "")).trim();
+
+          kecamatanDomisili = String(getFieldFromRow(rd, [
+            "Kecamatan domisili korban",
+            "kecamatanDomisili",
+            "Kecamatan Domisili Korban",
+            "Kecamatan Domisili",
+            "Kecamatan Korban",
+            "Kecamatan Tempat Tinggal",
+            "Kecamatan domisili",
+            "kecamatan_domisili"
+          ], "")).trim();
+
+          kabupatenKotaDomisili = String(getFieldFromRow(rd, [
+            "Kab kota korban",
+            "kabupatenKotaDomisili",
+            "Kab/Kota Korban",
+            "Kab/Kota Domisili Korban",
+            "Kab/Kota domisili",
+            "Kabupaten/Kota Korban",
+            "Kabupaten/Kota Domisili Korban",
+            "Kabupaten/Kota Domisili",
+            "Kabupaten Kota Domisili",
+            "Kab kota domisili",
+            "kab_kota_korban"
+          ], "")).trim();
+
+          provinsiDomisili = String(getFieldFromRow(rd, [
+            "Provinsi domisili korban",
+            "provinsiDomisili",
+            "Provinsi Domisili Korban",
+            "Provinsi Domisili",
+            "Provinsi Korban",
+            "Provinsi domisili"
+          ], "")).trim();
+
+          // Kelurahan utama untuk seleksi/filter mengacu ke kelurahan domisili korban
+          kelurahan = (kelurahanDomisili || kelurahanKejadian || getFieldFromRow(rd, ["Kelurahan", "kelurahan", "Desa"], "Sananwetan")).trim();
+          alamat = rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (alamatKejadian || "-");
 
           kondisiLuka = getFieldFromRow(rd, [
             "Kondisi Luka",
@@ -1929,13 +2213,15 @@ export async function syncPatientsFromGoogleSheets(
           // Susun fullData lengkap dari baris spreadsheet agar tampilan PDF 100% mutakhir dengan data spreadsheet
           const fullDataFromSheet: Partial<FormGHPRData> = {
             waktuKejadian: tglKejadian || String(getFieldFromRow(rd, ["Waktu Kejadian", "waktuKejadian", "Tanggal Gigitan", "col_2"], ex.waktuKejadian || "")),
-            alamatKejadian: String(getFieldFromRow(rd, ["Alamat Kejadian", "alamatKejadian", "col_3"], alamat !== "-" ? alamat : (ex.alamatKorban || ""))),
-            kelurahan: kelurahan && kelurahan !== "-" ? kelurahan : ex.kelurahan,
+            tanggalKejadian: tglKejadian,
+            jamKejadian: rawJam || ex.jamKejadian || "",
+            alamatKejadian: alamatKejadian || ex.alamatKejadian || "",
+            kelurahan: kelurahanKejadian || ex.kelurahan || "Sananwetan",
             kelurahanCustom: "",
-            kecamatan: String(getFieldFromRow(rd, ["Kecamatan", "kecamatan", "col_5"], ex.kecamatan || "Sananwetan")),
+            kecamatan: kecamatanKejadian || ex.kecamatan || "Sananwetan",
             kecamatanCustom: "",
-            kabupatenKota: String(getFieldFromRow(rd, ["Kabupaten/Kota", "kabupatenKota", "col_6"], ex.kabupatenKota || "Kota Blitar")),
-            provinsi: String(getFieldFromRow(rd, ["Provinsi", "provinsi", "col_7"], "Jawa Timur")),
+            kabupatenKota: kabupatenKotaKejadian || ex.kabupatenKota || "Kota Blitar",
+            provinsi: provinsiKejadian || ex.provinsi || "Jawa Timur",
             sumberInfo: String(getFieldFromRow(rd, ["Sumber Informasi", "sumberInfo", "col_8"], "Laporan Petugas Faskes")),
             kronologi: String(getFieldFromRow(rd, ["Kronologi Kejadian", "kronologi", "Kronologi", "col_9"], ex.fullData?.kronologi || `Kasus gigitan HPR di wilayah Kel. ${kelurahan}`)),
             spesiesHPR: spesiesHPR || ex.spesiesHPR,
@@ -1958,7 +2244,14 @@ export async function syncPatientsFromGoogleSheets(
             namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
             umurKorban: umur !== "-" ? umur : ex.umurKorban,
             noHpKorban: noHp !== "-" ? noHp : (ex.noHpKorban || ex.kontakKorban || "-"),
-            alamatKorban: alamat !== "-" ? alamat : ex.alamatKorban,
+            alamatKorban: rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (ex.alamatKorban || alamatKejadian || "-"),
+            kelurahanDomisili: kelurahanDomisili || ex.kelurahanDomisili || kelurahan,
+            kelurahanDomisiliCustom: "",
+            kecamatanDomisili: kecamatanDomisili || ex.kecamatanDomisili || kecamatanKejadian || "Sananwetan",
+            kecamatanDomisiliCustom: "",
+            kabupatenKotaDomisili: kabupatenKotaDomisili || ex.kabupatenKotaDomisili || kabupatenKotaKejadian || "Kota Blitar",
+            kabupatenKotaDomisiliCustom: "",
+            provinsiDomisili: provinsiDomisili || ex.provinsiDomisili || "Jawa Timur",
             jkKorban: jk || ex.jkKorban,
             kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], ex.fullData?.kondisiKorban || "Sehat")),
             kondisiUmumKorban: String(getFieldFromRow(rd, ["Kondisi Umum Korban", "kondisiUmumKorban", "Kondisi Umum", "Keadaan Umum Korban", "Kondisi Korban", "kondisiKorban"], ex.fullData?.kondisiUmumKorban || ex.fullData?.kondisiKorban || "Sehat")),
@@ -1990,9 +2283,21 @@ export async function syncPatientsFromGoogleSheets(
           const merged: PatientMonitoringItem = {
             ...ex,
             id_kasus: sId,
+            waktuKejadian: tglKejadian || ex.waktuKejadian,
+            tanggalKejadian: tglKejadian || ex.tanggalKejadian,
+            jamKejadian: rawJam || ex.jamKejadian || "",
+            alamatKejadian: alamatKejadian || ex.alamatKejadian || "",
+            kelurahanKejadian: kelurahanKejadian || ex.kelurahanKejadian || "Sananwetan",
+            kecamatanKejadian: kecamatanKejadian || ex.kecamatanKejadian || "Sananwetan",
+            kabupatenKotaKejadian: kabupatenKotaKejadian || ex.kabupatenKotaKejadian || "Kota Blitar",
+            provinsiKejadian: provinsiKejadian || ex.provinsiKejadian || "Jawa Timur",
+            kelurahanDomisili: kelurahanDomisili || ex.kelurahanDomisili || kelurahan,
+            kecamatanDomisili: kecamatanDomisili || ex.kecamatanDomisili || kecamatanKejadian || "Sananwetan",
+            kabupatenKotaDomisili: kabupatenKotaDomisili || ex.kabupatenKotaDomisili || kabupatenKotaKejadian || "Kota Blitar",
+            provinsiDomisili: provinsiDomisili || ex.provinsiDomisili || "Jawa Timur",
             namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
             kelurahan: kelurahan && kelurahan !== "-" ? kelurahan : ex.kelurahan,
-            alamatKorban: alamat !== "-" ? alamat : ex.alamatKorban,
+            alamatKorban: rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (ex.alamatKorban || alamatKejadian || "-"),
             kontakKorban: noHp !== "-" ? noHp : (ex.kontakKorban || ex.noHpKorban || "-"),
             noHpKorban: noHp !== "-" ? noHp : (ex.noHpKorban || ex.kontakKorban || "-"),
             kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], ex.kondisiKorban || "Sehat")),
@@ -2030,7 +2335,7 @@ export async function syncPatientsFromGoogleSheets(
               namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
               umurKorban: umur !== "-" ? umur : ex.umurKorban,
               jkKorban: jk || ex.jkKorban,
-              alamatKorban: alamat !== "-" ? alamat : ex.alamatKorban,
+              alamatKorban: rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (ex.alamatKorban || alamatKejadian || "-"),
               noHpKorban: noHp !== "-" ? noHp : (ex.noHpKorban || ex.kontakKorban || "-"),
               kelurahan: kelurahan && kelurahan !== "-" ? kelurahan : ex.kelurahan,
               kondisiLuka: kondisiLuka !== "-" ? kondisiLuka : ex.kondisiLuka,
@@ -2081,13 +2386,15 @@ export async function syncPatientsFromGoogleSheets(
           // Susun fullData lengkap untuk kasus baru dari Google Sheets
           const fullDataNewSheet: Partial<FormGHPRData> = {
             waktuKejadian: tglKejadian || String(getFieldFromRow(rd, ["Waktu Kejadian", "waktuKejadian", "Tanggal Gigitan", "col_2"], "")),
-            alamatKejadian: String(getFieldFromRow(rd, ["Alamat Kejadian", "alamatKejadian", "col_3"], alamat)),
-            kelurahan: kelurahan,
+            tanggalKejadian: tglKejadian,
+            jamKejadian: rawJam || "",
+            alamatKejadian: alamatKejadian || "",
+            kelurahan: kelurahanKejadian || "Sananwetan",
             kelurahanCustom: "",
-            kecamatan: String(getFieldFromRow(rd, ["Kecamatan", "kecamatan", "col_5"], "Sananwetan")),
+            kecamatan: kecamatanKejadian || "Sananwetan",
             kecamatanCustom: "",
-            kabupatenKota: String(getFieldFromRow(rd, ["Kabupaten/Kota", "kabupatenKota", "col_6"], "Kota Blitar")),
-            provinsi: String(getFieldFromRow(rd, ["Provinsi", "provinsi", "col_7"], "Jawa Timur")),
+            kabupatenKota: kabupatenKotaKejadian || "Kota Blitar",
+            provinsi: provinsiKejadian || "Jawa Timur",
             sumberInfo: String(getFieldFromRow(rd, ["Sumber Informasi", "sumberInfo", "col_8"], "Laporan Petugas Faskes")),
             kronologi: String(getFieldFromRow(rd, ["Kronologi Kejadian", "kronologi", "Kronologi", "col_9"], `Kasus gigitan HPR di wilayah Kel. ${kelurahan}`)),
             spesiesHPR: spesiesHPR,
@@ -2110,7 +2417,14 @@ export async function syncPatientsFromGoogleSheets(
             namaKorban: nama,
             umurKorban: umur,
             noHpKorban: noHp,
-            alamatKorban: alamat,
+            alamatKorban: rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (alamatKejadian || "-"),
+            kelurahanDomisili: kelurahanDomisili || kelurahan,
+            kelurahanDomisiliCustom: "",
+            kecamatanDomisili: kecamatanDomisili || kecamatanKejadian || "Sananwetan",
+            kecamatanDomisiliCustom: "",
+            kabupatenKotaDomisili: kabupatenKotaDomisili || kabupatenKotaKejadian || "Kota Blitar",
+            kabupatenKotaDomisiliCustom: "",
+            provinsiDomisili: provinsiDomisili || "Jawa Timur",
             jkKorban: jk,
             kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], "Sehat")),
             kondisiUmumKorban: String(getFieldFromRow(rd, ["Kondisi Umum Korban", "kondisiUmumKorban", "Kondisi Umum", "Keadaan Umum Korban", "Kondisi Korban", "kondisiKorban"], "Sehat")),
@@ -2143,15 +2457,26 @@ export async function syncPatientsFromGoogleSheets(
             id_kasus: sId,
             timestamp_submit: waktuSubmit || new Date().toLocaleString("id-ID"),
             waktuKejadian: tglKejadian,
+            tanggalKejadian: tglKejadian,
+            jamKejadian: rawJam || "",
+            alamatKejadian: alamatKejadian || "",
+            kelurahanKejadian: kelurahanKejadian || "Sananwetan",
+            kecamatanKejadian: kecamatanKejadian || "Sananwetan",
+            kabupatenKotaKejadian: kabupatenKotaKejadian || "Kota Blitar",
+            provinsiKejadian: provinsiKejadian || "Jawa Timur",
+            kelurahanDomisili: kelurahanDomisili || kelurahan,
+            kecamatanDomisili: kecamatanDomisili || kecamatanKejadian || "Sananwetan",
+            kabupatenKotaDomisili: kabupatenKotaDomisili || kabupatenKotaKejadian || "Kota Blitar",
+            provinsiDomisili: provinsiDomisili || "Jawa Timur",
             namaKorban: nama,
             umurKorban: umur,
             jkKorban: jk,
-            alamatKorban: alamat,
+            alamatKorban: rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (alamatKejadian || "-"),
             kontakKorban: noHp,
             noHpKorban: noHp,
             kelurahan: kelurahan,
-            kecamatan: String(getFieldFromRow(rd, ["Kecamatan", "kecamatan"], "Sananwetan")),
-            kabupatenKota: String(getFieldFromRow(rd, ["Kabupaten/Kota", "kabupatenKota"], "Kota Blitar")),
+            kecamatan: kecamatanDomisili || String(getFieldFromRow(rd, ["Kecamatan", "kecamatan"], "Sananwetan")),
+            kabupatenKota: kabupatenKotaDomisili || String(getFieldFromRow(rd, ["Kabupaten/Kota", "kabupatenKota"], "Kota Blitar")),
             spesiesHPR: spesiesHPR,
             rasHewan: String(getFieldFromRow(rd, ["Ras Hewan", "rasHewan"], "-")),
             kondisiHewan: kondisiHewan,
@@ -2186,7 +2511,7 @@ export async function syncPatientsFromGoogleSheets(
               namaKorban: nama,
               umurKorban: umur,
               jkKorban: jk,
-              alamatKorban: alamat,
+              alamatKorban: rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (alamatKejadian || "-"),
               noHpKorban: noHp,
               kelurahan: kelurahan,
               kondisiLuka: kondisiLuka,
@@ -2194,7 +2519,7 @@ export async function syncPatientsFromGoogleSheets(
               rekomendasi: rekomendasi,
               catatanPerkembanganHarian: rawCatatanLog
             } as any,
-            lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : new Date().toLocaleString("id-ID")
+            lastUpdated: rawLastUpd && rawLastUpd !== "-" ? rawLastUpd : (waktuSubmit || new Date().toLocaleString("id-ID"))
           };
 
           if (alreadyInSyncedIdx >= 0) {

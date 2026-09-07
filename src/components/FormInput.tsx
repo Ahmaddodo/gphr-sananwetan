@@ -63,15 +63,59 @@ export const FormInput: React.FC<FormInputProps> = ({
           }`}
         />
       ) : (
-        <input
-          type={type}
-          value={typeof formData[k] === "string" ? (formData[k] as string) : ""}
-          onChange={(e) => updateField(k, e.target.value)}
-          placeholder={placeholder}
-          className={`w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 ${
-            errors[k] ? "border-rose-300 bg-rose-50/40" : "border-slate-200"
-          }`}
-        />
+        (() => {
+          let inputValue = typeof formData[k] === "string" ? (formData[k] as string) : "";
+          if (type === "datetime-local" && inputValue) {
+            const trimmed = inputValue.trim();
+            if (trimmed.includes(" ") && !trimmed.includes("T")) {
+              const parts = trimmed.split(" ");
+              const datePart = parts[0];
+              const timePart = parts[1] || "10:00";
+              const dmy = datePart.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+              if (dmy) {
+                inputValue = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T${timePart.slice(0, 5)}`;
+              } else if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+                inputValue = `${datePart}T${timePart.slice(0, 5)}`;
+              }
+            } else if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+              inputValue = `${trimmed}T10:00`;
+            } else if (/^\d{1,2}[\/\-]\d{1,2}[\/\-](\d{4})/.test(trimmed)) {
+              const dmy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+              if (dmy) {
+                inputValue = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T10:00`;
+              }
+            } else if (trimmed.includes("T")) {
+              const [d, t] = trimmed.split("T");
+              inputValue = `${d}T${(t || "10:00").slice(0, 5)}`;
+            }
+          } else if (type === "date" && inputValue) {
+            const trimmed = inputValue.trim();
+            let dateOnly = trimmed;
+            if (dateOnly.includes("T")) {
+              dateOnly = dateOnly.split("T")[0];
+            } else if (dateOnly.includes(" ")) {
+              dateOnly = dateOnly.split(" ")[0];
+            }
+            const dmy = dateOnly.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (dmy) {
+              inputValue = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+            } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+              inputValue = dateOnly;
+            }
+          }
+
+          return (
+            <input
+              type={type}
+              value={inputValue}
+              onChange={(e) => updateField(k, e.target.value)}
+              placeholder={placeholder}
+              className={`w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 ${
+                errors[k] ? "border-rose-300 bg-rose-50/40" : "border-slate-200"
+              }`}
+            />
+          );
+        })()
       )}
       {helpText && <p className="text-[11px] text-slate-500 mt-0.5">{helpText}</p>}
       {errors[k] && (

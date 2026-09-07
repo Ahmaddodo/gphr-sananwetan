@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Users, User, FileText, ChevronRight, TriangleAlert, Camera, Trash2, Upload, Lock, FileSpreadsheet, ExternalLink, Database, Send, Settings2, UserCheck } from "lucide-react";
+import { Clock, Users, User, FileText, ChevronRight, TriangleAlert, Camera, Trash2, Upload, Lock, FileSpreadsheet, ExternalLink, Database, Send, Settings2, UserCheck, MapPin } from "lucide-react";
 import { FormGHPRData, FormErrors, UserAccessProfile } from "../types";
 import { FormInput } from "./FormInput";
 import { PertolonganPertamaSelector } from "./PertolonganPertamaSelector";
@@ -81,17 +81,66 @@ export const FormSteps: React.FC<FormStepsProps> = ({
       {/* STEP 1 */}
       {step === 1 && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FormInput
-              label="Waktu Kejadian"
-              k="waktuKejadian"
-              type="datetime-local"
-              required
-              formData={formData}
-              errors={errors}
-              updateField={updateField}
-              showAsterisk={showAsterisk}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                <span>Tanggal Kejadian</span>
+                {showAsterisk && (
+                  <span className="text-rose-500 font-bold ml-0.5 text-sm leading-none">*</span>
+                )}
+              </label>
+              <input
+                type="date"
+                value={
+                  formData.tanggalKejadian ||
+                  (formData.waktuKejadian ? formData.waktuKejadian.split("T")[0].split(" ")[0] : "")
+                }
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  updateField("tanggalKejadian", newDate);
+                  const currentJam = formData.jamKejadian || (formData.waktuKejadian?.includes("T") ? formData.waktuKejadian.split("T")[1]?.slice(0, 5) : formData.waktuKejadian?.includes(" ") ? formData.waktuKejadian.split(" ")[1]?.slice(0, 5) : "10:00");
+                  if (newDate) {
+                    updateField("waktuKejadian", `${newDate} ${currentJam || "10:00"}`);
+                  }
+                }}
+                className={`w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 ${
+                  errors.tanggalKejadian || errors.waktuKejadian ? "border-rose-300 bg-rose-50/40" : "border-slate-200"
+                }`}
+              />
+              <p className="text-[11px] text-slate-500">Tanggal gigitan atau kontak HPR.</p>
+              {(errors.tanggalKejadian || errors.waktuKejadian) && (
+                <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1 mt-0.5">
+                  <TriangleAlert size={12} />
+                  {errors.tanggalKejadian || errors.waktuKejadian}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                <span>Jam Kejadian</span>
+              </label>
+              <input
+                type="time"
+                value={
+                  formData.jamKejadian ||
+                  (formData.waktuKejadian?.includes("T")
+                    ? formData.waktuKejadian.split("T")[1]?.slice(0, 5)
+                    : formData.waktuKejadian?.includes(" ")
+                    ? formData.waktuKejadian.split(" ")[1]?.slice(0, 5)
+                    : "10:00")
+                }
+                onChange={(e) => {
+                  const newTime = e.target.value;
+                  updateField("jamKejadian", newTime);
+                  const curDate = formData.tanggalKejadian || (formData.waktuKejadian ? formData.waktuKejadian.split("T")[0].split(" ")[0] : new Date().toISOString().split("T")[0]);
+                  updateField("waktuKejadian", `${curDate} ${newTime || "10:00"}`);
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+              <p className="text-[11px] text-slate-500">Pukul / perkiraan waktu kontak.</p>
+            </div>
+
             <div className="flex flex-col gap-1.5 min-w-0">
               <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
                 <span>Sumber Informasi</span>
@@ -690,7 +739,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                 <FormInput
                   label="Alamat Korban"
                   k="alamatKorban"
-                  placeholder="Dusun, RT/RW, Desa"
+                  placeholder="Dusun, RT/RW, Jalan tempat tinggal korban"
                   required
                   formData={formData}
                   errors={errors}
@@ -719,6 +768,119 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                 showAsterisk={showAsterisk}
               />
             </div>
+
+            {/* Bagian Domisili Korban - Acuan Filter & Hak Akses Petugas */}
+            <div className="mt-5 rounded-xl border border-blue-200/80 bg-blue-50/40 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-900">
+                  <MapPin size={15} className="text-blue-600" />
+                  <span>Wilayah Domisili Korban (Acuan Hak Akses & Filter Kelurahan)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const kel = formData.kelurahan || "Sananwetan";
+                    const kec = formData.kecamatan || "Sananwetan";
+                    const kab = formData.kabupatenKota || "Kota Blitar";
+                    const prov = formData.provinsi || "Jawa Timur";
+                    updateField("kelurahanDomisili", kel);
+                    if (formData.kelurahanCustom) updateField("kelurahanDomisiliCustom", formData.kelurahanCustom);
+                    updateField("kecamatanDomisili", kec);
+                    updateField("kabupatenKotaDomisili", kab);
+                    updateField("provinsiDomisili", prov);
+                  }}
+                  className="px-3 py-1 text-[11px] font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition"
+                >
+                  Salin dari Lokasi Kejadian (Kel. {formData.kelurahan || "Sananwetan"})
+                </button>
+              </div>
+              <p className="text-[11px] text-blue-700 mb-4 leading-relaxed">
+                Penting: Petugas surveilans kelurahan akan memantau pasien berdasarkan <b>Kelurahan Domisili Korban</b> ini (bukan dari lokasi kejadian).
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {/* Kelurahan Domisili */}
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                    <span>Kelurahan Domisili</span>
+                    {showAsterisk && (
+                      <span className="text-rose-500 font-bold ml-0.5 text-sm leading-none">*</span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <input
+                      list="kelurahan-domisili-datalist"
+                      value={formData.kelurahanDomisili || formData.kelurahan || ""}
+                      onChange={(e) => updateField("kelurahanDomisili", e.target.value)}
+                      placeholder="Pilih kelurahan domisili korban..."
+                      className={`w-full rounded-lg border bg-white px-3.5 py-2.5 pr-9 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 ${
+                        errors.kelurahanDomisili ? "border-rose-300 bg-rose-50/40" : "border-slate-200"
+                      }`}
+                    />
+                    <datalist id="kelurahan-domisili-datalist">
+                      {listKelurahan.map((kName) => (
+                        <option key={kName} value={kName} />
+                      ))}
+                      <option value="Lainnya" />
+                    </datalist>
+                    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <ChevronRight className="rotate-90" size={14} />
+                    </div>
+                  </div>
+                  {errors.kelurahanDomisili && (
+                    <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1 mt-0.5">
+                      <TriangleAlert size={12} />
+                      {errors.kelurahanDomisili}
+                    </span>
+                  )}
+                  {formData.kelurahanDomisili === "Lainnya" && (
+                    <input
+                      value={formData.kelurahanDomisiliCustom || ""}
+                      onChange={(e) => updateField("kelurahanDomisiliCustom", e.target.value)}
+                      placeholder="Ketik kelurahan/desa domisili luar..."
+                      className="mt-2 w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  )}
+                </div>
+
+                {/* Kecamatan Domisili */}
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                    <span>Kecamatan Domisili</span>
+                  </label>
+                  <input
+                    list="kecamatan-domisili-datalist"
+                    value={formData.kecamatanDomisili || "Sananwetan"}
+                    onChange={(e) => updateField("kecamatanDomisili", e.target.value)}
+                    placeholder="Kecamatan domisili korban..."
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  />
+                  <datalist id="kecamatan-domisili-datalist">
+                    <option value="Sananwetan" />
+                    <option value="Kepanjenkidul" />
+                    <option value="Sukorejo" />
+                    <option value="Kanigoro" />
+                    <option value="Nglegok" />
+                    <option value="Garum" />
+                    <option value="Lainnya" />
+                  </datalist>
+                </div>
+
+                {/* Kab/Kota Domisili */}
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                    <span>Kab / Kota Domisili</span>
+                  </label>
+                  <input
+                    value={formData.kabupatenKotaDomisili || "Kota Blitar"}
+                    onChange={(e) => updateField("kabupatenKotaDomisili", e.target.value)}
+                    placeholder="Kota Blitar / Kab. Blitar..."
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
               <FormInput
                 label="Kondisi Umum Korban"

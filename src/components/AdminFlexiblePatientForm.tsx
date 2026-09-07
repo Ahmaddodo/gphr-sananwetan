@@ -31,6 +31,8 @@ import { addToOfflineQueue, isAppOnline } from "../lib/offlineSyncService";
 
 const initialFlexibleFormState: FormGHPRData = {
   waktuKejadian: "",
+  tanggalKejadian: "",
+  jamKejadian: "",
   alamatKejadian: "",
   kelurahan: "",
   kelurahanCustom: "",
@@ -39,6 +41,13 @@ const initialFlexibleFormState: FormGHPRData = {
   kabupatenKota: "",
   kabupatenKotaCustom: "",
   provinsi: "",
+  kelurahanDomisili: "",
+  kelurahanDomisiliCustom: "",
+  kecamatanDomisili: "",
+  kecamatanDomisiliCustom: "",
+  kabupatenKotaDomisili: "",
+  kabupatenKotaDomisiliCustom: "",
+  provinsiDomisili: "Jawa Timur",
   sumberInfo: "",
   kronologi: "",
   spesiesHPR: "",
@@ -179,6 +188,20 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
     const kel = finalKel || formData.kelurahan || "";
     const kec = finalKec || formData.kecamatan || "";
     const kab = finalKab || formData.kabupatenKota || "";
+
+    const finalKelDomisili = formData.kelurahanDomisiliCustom && formData.kelurahanDomisili?.toLowerCase().includes("lainnya")
+      ? formData.kelurahanDomisiliCustom
+      : (formData.kelurahanDomisili || kel);
+
+    const finalKecDomisili = formData.kecamatanDomisiliCustom && formData.kecamatanDomisili?.toLowerCase().includes("lainnya")
+      ? formData.kecamatanDomisiliCustom
+      : (formData.kecamatanDomisili || kec);
+
+    const finalKabDomisili = formData.kabupatenKotaDomisiliCustom && formData.kabupatenKotaDomisili?.toLowerCase().includes("lainnya")
+      ? formData.kabupatenKotaDomisiliCustom
+      : (formData.kabupatenKotaDomisili || kab);
+
+    const finalProvDomisili = formData.provinsiDomisili || "Jawa Timur";
     const namaPasien = (formData.namaKorban || "").trim();
 
     const payload = {
@@ -192,11 +215,18 @@ export const AdminFlexiblePatientForm: React.FC<AdminFlexiblePatientFormProps> =
       kecamatan: kec,
       kabupatenKota: kab,
       provinsi: formData.provinsi || "",
+      kelurahanDomisili: finalKelDomisili,
+      kecamatanDomisili: finalKecDomisili,
+      kabupatenKotaDomisili: finalKabDomisili,
+      provinsiDomisili: finalProvDomisili,
       spesies_final: formData.spesiesHPR === "Lainnya" ? (formData.spesiesLain || "") : (formData.spesiesHPR || ""),
       kelurahan_final: kel,
       kecamatan_final: kec,
       kabupatenKota_final: kab,
       waktuKejadian: formData.waktuKejadian || "",
+      tanggalKejadian: formData.tanggalKejadian || formData.waktuKejadian || "",
+      jamKejadian: formData.jamKejadian || "",
+      alamatKejadian: formData.alamatKejadian || "",
       tanggalPelaksanaan: formData.tanggalPelaksanaan || "",
       pelaksanaNama: formData.pelaksanaNama || DEFAULT_PELAKSANA_NAMA,
       pelaksanaNIP: formData.pelaksanaNIP || DEFAULT_PELAKSANA_NIP,

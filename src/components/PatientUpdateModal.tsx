@@ -72,6 +72,12 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   );
   const [hariObservasi, setHariObservasi] = useState<number>(patient?.hariObservasiKe || 1);
   const [kondisiLuka, setKondisiLuka] = useState<string>(patient?.kondisiLuka || "");
+  const [kondisiUmumKorban, setKondisiUmumKorban] = useState<string>(
+    patient?.kondisiUmumKorban || patient?.kondisiKorban || patient?.fullData?.kondisiUmumKorban || patient?.fullData?.kondisiKorban || "Sehat"
+  );
+  const [lokasiLuka, setLokasiLuka] = useState<string>(patient?.lokasiLuka || patient?.fullData?.lokasiLuka || "");
+  const [pertolonganPertama, setPertolonganPertama] = useState<string>(patient?.pertolonganPertama || patient?.fullData?.pertolonganPertama || "");
+  const [tindakanKasus, setTindakanKasus] = useState<string>(patient?.tindakanKasus || patient?.fullData?.tindakanKasus || "");
   const [kondisiHewanText, setKondisiHewanText] = useState<string>(patient?.kondisiHewan || "");
   const [rekomendasi, setRekomendasi] = useState<string>(patient?.rekomendasi || "");
 
@@ -128,6 +134,10 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       const obsDay = calculateObservationDay(patient);
       setHariObservasi(obsDay);
       setKondisiLuka(patient.kondisiLuka || "");
+      setKondisiUmumKorban(patient.kondisiUmumKorban || patient.kondisiKorban || patient.fullData?.kondisiUmumKorban || patient.fullData?.kondisiKorban || "Sehat");
+      setLokasiLuka(patient.lokasiLuka || patient.fullData?.lokasiLuka || "");
+      setPertolonganPertama(patient.pertolonganPertama || patient.fullData?.pertolonganPertama || "");
+      setTindakanKasus(patient.tindakanKasus || patient.fullData?.tindakanKasus || "");
       setKondisiHewanText(patient.kondisiHewan || "");
       setRekomendasi(patient.rekomendasi || "");
       setJadwalVAR(patient.jadwalVAR || {
@@ -364,6 +374,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       statusHewanObservasi: statusHewan,
       hariObservasiKe: Number(hariObservasi),
       kondisiLuka,
+      kondisiUmumKorban: kondisiUmumKorban || "Sehat",
+      kondisiKorban: kondisiUmumKorban || "Sehat",
+      lokasiLuka: lokasiLuka || "-",
+      pertolonganPertama: pertolonganPertama || "-",
+      tindakanKasus: tindakanKasus || "-",
       kondisiHewan: kondisiHewanText,
       rekomendasi,
       jadwalVAR,
@@ -375,6 +390,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       fullData: {
         ...(patient.fullData || {}),
         kondisiLuka,
+        kondisiUmumKorban: kondisiUmumKorban || "Sehat",
+        kondisiKorban: kondisiUmumKorban || "Sehat",
+        lokasiLuka: lokasiLuka || "-",
+        pertolonganPertama: pertolonganPertama || "-",
+        tindakanKasus: tindakanKasus || "-",
         kondisiHewan: kondisiHewanText,
         rekomendasi,
         statusPemantauan,
@@ -402,17 +422,19 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       id_kasus: patient.id_kasus,
       timestamp_submit: patient.timestamp_submit || new Date().toISOString(),
       waktuKejadian: patient.waktuKejadian || rawData.waktuKejadian || "",
-      alamatKejadian: patient.alamatKorban || rawData.alamatKejadian || patient.kelurahan || "",
-      kelurahan: patient.kelurahan,
+      tanggalKejadian: patient.tanggalKejadian || patient.waktuKejadian || rawData.waktuKejadian || "",
+      jamKejadian: patient.jamKejadian || rawData.jamKejadian || "",
+      alamatKejadian: patient.alamatKejadian || rawData.alamatKejadian || "",
+      kelurahan: patient.kelurahanKejadian || rawData.kelurahan || "Sananwetan",
       kelurahanCustom: rawData.kelurahanCustom || "",
-      kelurahan_final: patient.kelurahan,
-      kecamatan: patient.kecamatan || "Sananwetan",
+      kelurahan_final: patient.kelurahanKejadian || rawData.kelurahan || "Sananwetan",
+      kecamatan: patient.kecamatanKejadian || rawData.kecamatan || "Sananwetan",
       kecamatanCustom: rawData.kecamatanCustom || "",
-      kecamatan_final: patient.kecamatan || "Sananwetan",
-      kabupatenKota: patient.kabupatenKota || "Kota Blitar",
+      kecamatan_final: patient.kecamatanKejadian || rawData.kecamatan || "Sananwetan",
+      kabupatenKota: patient.kabupatenKotaKejadian || rawData.kabupatenKota || "Kota Blitar",
       kabupatenKotaCustom: rawData.kabupatenKotaCustom || "",
-      kabupatenKota_final: patient.kabupatenKota || "Kota Blitar",
-      provinsi: "Jawa Timur",
+      kabupatenKota_final: patient.kabupatenKotaKejadian || rawData.kabupatenKota || "Kota Blitar",
+      provinsi: patient.provinsiKejadian || rawData.provinsi || "Jawa Timur",
       sumberInfo: rawData.sumberInfo || "Laporan Petugas Puskesmas",
       kronologi: rawData.kronologi || `Kasus gigitan HPR di wilayah Kel. ${patient.kelurahan}`,
       spesiesHPR: patient.spesiesHPR || "Anjing",
@@ -436,14 +458,19 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       namaKorban: patient.namaKorban,
       noHpKorban: patient.noHpKorban || patient.kontakKorban || "-",
       umurKorban: patient.umurKorban,
-      alamatKorban: patient.alamatKorban,
+      alamatKorban: patient.alamatKorban || rawData.alamatKorban || "-",
+      kelurahanDomisili: patient.kelurahanDomisili || rawData.kelurahanDomisili || patient.kelurahan || "",
+      kecamatanDomisili: patient.kecamatanDomisili || rawData.kecamatanDomisili || patient.kecamatan || "",
+      kabupatenKotaDomisili: patient.kabupatenKotaDomisili || rawData.kabupatenKotaDomisili || patient.kabupatenKota || "",
+      provinsiDomisili: patient.provinsiDomisili || rawData.provinsiDomisili || "Jawa Timur",
       jkKorban: patient.jkKorban,
-      kondisiKorban: rawData.kondisiKorban || "Sadar Baik",
-      kondisiLuka: kondisiLuka, // Data Kondisi Luka yang baru diganti!
-      lokasiLuka: patient.lokasiLuka || "-",
-      pertolonganPertama: patient.pertolonganPertama || "-",
+      kondisiKorban: kondisiUmumKorban || "Sehat",
+      kondisiUmumKorban: kondisiUmumKorban || "Sehat",
+      kondisiLuka: kondisiLuka,
+      lokasiLuka: lokasiLuka || "-",
+      pertolonganPertama: pertolonganPertama || "-",
       detailPertolongan: patient.detailPertolongan || "",
-      tindakanKasus: patient.tindakanKasus || "-",
+      tindakanKasus: tindakanKasus || "-",
       tindakanHPR: patient.tindakanHPR || "Observasi 14 Hari",
       tindakanMasyarakat: rawData.tindakanMasyarakat || "Edukasi Bahaya Rabies",
       rekomendasi: rekomendasi,
@@ -469,6 +496,27 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       nipPJMonitoring: currentUser.nip || patient.nipPJ || DEFAULT_PELAKSANA_NIP,
       lastUpdated: lastUpdateTimestamp,
       // Header names untuk Google Spreadsheet
+      "Tanggal Kejadian": patient.tanggalKejadian || patient.waktuKejadian || rawData.waktuKejadian || "",
+      "Jam Kejadian": patient.jamKejadian || rawData.jamKejadian || "",
+      "Alamat Kejadian": patient.alamatKejadian || rawData.alamatKejadian || "",
+      "Kelurahan Kejadian": patient.kelurahanKejadian || rawData.kelurahan || "Sananwetan",
+      "Kecamatan Kejadian": patient.kecamatanKejadian || rawData.kecamatan || "Sananwetan",
+      "Kabupaten/Kota Kejadian": patient.kabupatenKotaKejadian || rawData.kabupatenKota || "Kota Blitar",
+      "Provinsi Kejadian": patient.provinsiKejadian || rawData.provinsi || "Jawa Timur",
+      "Alamat Korban": patient.alamatKorban || rawData.alamatKorban || "-",
+      "Kelurahan domisili korban": patient.kelurahanDomisili || rawData.kelurahanDomisili || patient.kelurahan || "",
+      "Kecamatan domisili korban": patient.kecamatanDomisili || rawData.kecamatanDomisili || patient.kecamatan || "",
+      "Kab kota korban": patient.kabupatenKotaDomisili || rawData.kabupatenKotaDomisili || patient.kabupatenKota || "",
+      "Provinsi domisili korban": patient.provinsiDomisili || rawData.provinsiDomisili || "Jawa Timur",
+      "Kondisi Umum Korban": kondisiUmumKorban || "Sehat",
+      "Kondisi Umum": kondisiUmumKorban || "Sehat",
+      "Keadaan Umum Korban": kondisiUmumKorban || "Sehat",
+      "Kondisi Korban": kondisiUmumKorban || "Sehat",
+      "Kondisi Luka": kondisiLuka,
+      "Lokasi Luka": lokasiLuka || "-",
+      "Pertolongan Pertama": pertolonganPertama || "-",
+      "Tindakan Kasus": tindakanKasus || "-",
+      "Rekomendasi": rekomendasi,
       "Status Pemantauan": statusPemantauan,
       "Hari Observasi": Number(hariObservasi),
       "Hari Pemantauan": Number(hariObservasi),
@@ -496,6 +544,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
           ...parsed[existingIdx],
           ...updatePayload,
           kondisiLuka,
+          kondisiUmumKorban: kondisiUmumKorban || "Sehat",
+          kondisiKorban: kondisiUmumKorban || "Sehat",
+          lokasiLuka: lokasiLuka || "-",
+          pertolonganPertama: pertolonganPertama || "-",
+          tindakanKasus: tindakanKasus || "-",
           kondisiHewan: kondisiHewanText,
           rekomendasi,
           timestamp_recorded: new Date().toISOString()
@@ -504,6 +557,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
         parsed.unshift({
           ...updatePayload,
           kondisiLuka,
+          kondisiUmumKorban: kondisiUmumKorban || "Sehat",
+          kondisiKorban: kondisiUmumKorban || "Sehat",
+          lokasiLuka: lokasiLuka || "-",
+          pertolonganPertama: pertolonganPertama || "-",
+          tindakanKasus: tindakanKasus || "-",
           timestamp_recorded: new Date().toISOString()
         });
       }
@@ -623,9 +681,17 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
           {/* Quick Summary Banner */}
           <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div>
-              <span className="text-slate-400 block font-semibold text-[11px]">KORBAN & LOKASI</span>
+              <span className="text-slate-400 block font-semibold text-[11px]">KORBAN & DOMISILI</span>
               <span className="font-bold text-slate-800">{patient.namaKorban} ({patient.jkKorban})</span>
-              <p className="text-slate-500 truncate">{patient.alamatKorban || patient.kelurahan}</p>
+              <p className="text-slate-600 truncate">{patient.alamatKorban || "-"}</p>
+              <p className="text-slate-500 text-[11px] truncate">
+                Domisili: Kel. {patient.kelurahanDomisili || patient.kelurahan || "-"}, Kec. {patient.kecamatanDomisili || patient.kecamatan || "-"}
+              </p>
+              {patient.alamatKejadian && (
+                <p className="text-amber-700 text-[11px] truncate mt-0.5 font-medium">
+                  TKP: {patient.alamatKejadian} (Kel. {patient.kelurahanKejadian || patient.kelurahan || "-"})
+                </p>
+              )}
             </div>
             <div>
               <span className="text-slate-400 block font-semibold text-[11px]">HEWAN PENULAR (HPR)</span>
@@ -737,8 +803,51 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
               </div>
             </div>
 
-            {/* Kondisi Luka & Hewan saat ini */}
+            {/* Kondisi Umum, Luka & Hewan saat ini */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Kondisi Umum Korban */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <span>Kondisi Umum Korban Saat Ini:</span>
+                  <span className="text-rose-500 font-bold ml-1 text-sm leading-none" title="Wajib diisi">*</span>
+                </label>
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={kondisiUmumKorban}
+                    onChange={(e) => setKondisiUmumKorban(e.target.value)}
+                    placeholder="Contoh: Sehat, Sadar Baik, Tidak Demam"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  {/* Quick Select Chips Kondisi Umum */}
+                  <div className="flex flex-wrap gap-1 items-center pt-0.5">
+                    <span className="text-[10px] text-slate-400 font-semibold mr-0.5">Pilihan:</span>
+                    {[
+                      "Sehat",
+                      "Sadar Baik",
+                      "Demam",
+                      "Lemas",
+                      "Nyeri Luka",
+                      "Gelisah"
+                    ].map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setKondisiUmumKorban(opt)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md border font-medium transition cursor-pointer ${
+                          kondisiUmumKorban.toLowerCase() === opt.toLowerCase()
+                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Kondisi Luka Korban */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   <span>Kondisi Luka Korban Saat Ini:</span>
@@ -754,7 +863,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                         setValidationErrors((prev) => ({ ...prev, kondisiLuka: "" }));
                       }
                     }}
-                    className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                    className={`w-full rounded-xl border bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
                       validationErrors.kondisiLuka ? "border-rose-400 bg-rose-50/40" : "border-slate-300"
                     }`}
                   >
@@ -786,7 +895,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                             setValidationErrors((prev) => ({ ...prev, kondisiLuka: "" }));
                           }
                         }}
-                        className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition cursor-pointer ${
+                        className={`text-xs px-2 py-0.5 rounded-md border font-bold transition cursor-pointer ${
                           kondisiLuka === opt || kondisiLuka.startsWith(opt)
                             ? "bg-blue-600 text-white border-blue-600 shadow-xs"
                             : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
@@ -798,7 +907,44 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
 
+            {/* Lokasi Luka & Catatan Kondisi Hewan */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Lokasi Luka */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <span>Lokasi Luka Gigitan / Cakaran:</span>
+                </label>
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={lokasiLuka}
+                    onChange={(e) => setLokasiLuka(e.target.value)}
+                    placeholder="Contoh: Tangan kanan / Jari telunjuk"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <div className="flex flex-wrap gap-1 items-center pt-0.5">
+                    <span className="text-[10px] text-slate-400 font-semibold mr-0.5">Pilihan:</span>
+                    {["Tangan / Jari", "Kaki / Betis", "Paha", "Lengan", "Wajah / Kepala", "Leher"].map((loc) => (
+                      <button
+                        key={loc}
+                        type="button"
+                        onClick={() => setLokasiLuka(loc)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md border font-medium transition cursor-pointer ${
+                          lokasiLuka.toLowerCase() === loc.toLowerCase()
+                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        {loc}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Catatan Kondisi Hewan */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   <span>Catatan Kondisi Hewan:</span>
@@ -852,6 +998,124 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pertolongan Pertama, Tindakan Medis & Rekomendasi */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Pertolongan Pertama */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <span>Pertolongan Pertama yang Diberikan:</span>
+                </label>
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={pertolonganPertama}
+                    onChange={(e) => setPertolonganPertama(e.target.value)}
+                    placeholder="Contoh: Cuci luka sabun air mengalir <12 jam"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <div className="flex flex-wrap gap-1 items-center pt-0.5">
+                    <span className="text-[10px] text-slate-400 font-semibold mr-0.5">Pilihan:</span>
+                    {[
+                      "Cuci luka sabun air mengalir <12 jam",
+                      "Cuci luka sabun air mengalir >12 jam",
+                      "Diberi Antiseptik (Betadine)",
+                      "VAR Dosis 1",
+                      "SAR"
+                    ].map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setPertolonganPertama(opt)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md border font-medium transition cursor-pointer ${
+                          pertolonganPertama.toLowerCase() === opt.toLowerCase()
+                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tindakan Medis Korban */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <span>Tindakan Medis terhadap Kasus:</span>
+                </label>
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={tindakanKasus}
+                    onChange={(e) => setTindakanKasus(e.target.value)}
+                    placeholder="Contoh: Perawatan luka berkala, edukasi observasi HPR"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <div className="flex flex-wrap gap-1 items-center pt-0.5">
+                    <span className="text-[10px] text-slate-400 font-semibold mr-0.5">Pilihan:</span>
+                    {[
+                      "Perawatan luka & observasi",
+                      "Pemberian VAR lengkap",
+                      "Rujuk ke RSUD",
+                      "Edukasi pencegahan rabies"
+                    ].map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setTindakanKasus(opt)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md border font-medium transition cursor-pointer ${
+                          tindakanKasus.toLowerCase() === opt.toLowerCase()
+                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Rekomendasi & Tindak Lanjut */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                <span>Rekomendasi & Rencana Tindak Lanjut:</span>
+              </label>
+              <div className="space-y-1.5">
+                <textarea
+                  rows={2}
+                  value={rekomendasi}
+                  onChange={(e) => setRekomendasi(e.target.value)}
+                  placeholder="Contoh: Lanjutkan observasi hewan s/d hari ke-14. Ingatkan jadwal VAR Dosis 3 & 7 jika hewan mati/sakit."
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+                <div className="flex flex-wrap gap-1 items-center pt-0.5">
+                  <span className="text-[10px] text-slate-400 font-semibold mr-0.5">Pilihan Cepat:</span>
+                  {[
+                    "Lanjutkan observasi hewan s/d hari ke-14",
+                    "Ingatkan jadwal VAR Dosis 3 & 7",
+                    "Kontrol puskesmas segera jika demam atau hewan sakit",
+                    "Selesai pemantauan - hewan sehat & korban sembuh"
+                  ].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setRekomendasi(opt)}
+                      className={`text-[10px] px-2 py-0.5 rounded-md border font-medium transition cursor-pointer ${
+                        rekomendasi.toLowerCase() === opt.toLowerCase()
+                          ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                          : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1173,23 +1437,45 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Kondisi Korban & Status Luka</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Kondisi Umum Korban</label>
                     <input
                       type="text"
                       value={logKondisiKorban}
                       onChange={(e) => setLogKondisiKorban(e.target.value)}
-                      placeholder="Contoh: Kondisi umum baik, luka mengering"
+                      placeholder="Contoh: Sehat, tidak ada demam"
                       className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     />
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {["Kondisi umum baik, tidak demam", "Luka bersih & mulai mengering", "Luka sembuh total"].map((chip) => (
+                      {["Kondisi umum baik, tidak demam", "Sadar baik & aktif", "Ada demam/pusing"].map((chip) => (
                         <button
                           key={chip}
                           type="button"
                           onClick={() => setLogKondisiKorban(chip)}
                           className="text-[10px] px-2 py-0.5 rounded bg-blue-100/60 hover:bg-blue-200 text-blue-800 transition cursor-pointer"
+                        >
+                          + {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Status & Perkembangan Luka</label>
+                    <input
+                      type="text"
+                      value={logStatusLuka}
+                      onChange={(e) => setLogStatusLuka(e.target.value)}
+                      placeholder="Contoh: Luka bersih & mulai mengering"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {["Luka bersih & mengering", "Tidak ada tanda infeksi", "Luka sembuh total"].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => setLogStatusLuka(chip)}
+                          className="text-[10px] px-2 py-0.5 rounded bg-amber-100/60 hover:bg-amber-200 text-amber-800 transition cursor-pointer"
                         >
                           + {chip}
                         </button>
