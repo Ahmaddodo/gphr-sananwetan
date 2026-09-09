@@ -21,7 +21,8 @@ import {
   HeartPulse,
   History,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Building2
 } from "lucide-react";
 import {
   PatientMonitoringItem,
@@ -78,6 +79,12 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const [lokasiLuka, setLokasiLuka] = useState<string>(patient?.lokasiLuka || patient?.fullData?.lokasiLuka || "");
   const [pertolonganPertama, setPertolonganPertama] = useState<string>(patient?.pertolonganPertama || patient?.fullData?.pertolonganPertama || "");
   const [tindakanKasus, setTindakanKasus] = useState<string>(patient?.tindakanKasus || patient?.fullData?.tindakanKasus || "");
+  const [tanggalBerkunjungFaskes, setTanggalBerkunjungFaskes] = useState<string>(
+    patient?.tanggalBerkunjungFaskes || patient?.fullData?.tanggalBerkunjungFaskes || ""
+  );
+  const [namaFaskes, setNamaFaskes] = useState<string>(
+    patient?.namaFaskes || patient?.fullData?.namaFaskes || "Puskesmas Sananwetan"
+  );
   const [kondisiHewanText, setKondisiHewanText] = useState<string>(patient?.kondisiHewan || "");
   const [rekomendasi, setRekomendasi] = useState<string>(patient?.rekomendasi || "");
 
@@ -138,6 +145,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       setLokasiLuka(patient.lokasiLuka || patient.fullData?.lokasiLuka || "");
       setPertolonganPertama(patient.pertolonganPertama || patient.fullData?.pertolonganPertama || "");
       setTindakanKasus(patient.tindakanKasus || patient.fullData?.tindakanKasus || "");
+      setTanggalBerkunjungFaskes(patient.tanggalBerkunjungFaskes || patient.fullData?.tanggalBerkunjungFaskes || "");
+      setNamaFaskes(patient.namaFaskes || patient.fullData?.namaFaskes || "Puskesmas Sananwetan");
       setKondisiHewanText(patient.kondisiHewan || "");
       setRekomendasi(patient.rekomendasi || "");
       setJadwalVAR(patient.jadwalVAR || {
@@ -370,6 +379,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
 
     const updatedItem: PatientMonitoringItem = {
       ...patient,
+      tanggalBerkunjungFaskes: tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || "",
+      namaFaskes: namaFaskes || patient.namaFaskes || "Puskesmas Sananwetan",
       statusPemantauan,
       statusHewanObservasi: statusHewan,
       hariObservasiKe: Number(hariObservasi),
@@ -389,6 +400,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       lastUpdated: lastUpdateTimestamp,
       fullData: {
         ...(patient.fullData || {}),
+        tanggalBerkunjungFaskes: tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || "",
+        namaFaskes: namaFaskes || patient.namaFaskes || "Puskesmas Sananwetan",
         kondisiLuka,
         kondisiUmumKorban: kondisiUmumKorban || "Sehat",
         kondisiKorban: kondisiUmumKorban || "Sehat",
@@ -424,6 +437,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       waktuKejadian: patient.waktuKejadian || rawData.waktuKejadian || "",
       tanggalKejadian: patient.tanggalKejadian || patient.waktuKejadian || rawData.waktuKejadian || "",
       jamKejadian: patient.jamKejadian || rawData.jamKejadian || "",
+      tanggalBerkunjungFaskes: tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || rawData.tanggalBerkunjungFaskes || "",
+      namaFaskes: namaFaskes || patient.namaFaskes || rawData.namaFaskes || "Puskesmas Sananwetan",
       alamatKejadian: patient.alamatKejadian || rawData.alamatKejadian || "",
       kelurahan: patient.kelurahanKejadian || rawData.kelurahan || "Sananwetan",
       kelurahanCustom: rawData.kelurahanCustom || "",
@@ -498,6 +513,10 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       // Header names untuk Google Spreadsheet
       "Tanggal Kejadian": patient.tanggalKejadian || patient.waktuKejadian || rawData.waktuKejadian || "",
       "Jam Kejadian": patient.jamKejadian || rawData.jamKejadian || "",
+      "Tanggal Berkunjung ke Faskes": tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || rawData.tanggalBerkunjungFaskes || "",
+      "Tanggal Berkunjung Faskes": tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || rawData.tanggalBerkunjungFaskes || "",
+      "Nama Faskes": namaFaskes || patient.namaFaskes || rawData.namaFaskes || "Puskesmas Sananwetan",
+      "Fasilitas Kesehatan": namaFaskes || patient.namaFaskes || rawData.namaFaskes || "Puskesmas Sananwetan",
       "Alamat Kejadian": patient.alamatKejadian || rawData.alamatKejadian || "",
       "Kelurahan Kejadian": patient.kelurahanKejadian || rawData.kelurahan || "Sananwetan",
       "Kecamatan Kejadian": patient.kecamatanKejadian || rawData.kecamatan || "Sananwetan",
@@ -690,6 +709,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
               {patient.alamatKejadian && (
                 <p className="text-amber-700 text-[11px] truncate mt-0.5 font-medium">
                   TKP: {patient.alamatKejadian} (Kel. {patient.kelurahanKejadian || patient.kelurahan || "-"})
+                </p>
+              )}
+              {patient.tanggalBerkunjungFaskes && (
+                <p className="text-blue-700 text-[11px] truncate mt-0.5 font-medium">
+                  Kunjungan Faskes: {patient.tanggalBerkunjungFaskes} ({patient.namaFaskes || "Puskesmas"})
                 </p>
               )}
             </div>
@@ -1078,6 +1102,56 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Riwayat Kunjungan Faskes Korban */}
+            <div className="rounded-xl border border-blue-200/80 bg-blue-50/50 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 size={16} className="text-blue-600" />
+                <span className="text-xs font-bold text-blue-950 uppercase tracking-wide">
+                  Kunjungan Fasilitas Kesehatan (Faskes)
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    <Calendar size={13} className="text-blue-600" />
+                    <span>Tanggal Berkunjung ke Faskes:</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={tanggalBerkunjungFaskes}
+                    onChange={(e) => setTanggalBerkunjungFaskes(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <span className="text-[10px] text-slate-500">Tanggal pertama kali korban berobat ke faskes.</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    <Building2 size={13} className="text-blue-600" />
+                    <span>Nama Fasilitas Kesehatan (Faskes):</span>
+                  </label>
+                  <input
+                    type="text"
+                    list="nama-faskes-options-modal"
+                    value={namaFaskes}
+                    onChange={(e) => setNamaFaskes(e.target.value)}
+                    placeholder="Contoh: Puskesmas Sananwetan"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <datalist id="nama-faskes-options-modal">
+                    <option value="Puskesmas Sananwetan" />
+                    <option value="RSUD Mardi Waluyo Kota Blitar" />
+                    <option value="Puskesmas Kepanjenkidul" />
+                    <option value="Puskesmas Sukorejo" />
+                    <option value="RS Syuhada Haji" />
+                    <option value="RS Aminah Blitar" />
+                    <option value="Klinik Pratama" />
+                  </datalist>
+                  <span className="text-[10px] text-slate-500">Puskesmas, RS, atau Klinik tempat pemeriksaan.</span>
                 </div>
               </div>
             </div>

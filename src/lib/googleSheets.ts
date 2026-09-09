@@ -1801,6 +1801,8 @@ export async function sendToAppsScript(
   const spesiesVal = (payload.spesies_final || payload.spesiesHPR || payload["Spesies HPR"] || "Anjing").trim();
   const waktuKejadianVal = (payload.waktuKejadian || payload["Waktu Kejadian"] || new Date().toISOString().slice(0, 16)).trim();
   const tglPelaksanaanVal = (payload.tanggalPelaksanaan || payload["Tanggal Pelaksanaan"] || new Date().toISOString().slice(0, 10)).trim();
+  const tanggalBerkunjungFaskesVal = (payload.tanggalBerkunjungFaskes || payload["Tanggal Berkunjung ke Faskes"] || payload["Tanggal Berkunjung Faskes"] || (payload as any).tanggalBerkunjungFaskes || "").trim();
+  const namaFaskesVal = (payload.namaFaskes || payload["Nama Faskes"] || payload["Faskes"] || payload["Fasilitas Kesehatan"] || (payload as any).namaFaskes || "Puskesmas Sananwetan").trim();
 
   // Data pemantauan tambahan (kolom 37-46)
   const pAny = payload as any;
@@ -1930,6 +1932,8 @@ export async function sendToAppsScript(
     is_update: action === "update",
     rowValues: orderedRowValues,
     // Field standar
+    tanggalBerkunjungFaskes: tanggalBerkunjungFaskesVal,
+    namaFaskes: namaFaskesVal,
     namaKorban: namaKorbanVal,
     noHpKorban: noHpVal,
     umurKorban: umurKorbanVal,
@@ -1967,6 +1971,11 @@ export async function sendToAppsScript(
     "ID Kasus": payload.id_kasus || "",
     "Waktu Submit": payload.timestamp_submit || new Date().toISOString(),
     "Waktu Kejadian": waktuKejadianVal,
+    "Tanggal Berkunjung ke Faskes": tanggalBerkunjungFaskesVal,
+    "Tanggal Berkunjung Faskes": tanggalBerkunjungFaskesVal,
+    "Nama Faskes": namaFaskesVal,
+    "Faskes": namaFaskesVal,
+    "Fasilitas Kesehatan": namaFaskesVal,
     "Alamat Kejadian": payload.alamatKejadian || "",
     "Kelurahan": kelurahanVal,
     "Kecamatan": kecamatanVal,

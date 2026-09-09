@@ -709,6 +709,11 @@ export const PatientMonitoringDashboard: React.FC<PatientMonitoringDashboardProp
                         <span className="text-[11px] text-slate-400 block mt-1">
                           {patient.waktuKejadian ? patient.waktuKejadian.slice(0, 10) : "-"}
                         </span>
+                        {(patient.tanggalBerkunjungFaskes || patient.fullData?.tanggalBerkunjungFaskes) && (
+                          <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded block mt-0.5 w-fit font-medium" title={`Faskes: ${patient.namaFaskes || patient.fullData?.namaFaskes || "Puskesmas"}`}>
+                            Faskes: {(patient.tanggalBerkunjungFaskes || patient.fullData?.tanggalBerkunjungFaskes || "").slice(0, 10)}
+                          </span>
+                        )}
                       </td>
 
                       {/* Nama Korban */}

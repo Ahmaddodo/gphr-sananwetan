@@ -149,8 +149,16 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
                         <td className="p-1 align-top">a. Waktu Kejadian</td>
                         <td className="p-1 align-top">{formatDateIndonesian(formData.waktuKejadian)}</td>
                       </tr>
+                      <tr className="border-b border-black">
+                        <td className="p-1 align-top">b. Kunjungan ke Faskes</td>
+                        <td className="p-1 align-top">
+                          {formData.tanggalBerkunjungFaskes
+                            ? `${formatDateIndonesian(formData.tanggalBerkunjungFaskes)}${formData.namaFaskes ? ` (${formData.namaFaskes})` : ""}`
+                            : (formData.namaFaskes || "-")}
+                        </td>
+                      </tr>
                       <tr>
-                        <td className="p-1 align-top">b. Tempat Kejadian</td>
+                        <td className="p-1 align-top">c. Tempat Kejadian</td>
                         <td className="p-0 align-top">
                           <table className="w-full border-collapse table-fixed">
                             <colgroup>
@@ -370,6 +378,14 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
                               <tr className="border-b border-black">
                                 <td className="p-1">Kondisi Korban</td>
                                 <td className="p-1">{formData.kondisiKorban || "-"}</td>
+                              </tr>
+                              <tr className="border-b border-black">
+                                <td className="p-1">Kunjungan ke Faskes</td>
+                                <td className="p-1">
+                                  {formData.tanggalBerkunjungFaskes
+                                    ? `${formatDateIndonesian(formData.tanggalBerkunjungFaskes)}${formData.namaFaskes ? ` (${formData.namaFaskes})` : ""}`
+                                    : (formData.namaFaskes || "-")}
+                                </td>
                               </tr>
                               <tr className="border-b border-black">
                                 <td className="p-1">Pertolongan Pertama</td>

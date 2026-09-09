@@ -156,6 +156,15 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
                   <span className="text-slate-500 font-medium">Waktu Kejadian Gigitan:</span>
                   <span className="font-semibold text-slate-800">{patient.waktuKejadian}</span>
                 </div>
+                {(patient.tanggalBerkunjungFaskes || patient.fullData?.tanggalBerkunjungFaskes) && (
+                  <div className="flex justify-between border-b border-slate-50 pb-1.5">
+                    <span className="text-slate-500 font-medium">Kunjungan ke Faskes:</span>
+                    <span className="font-semibold text-emerald-800 text-right">
+                      {patient.tanggalBerkunjungFaskes || patient.fullData?.tanggalBerkunjungFaskes}
+                      {patient.namaFaskes || patient.fullData?.namaFaskes ? ` (${patient.namaFaskes || patient.fullData?.namaFaskes})` : ""}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between border-b border-slate-50 pb-1.5">
                   <span className="text-slate-500 font-medium">Kondisi Umum Korban:</span>
                   <span className="font-semibold text-blue-800 text-right">{patient.kondisiUmumKorban || patient.kondisiKorban || patient.fullData?.kondisiUmumKorban || patient.fullData?.kondisiKorban || "Sehat"}</span>

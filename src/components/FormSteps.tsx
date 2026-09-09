@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Users, User, FileText, ChevronRight, TriangleAlert, Camera, Trash2, Upload, Lock, FileSpreadsheet, ExternalLink, Database, Send, Settings2, UserCheck, MapPin } from "lucide-react";
+import { Clock, Users, User, FileText, ChevronRight, TriangleAlert, Camera, Trash2, Upload, Lock, FileSpreadsheet, ExternalLink, Database, Send, Settings2, UserCheck, MapPin, Building2, Calendar } from "lucide-react";
 import { FormGHPRData, FormErrors, UserAccessProfile } from "../types";
 import { FormInput } from "./FormInput";
 import { PertolonganPertamaSelector } from "./PertolonganPertamaSelector";
@@ -81,7 +81,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
       {/* STEP 1 */}
       {step === 1 && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5 min-w-0">
               <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
                 <span>Tanggal Kejadian</span>
@@ -141,6 +141,48 @@ export const FormSteps: React.FC<FormStepsProps> = ({
               <p className="text-[11px] text-slate-500">Pukul / perkiraan waktu kontak.</p>
             </div>
 
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                <Calendar size={13} className="text-blue-600" />
+                <span>Tgl Berkunjung ke Faskes</span>
+              </label>
+              <input
+                type="date"
+                value={formData.tanggalBerkunjungFaskes || ""}
+                onChange={(e) => updateField("tanggalBerkunjungFaskes", e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+              <p className="text-[11px] text-slate-500">Tanggal pertama kali berobat ke Faskes.</p>
+            </div>
+
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                <Building2 size={13} className="text-blue-600" />
+                <span>Fasilitas Kesehatan (Faskes)</span>
+              </label>
+              <div className="relative">
+                <input
+                  list="namafaskes-datalist-step1"
+                  value={formData.namaFaskes || ""}
+                  onChange={(e) => updateField("namaFaskes", e.target.value)}
+                  placeholder="Puskesmas Sananwetan..."
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+                <datalist id="namafaskes-datalist-step1">
+                  <option value="Puskesmas Sananwetan" />
+                  <option value="RSUD Mardi Waluyo Kota Blitar" />
+                  <option value="Puskesmas Kepanjenkidul" />
+                  <option value="Puskesmas Sukorejo" />
+                  <option value="RS Syuhada Haji" />
+                  <option value="RS Aminah Blitar" />
+                  <option value="Klinik Pratama" />
+                </datalist>
+              </div>
+              <p className="text-[11px] text-slate-500">Puskesmas / RS tempat periksa.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5">
             <div className="flex flex-col gap-1.5 min-w-0">
               <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
                 <span>Sumber Informasi</span>
@@ -903,6 +945,55 @@ export const FormSteps: React.FC<FormStepsProps> = ({
               error={errors.pertolonganPertama}
               showAsterisk={showAsterisk}
             />
+          </div>
+
+          {/* Kunjungan Fasilitas Kesehatan (Faskes) */}
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4 sm:p-5 shadow-2xs">
+            <h4 className="text-xs font-bold text-blue-950 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Building2 size={15} className="text-blue-600" />
+              <span>Kunjungan Fasilitas Kesehatan (Faskes)</span>
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5 min-w-0">
+                <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                  <Calendar size={13} className="text-blue-600" />
+                  <span>Tanggal Berkunjung ke Faskes</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.tanggalBerkunjungFaskes || ""}
+                  onChange={(e) => updateField("tanggalBerkunjungFaskes", e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+                <p className="text-[11px] text-slate-500">Tanggal korban pertama kali datang berobat ke faskes.</p>
+              </div>
+
+              <div className="flex flex-col gap-1.5 min-w-0">
+                <label className="text-xs font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1">
+                  <Building2 size={13} className="text-blue-600" />
+                  <span>Nama Fasilitas Kesehatan (Faskes)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    list="namafaskes-datalist-step5"
+                    value={formData.namaFaskes || ""}
+                    onChange={(e) => updateField("namaFaskes", e.target.value)}
+                    placeholder="Puskesmas Sananwetan..."
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  />
+                  <datalist id="namafaskes-datalist-step5">
+                    <option value="Puskesmas Sananwetan" />
+                    <option value="RSUD Mardi Waluyo Kota Blitar" />
+                    <option value="Puskesmas Kepanjenkidul" />
+                    <option value="Puskesmas Sukorejo" />
+                    <option value="RS Syuhada Haji" />
+                    <option value="RS Aminah Blitar" />
+                    <option value="Klinik Pratama" />
+                  </datalist>
+                </div>
+                <p className="text-[11px] text-slate-500">Puskesmas, RS, atau Klinik tempat korban berobat.</p>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

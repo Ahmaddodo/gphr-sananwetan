@@ -244,6 +244,7 @@ export function deduplicateAndSortLogs(logs: MonitoringDailyLog[]): MonitoringDa
   if (!Array.isArray(logs) || logs.length === 0) return [];
 
   const seenKeys = new Set<string>();
+  const seenIds = new Set<string>();
   const uniqueLogs: MonitoringDailyLog[] = [];
 
   for (let i = 0; i < logs.length; i++) {
@@ -251,20 +252,33 @@ export function deduplicateAndSortLogs(logs: MonitoringDailyLog[]): MonitoringDa
     if (!log) continue;
 
     const cleanDate = (log.tanggal || "").trim();
+    const cleanHari = String(log.hariKe || "");
     const cleanPetugas = (log.petugasNama || "").trim().toLowerCase();
     const cleanKondisi = (log.kondisiKorban || log.statusLuka || "").trim().toLowerCase();
     const cleanSuhu = (log.suhuTubuh || "").trim().toLowerCase();
     const cleanTindakan = (log.tindakanDilakukan || "").trim().toLowerCase();
     const cleanCatatan = (log.catatanKhusus || "").trim().toLowerCase();
 
-    // Composite signature to ensure true uniqueness without accidentally merging distinct logs on the same date
-    const sigKey = `${cleanDate}|${cleanPetugas}|${cleanKondisi}|${cleanSuhu}|${cleanTindakan}|${cleanCatatan}`;
+    // Normalisasi agar format "-" atau "" tidak dianggap beda log
+    const normKondisi = cleanKondisi === "-" ? "" : cleanKondisi;
+    const normSuhu = cleanSuhu === "-" ? "" : cleanSuhu;
+    const normTindakan = cleanTindakan === "-" ? "" : cleanTindakan;
+    const normCatatan = cleanCatatan === "-" ? "" : cleanCatatan;
+
+    // Composite signature
+    const sigKey = `${cleanDate}|${cleanHari}|${cleanPetugas}|${normKondisi}|${normSuhu}|${normTindakan}|${normCatatan}`;
 
     if (!seenKeys.has(sigKey)) {
       seenKeys.add(sigKey);
+
+      let assignedId = log.id && !seenIds.has(log.id)
+        ? log.id
+        : `log-${cleanDate || "tgl"}-${cleanHari || i + 1}-${i}-${Math.random().toString(36).slice(2, 6)}`;
+      seenIds.add(assignedId);
+
       uniqueLogs.push({
         ...log,
-        id: log.id || `log-${cleanDate}-${log.hariKe || i + 1}-${i}`
+        id: assignedId
       });
     }
   }
@@ -1578,6 +1592,10 @@ export function syncPatientFromFormSubmission(
     waktuKejadian: formData.waktuKejadian || "",
     tanggalKejadian: formData.tanggalKejadian || tglKejadian,
     jamKejadian: formData.jamKejadian || "",
+    tanggalBerkunjungFaskes: formData.tanggalBerkunjungFaskes || "",
+    namaFaskes: formData.namaFaskes || "",
+    sumberInfo: formData.sumberInfo || "",
+    sumberLaporan: formData.sumberLaporan || "",
     alamatKejadian: formData.alamatKejadian || "",
     kelurahanKejadian: finalKel,
     kecamatanKejadian: finalKec,
@@ -2042,6 +2060,25 @@ export async function syncPatientsFromGoogleSheets(
           ], "Dalam Pemantauan (Aktif)");
         }
 
+        const rawTanggalBerkunjungFaskes = String(getFieldFromRow(rd, [
+          "Tanggal Berkunjung ke Faskes",
+          "Tanggal Berkunjung Faskes",
+          "tanggalBerkunjungFaskes",
+          "Tanggal Berkunjung",
+          "Tgl Berkunjung",
+          "Tanggal Faskes",
+          "Tgl Kunjungan Faskes"
+        ], "")).trim();
+
+        const rawNamaFaskes = String(getFieldFromRow(rd, [
+          "Nama Faskes",
+          "namaFaskes",
+          "Faskes",
+          "Fasilitas Kesehatan",
+          "Nama Fasilitas Kesehatan",
+          "Puskesmas/Faskes"
+        ], "Puskesmas Sananwetan")).trim();
+
         // Ekstraksi data pemantauan kolom 37-46
         const rawHariObs = Number(getFieldFromRow(rd, [
           "Hari Observasi",
@@ -2215,6 +2252,8 @@ export async function syncPatientsFromGoogleSheets(
             waktuKejadian: tglKejadian || String(getFieldFromRow(rd, ["Waktu Kejadian", "waktuKejadian", "Tanggal Gigitan", "col_2"], ex.waktuKejadian || "")),
             tanggalKejadian: tglKejadian,
             jamKejadian: rawJam || ex.jamKejadian || "",
+            tanggalBerkunjungFaskes: rawTanggalBerkunjungFaskes || ex.tanggalBerkunjungFaskes || ex.fullData?.tanggalBerkunjungFaskes || "",
+            namaFaskes: rawNamaFaskes || ex.namaFaskes || ex.fullData?.namaFaskes || "Puskesmas Sananwetan",
             alamatKejadian: alamatKejadian || ex.alamatKejadian || "",
             kelurahan: kelurahanKejadian || ex.kelurahan || "Sananwetan",
             kelurahanCustom: "",
@@ -2286,6 +2325,10 @@ export async function syncPatientsFromGoogleSheets(
             waktuKejadian: tglKejadian || ex.waktuKejadian,
             tanggalKejadian: tglKejadian || ex.tanggalKejadian,
             jamKejadian: rawJam || ex.jamKejadian || "",
+            tanggalBerkunjungFaskes: rawTanggalBerkunjungFaskes || ex.tanggalBerkunjungFaskes || ex.fullData?.tanggalBerkunjungFaskes || "",
+            namaFaskes: rawNamaFaskes || ex.namaFaskes || ex.fullData?.namaFaskes || "Puskesmas Sananwetan",
+            sumberInfo: String(fullDataFromSheet.sumberInfo || ex.sumberInfo || "Laporan Petugas Faskes"),
+            sumberLaporan: String(fullDataFromSheet.sumberLaporan || ex.sumberLaporan || "Laporan Petugas Faskes"),
             alamatKejadian: alamatKejadian || ex.alamatKejadian || "",
             kelurahanKejadian: kelurahanKejadian || ex.kelurahanKejadian || "Sananwetan",
             kecamatanKejadian: kecamatanKejadian || ex.kecamatanKejadian || "Sananwetan",
@@ -2388,6 +2431,8 @@ export async function syncPatientsFromGoogleSheets(
             waktuKejadian: tglKejadian || String(getFieldFromRow(rd, ["Waktu Kejadian", "waktuKejadian", "Tanggal Gigitan", "col_2"], "")),
             tanggalKejadian: tglKejadian,
             jamKejadian: rawJam || "",
+            tanggalBerkunjungFaskes: rawTanggalBerkunjungFaskes,
+            namaFaskes: rawNamaFaskes || "Puskesmas Sananwetan",
             alamatKejadian: alamatKejadian || "",
             kelurahan: kelurahanKejadian || "Sananwetan",
             kelurahanCustom: "",
@@ -2459,6 +2504,10 @@ export async function syncPatientsFromGoogleSheets(
             waktuKejadian: tglKejadian,
             tanggalKejadian: tglKejadian,
             jamKejadian: rawJam || "",
+            tanggalBerkunjungFaskes: rawTanggalBerkunjungFaskes,
+            namaFaskes: rawNamaFaskes || "Puskesmas Sananwetan",
+            sumberInfo: String(fullDataNewSheet.sumberInfo || "Laporan Petugas Faskes"),
+            sumberLaporan: String(fullDataNewSheet.sumberLaporan || "Laporan Petugas Faskes"),
             alamatKejadian: alamatKejadian || "",
             kelurahanKejadian: kelurahanKejadian || "Sananwetan",
             kecamatanKejadian: kecamatanKejadian || "Sananwetan",

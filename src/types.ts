@@ -222,6 +222,8 @@ export interface PatientMonitoringItem {
   tindakanKasus: string;
   tindakanHPR?: string;
   rekomendasi?: string;
+  sumberInfo?: string;
+  sumberLaporan?: string;
   statusPemantauan: StatusPemantauanPasien;
   statusHewanObservasi: StatusHewanObservasi;
   hariObservasiKe: number;
