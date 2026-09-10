@@ -1121,8 +1121,51 @@ export default function App() {
     const kec = finalKec || formData.kecamatan || "";
     const kab = finalKab || formData.kabupatenKota || "";
 
+    const finalKelDom = formData.kelurahanDomisili === "Lainnya"
+      ? (formData.kelurahanDomisiliCustom || "")
+      : (formData.kelurahanDomisili || "");
+    const finalKecDom = formData.kecamatanDomisiliCustom && formData.kecamatanDomisili === "Lainnya"
+      ? (formData.kecamatanDomisiliCustom || "")
+      : (formData.kecamatanDomisili || "");
+    const finalKabDom = formData.kabupatenKotaDomisiliCustom && formData.kabupatenKotaDomisili === "Lainnya"
+      ? (formData.kabupatenKotaDomisiliCustom || "")
+      : (formData.kabupatenKotaDomisili || "");
+    const finalProvDom = formData.provinsiDomisili || "Jawa Timur";
+
+    // Cari data pasien eksisting untuk mempertahankan riwayat pemantauan harian & jadwal VAR saat edit form
+    const currentCaseId = editingCaseId || submittedData?.id || generatedId;
+    let existingPat: PatientMonitoringItem | undefined = undefined;
+    try {
+      const allP = getAllPatients();
+      existingPat = allP.find((p) => p.id_kasus === currentCaseId);
+      if (!existingPat && formData.namaKorban) {
+        const cleanName = formData.namaKorban.toLowerCase().trim();
+        existingPat = allP.find((p) => (p.namaKorban || "").toLowerCase().trim() === cleanName);
+      }
+    } catch (e) {}
+
+    // Ekstrak catatan riwayat perkembangan harian pasien agar TIDAK terhapus/menjadi '-' saat edit form
+    const resolvedCatatanPerkembangan = (existingPat?.riwayatLog && existingPat.riwayatLog.length > 0)
+      ? existingPat.riwayatLog.map((log: any, idx: number) =>
+          `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] (${log.petugasNama || "Petugas"}) Luka: ${log.statusLuka || log.kondisiKorban || "-"}, Suhu: ${log.suhuTubuh || "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`
+        ).join("\n")
+      : (existingPat?.catatanPerkembanganHarian && existingPat.catatanPerkembanganHarian !== "-" ? existingPat.catatanPerkembanganHarian : "-");
+
+    const jVAR0 = existingPat?.jadwalVAR?.dosis0?.tanggal
+      ? `${existingPat.jadwalVAR.dosis0.status || "Diberikan"} (${existingPat.jadwalVAR.dosis0.tanggal})`
+      : ((existingPat as any)?.jadwalVAR_0 || "-");
+    const jVAR3 = existingPat?.jadwalVAR?.dosis3?.tanggal
+      ? `${existingPat.jadwalVAR.dosis3.status || "Diberikan"} (${existingPat.jadwalVAR.dosis3.tanggal})`
+      : ((existingPat as any)?.jadwalVAR_3 || "-");
+    const jVAR7 = existingPat?.jadwalVAR?.dosis7?.tanggal
+      ? `${existingPat.jadwalVAR.dosis7.status || "Diberikan"} (${existingPat.jadwalVAR.dosis7.tanggal})`
+      : ((existingPat as any)?.jadwalVAR_7 || "-");
+    const jVAR21 = existingPat?.jadwalVAR?.dosis21?.tanggal
+      ? `${existingPat.jadwalVAR.dosis21.status || "Diberikan"} (${existingPat.jadwalVAR.dosis21.tanggal})`
+      : ((existingPat as any)?.jadwalVAR_21 || "-");
+
     return {
-      id_kasus: editingCaseId || submittedData?.id || generatedId,
+      id_kasus: currentCaseId,
       timestamp_submit: new Date().toISOString(),
       ...formData,
       action: editingCaseId ? "update" : "create",
@@ -1130,7 +1173,7 @@ export default function App() {
       kelurahan: kel,
       kecamatan: kec,
       kabupatenKota: kab,
-      provinsi: formData.provinsi || "",
+      provinsi: formData.provinsi || "Jawa Timur",
       spesies_final: formData.spesiesHPR === "Lainnya" ? (formData.spesiesLain || "") : (formData.spesiesHPR || ""),
       kelurahan_final: kel,
       kecamatan_final: kec,
@@ -1138,6 +1181,50 @@ export default function App() {
       namaKorban: formData.namaKorban || "",
       noHpKorban: formData.noHpKorban || "",
       kondisiLuka: formData.kondisiLuka || "",
+      // Field Domisili Korban
+      kelurahanDomisili: finalKelDom || existingPat?.kelurahanDomisili || "",
+      "Kelurahan Domisili": finalKelDom || existingPat?.kelurahanDomisili || "",
+      "Kelurahan domisili korban": finalKelDom || existingPat?.kelurahanDomisili || "",
+      kecamatanDomisili: finalKecDom || existingPat?.kecamatanDomisili || "",
+      "Kecamatan Domisili": finalKecDom || existingPat?.kecamatanDomisili || "",
+      "Kecamatan domisili korban": finalKecDom || existingPat?.kecamatanDomisili || "",
+      kabupatenKotaDomisili: finalKabDom || existingPat?.kabupatenKotaDomisili || "",
+      "Kabupaten/Kota Domisili": finalKabDom || existingPat?.kabupatenKotaDomisili || "",
+      "Kab Kota Domisili": finalKabDom || existingPat?.kabupatenKotaDomisili || "",
+      "Kab kota korban": finalKabDom || existingPat?.kabupatenKotaDomisili || "",
+      provinsiDomisili: finalProvDom || existingPat?.provinsiDomisili || "Jawa Timur",
+      "Provinsi Domisili": finalProvDom || existingPat?.provinsiDomisili || "Jawa Timur",
+      "Provinsi domisili korban": finalProvDom || existingPat?.provinsiDomisili || "Jawa Timur",
+      // Sinkronisasi Faskes & Sumber Laporan
+      tanggalBerkunjungFaskes: formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      "Tanggal Berkunjung ke Faskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      namaFaskes: formData.namaFaskes || formData.sumberLaporan || existingPat?.namaFaskes || "",
+      "Nama Faskes": formData.namaFaskes || formData.sumberLaporan || existingPat?.namaFaskes || "",
+      sumberLaporan: formData.sumberLaporan || formData.namaFaskes || existingPat?.sumberLaporan || "",
+      "Sumber Laporan": formData.sumberLaporan || formData.namaFaskes || existingPat?.sumberLaporan || "",
+      sumberInfo: formData.sumberInfo || existingPat?.sumberInfo || "",
+      "Sumber Informasi": formData.sumberInfo || existingPat?.sumberInfo || "",
+      // Proteksi Data Pemantauan Harian & VAR
+      statusPemantauan: existingPat?.statusPemantauan || "Dalam Pemantauan (Aktif)",
+      "Status Pemantauan": existingPat?.statusPemantauan || "Dalam Pemantauan (Aktif)",
+      hariObservasi: existingPat?.hariObservasiKe || (existingPat as any)?.hariObservasi || 1,
+      "Hari Observasi": existingPat?.hariObservasiKe || (existingPat as any)?.hariObservasi || 1,
+      statusHewanObservasi: existingPat?.statusHewanObservasi || "Sehat / Normal (Observasi)",
+      "Status Hewan Observasi": existingPat?.statusHewanObservasi || "Sehat / Normal (Observasi)",
+      jadwalVAR_0: jVAR0,
+      "Jadwal VAR Dosis 0": jVAR0,
+      jadwalVAR_3: jVAR3,
+      "Jadwal VAR Dosis 3": jVAR3,
+      jadwalVAR_7: jVAR7,
+      "Jadwal VAR Dosis 7": jVAR7,
+      jadwalVAR_21: jVAR21,
+      "Jadwal VAR Dosis 21": jVAR21,
+      catatanPerkembanganHarian: resolvedCatatanPerkembangan,
+      "Catatan Perkembangan Harian": resolvedCatatanPerkembangan,
+      catatanLogHarian: resolvedCatatanPerkembangan,
+      riwayatLog: existingPat?.riwayatLog || [],
+      petugasPJMonitoring: existingPat?.petugasPJ || formData.pelaksanaNama || "",
+      "Petugas PJ Monitoring": existingPat?.petugasPJ || formData.pelaksanaNama || ""
     };
   }, [formData, submittedData, editingCaseId, getFinalKelurahan, getFinalKecamatan, getFinalKabKota]);
 

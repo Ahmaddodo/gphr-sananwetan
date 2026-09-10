@@ -161,41 +161,69 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                 <span>Fasilitas Kesehatan (Faskes)</span>
               </label>
               <div className="relative">
+                <select
+                  value={
+                    [
+                      "RSUD Mardi Waluyo",
+                      "RSUD Ngudi Waluyo Wlingi",
+                      "Puskesmas Sananwetan",
+                      "Puskesmas",
+                      "Perangkat Desa",
+                      "RSUD",
+                      "Warga",
+                      "Bhabinsa/Bhabinkamtibmas"
+                    ].includes(formData.namaFaskes || formData.sumberLaporan || "")
+                      ? (formData.namaFaskes || formData.sumberLaporan || "")
+                      : (formData.namaFaskes || formData.sumberLaporan ? "Lainnya" : "")
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "Lainnya") {
+                      updateField("namaFaskes", "");
+                      updateField("sumberLaporan", "");
+                    } else {
+                      updateField("namaFaskes", val);
+                      updateField("sumberLaporan", val);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                >
+                  <option value="">-- Pilih Fasilitas Kesehatan --</option>
+                  <option value="RSUD Mardi Waluyo">RSUD Mardi Waluyo</option>
+                  <option value="RSUD Ngudi Waluyo Wlingi">RSUD Ngudi Waluyo Wlingi</option>
+                  <option value="Puskesmas Sananwetan">Puskesmas Sananwetan</option>
+                  <option value="Puskesmas">Puskesmas</option>
+                  <option value="Perangkat Desa">Perangkat Desa</option>
+                  <option value="RSUD">RSUD</option>
+                  <option value="Warga">Warga</option>
+                  <option value="Bhabinsa/Bhabinkamtibmas">Bhabinsa/Bhabinkamtibmas</option>
+                  <option value="Lainnya">Lainnya (Ketik Manual)</option>
+                </select>
+              </div>
+              {(![
+                "",
+                "RSUD Mardi Waluyo",
+                "RSUD Ngudi Waluyo Wlingi",
+                "Puskesmas Sananwetan",
+                "Puskesmas",
+                "Perangkat Desa",
+                "RSUD",
+                "Warga",
+                "Bhabinsa/Bhabinkamtibmas"
+              ].includes(formData.namaFaskes || formData.sumberLaporan || "")) && (
                 <input
-                  list="namafaskes-datalist-step1"
-                  value={formData.namaFaskes || ""}
+                  type="text"
+                  value={formData.namaFaskes || formData.sumberLaporan || ""}
                   onChange={(e) => {
                     const val = e.target.value;
                     updateField("namaFaskes", val);
-                    updateField("sumberInfo", val);
                     updateField("sumberLaporan", val);
                   }}
-                  placeholder="Puskesmas Sananwetan..."
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  placeholder="Ketik nama fasilitas kesehatan / sumber laporan..."
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                 />
-                <datalist id="namafaskes-datalist-step1">
-                  <option value="Puskesmas Sananwetan" />
-                  <option value="RSUD Mardi Waluyo Kota Blitar" />
-                  <option value="Puskesmas Kepanjenkidul" />
-                  <option value="Puskesmas Sukorejo" />
-                  <option value="RS Syuhada Haji" />
-                  <option value="RS Aminah Blitar" />
-                  <option value="Klinik Pratama" />
-                </datalist>
-              </div>
-              <p className="text-[11px] text-slate-500">Puskesmas / RS tempat periksa.</p>
-              {Boolean((formData.sumberLaporan || formData.sumberInfo) && !formData.namaFaskes) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ans = formData.sumberLaporan || formData.sumberInfo;
-                    updateField("namaFaskes", ans);
-                  }}
-                  className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium underline flex items-center gap-1 cursor-pointer text-left"
-                >
-                  Samakan dengan Sumber Laporan ({formData.sumberLaporan || formData.sumberInfo})
-                </button>
               )}
+              <p className="text-[11px] text-slate-500">Disinkronkan dengan Sumber Laporan (Rekomendasi Tim).</p>
             </div>
           </div>
 
@@ -208,30 +236,43 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                 )}
               </label>
               <div className="relative">
-                <input
-                  list="sumberinfo-datalist"
-                  value={formData.sumberInfo || formData.sumberLaporan || ""}
+                <select
+                  value={
+                    ["Orang tua", "Warga", "Penderita", "Keluarga"].includes(formData.sumberInfo || "")
+                      ? (formData.sumberInfo || "")
+                      : (formData.sumberInfo ? "Lainnya" : "")
+                  }
                   onChange={(e) => {
                     const val = e.target.value;
-                    updateField("sumberInfo", val);
-                    updateField("sumberLaporan", val);
+                    if (val === "Lainnya") {
+                      updateField("sumberInfo", "Lainnya");
+                    } else {
+                      updateField("sumberInfo", val);
+                    }
                   }}
-                  placeholder="Ketik sumber informasi (misal: Laporan Warga, Puskesmas...)"
                   className={`w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 ${
                     errors.sumberInfo ? "border-rose-300 bg-rose-50/40" : "border-slate-200"
                   }`}
-                />
-                <datalist id="sumberinfo-datalist">
-                  <option value="Laporan Warga" />
-                  <option value="Puskesmas" />
-                  <option value="Rumah Sakit" />
-                  <option value="Perangkat Desa" />
-                  <option value="Bhabinkamtibmas" />
-                  <option value="Kader Kesehatan" />
-                </datalist>
+                >
+                  <option value="">-- Pilih Sumber Informasi --</option>
+                  <option value="Orang tua">Orang tua</option>
+                  <option value="Warga">Warga</option>
+                  <option value="Penderita">Penderita</option>
+                  <option value="Keluarga">Keluarga</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
               </div>
+              {((formData.sumberInfo && !["Orang tua", "Warga", "Penderita", "Keluarga"].includes(formData.sumberInfo)) || formData.sumberInfo === "Lainnya") && (
+                <input
+                  type="text"
+                  value={formData.sumberInfo === "Lainnya" ? "" : formData.sumberInfo}
+                  onChange={(e) => updateField("sumberInfo", e.target.value)}
+                  placeholder="Ketik sumber informasi lainnya..."
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              )}
               <p className="text-[11px] text-slate-500">
-                Ketik langsung atau pilih dari rekomendasi.
+                Pilihan: Orang tua, Warga, Penderita, Keluarga, atau Lainnya.
               </p>
               {errors.sumberInfo && (
                 <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1 mt-0.5">
@@ -1051,24 +1092,69 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                   <span>Nama Fasilitas Kesehatan (Faskes)</span>
                 </label>
                 <div className="relative">
-                  <input
-                    list="namafaskes-datalist-step5"
-                    value={formData.namaFaskes || ""}
-                    onChange={(e) => updateField("namaFaskes", e.target.value)}
-                    placeholder="Puskesmas Sananwetan..."
+                  <select
+                    value={
+                      [
+                        "RSUD Mardi Waluyo",
+                        "RSUD Ngudi Waluyo Wlingi",
+                        "Puskesmas Sananwetan",
+                        "Puskesmas",
+                        "Perangkat Desa",
+                        "RSUD",
+                        "Warga",
+                        "Bhabinsa/Bhabinkamtibmas"
+                      ].includes(formData.namaFaskes || formData.sumberLaporan || "")
+                        ? (formData.namaFaskes || formData.sumberLaporan || "")
+                        : (formData.namaFaskes || formData.sumberLaporan ? "Lainnya" : "")
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "Lainnya") {
+                        updateField("namaFaskes", "");
+                        updateField("sumberLaporan", "");
+                      } else {
+                        updateField("namaFaskes", val);
+                        updateField("sumberLaporan", val);
+                      }
+                    }}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                  />
-                  <datalist id="namafaskes-datalist-step5">
-                    <option value="Puskesmas Sananwetan" />
-                    <option value="RSUD Mardi Waluyo Kota Blitar" />
-                    <option value="Puskesmas Kepanjenkidul" />
-                    <option value="Puskesmas Sukorejo" />
-                    <option value="RS Syuhada Haji" />
-                    <option value="RS Aminah Blitar" />
-                    <option value="Klinik Pratama" />
-                  </datalist>
+                  >
+                    <option value="">-- Pilih Fasilitas Kesehatan --</option>
+                    <option value="RSUD Mardi Waluyo">RSUD Mardi Waluyo</option>
+                    <option value="RSUD Ngudi Waluyo Wlingi">RSUD Ngudi Waluyo Wlingi</option>
+                    <option value="Puskesmas Sananwetan">Puskesmas Sananwetan</option>
+                    <option value="Puskesmas">Puskesmas</option>
+                    <option value="Perangkat Desa">Perangkat Desa</option>
+                    <option value="RSUD">RSUD</option>
+                    <option value="Warga">Warga</option>
+                    <option value="Bhabinsa/Bhabinkamtibmas">Bhabinsa/Bhabinkamtibmas</option>
+                    <option value="Lainnya">Lainnya (Ketik Manual)</option>
+                  </select>
                 </div>
-                <p className="text-[11px] text-slate-500">Puskesmas, RS, atau Klinik tempat korban berobat.</p>
+                {(![
+                  "",
+                  "RSUD Mardi Waluyo",
+                  "RSUD Ngudi Waluyo Wlingi",
+                  "Puskesmas Sananwetan",
+                  "Puskesmas",
+                  "Perangkat Desa",
+                  "RSUD",
+                  "Warga",
+                  "Bhabinsa/Bhabinkamtibmas"
+                ].includes(formData.namaFaskes || formData.sumberLaporan || "")) && (
+                  <input
+                    type="text"
+                    value={formData.namaFaskes || formData.sumberLaporan || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      updateField("namaFaskes", val);
+                      updateField("sumberLaporan", val);
+                    }}
+                    placeholder="Ketik nama fasilitas kesehatan / sumber laporan..."
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  />
+                )}
+                <p className="text-[11px] text-slate-500">Puskesmas, RS, atau Klinik tempat korban berobat (sinkron dengan Sumber Laporan).</p>
               </div>
             </div>
           </div>

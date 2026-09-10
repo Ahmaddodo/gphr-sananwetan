@@ -1638,25 +1638,35 @@ export function syncPatientFromFormSubmission(
       dosis7: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" },
       dosis21: { tanggal: "", status: "Belum Diberikan", lokasiPemberian: "", keterangan: "" }
     },
-    riwayatLog: existing?.riwayatLog || [
-      {
-        id: `log-init-${Date.now()}`,
-        tanggal: tglKejadian,
-        hariKe: 1,
-        petugasNama: formData.pelaksanaNama || "",
-        petugasNIP: formData.pelaksanaNIP || "",
-        kelurahan: finalKel,
-        kondisiKorban: formData.kondisiLuka || "",
-        statusLuka: formData.kondisiLuka || "",
-        kondisiHewan: formData.kondisiHewan || "",
-        tindakanDilakukan: formData.tindakanKasus || "",
-        catatanKhusus: formData.rekomendasi || ""
-      }
-    ],
-    petugasPJ: formData.pelaksanaNama || "",
-    nipPJ: formData.pelaksanaNIP || "",
+    riwayatLog: (existing?.riwayatLog && existing.riwayatLog.length > 0)
+      ? existing.riwayatLog
+      : [
+          {
+            id: `log-init-${Date.now()}`,
+            tanggal: tglKejadian,
+            hariKe: 1,
+            petugasNama: formData.pelaksanaNama || "",
+            petugasNIP: formData.pelaksanaNIP || "",
+            kelurahan: finalKel,
+            kondisiKorban: formData.kondisiLuka || "",
+            statusLuka: formData.kondisiLuka || "",
+            kondisiHewan: formData.kondisiHewan || "",
+            tindakanDilakukan: formData.tindakanKasus || "",
+            catatanKhusus: formData.rekomendasi || ""
+          }
+        ],
+    catatanPerkembanganHarian: existing?.catatanPerkembanganHarian || (existing?.riwayatLog && existing.riwayatLog.length > 0 ? existing.riwayatLog.map((log: any, idx: number) => `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] (${log.petugasNama || "Petugas"}) Luka: ${log.statusLuka || log.kondisiKorban || "-"}, Suhu: ${log.suhuTubuh || "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`).join("\n") : ""),
+    petugasPJ: formData.pelaksanaNama || existing?.petugasPJ || "",
+    nipPJ: formData.pelaksanaNIP || existing?.nipPJ || "",
     lastUpdated: new Date().toLocaleString("id-ID"),
-    fullData: formData
+    fullData: {
+      ...formData,
+      kelurahanDomisili: finalKelDomisili,
+      kecamatanDomisili: finalKecDomisili,
+      kabupatenKotaDomisili: finalKabDomisili,
+      provinsiDomisili: finalProvDomisili,
+      catatanPerkembanganHarian: existing?.catatanPerkembanganHarian || ""
+    }
   };
 
   upsertPatient(updatedPatient);

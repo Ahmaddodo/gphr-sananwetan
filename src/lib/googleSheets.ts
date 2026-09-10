@@ -1536,17 +1536,17 @@ function prosesDataMasuk(data, action) {
       if (h === "alamat korban" || h === "alamat pasien" || h === "alamat domisili korban" || h === "alamat domisili" || h === "alamat") {
         return d.alamatKorban || d.alamatPasien || "-";
       }
-      if (h.indexOf("kelurahan domisili") !== -1 || h === "kelurahan korban" || h === "kelurahan tempat tinggal") {
-        return d.kelurahanDomisili || d["Kelurahan Domisili"] || "-";
+      if (h.indexOf("kelurahan domisili") !== -1 || h === "kelurahan korban" || h === "kelurahan tempat tinggal" || (h.indexOf("kelurahan") !== -1 && (h.indexOf("korban") !== -1 || h.indexOf("pasien") !== -1 || h.indexOf("domisili") !== -1))) {
+        return d.kelurahanDomisili || d["Kelurahan Domisili"] || d["Kelurahan domisili korban"] || d.kelurahan_final || d.kelurahan || "-";
       }
-      if (h.indexOf("kecamatan domisili") !== -1 || h === "kecamatan korban") {
-        return d.kecamatanDomisili || d["Kecamatan Domisili"] || "-";
+      if (h.indexOf("kecamatan domisili") !== -1 || h === "kecamatan korban" || (h.indexOf("kecamatan") !== -1 && (h.indexOf("korban") !== -1 || h.indexOf("pasien") !== -1 || h.indexOf("domisili") !== -1))) {
+        return d.kecamatanDomisili || d["Kecamatan Domisili"] || d["Kecamatan domisili korban"] || d.kecamatan_final || d.kecamatan || "-";
       }
-      if (h.indexOf("kabupaten/kota domisili") !== -1 || h.indexOf("kab kota domisili") !== -1 || h.indexOf("kota domisili") !== -1 || h.indexOf("kabupaten domisili") !== -1 || h === "kab kota korban") {
-        return d.kabupatenKotaDomisili || d["Kabupaten/Kota Domisili"] || d["Kab Kota Domisili"] || "-";
+      if (h.indexOf("kabupaten/kota domisili") !== -1 || h.indexOf("kab kota domisili") !== -1 || h.indexOf("kota domisili") !== -1 || h.indexOf("kabupaten domisili") !== -1 || h === "kab kota korban" || ((h.indexOf("kab") !== -1 || h.indexOf("kota") !== -1) && (h.indexOf("korban") !== -1 || h.indexOf("pasien") !== -1 || h.indexOf("domisili") !== -1))) {
+        return d.kabupatenKotaDomisili || d["Kabupaten/Kota Domisili"] || d["Kab Kota Domisili"] || d["Kab kota korban"] || d.kabupatenKota_final || d.kabupatenKota || "-";
       }
-      if (h.indexOf("provinsi domisili") !== -1 || h === "provinsi korban") {
-        return d.provinsiDomisili || d["Provinsi Domisili"] || "-";
+      if (h.indexOf("provinsi domisili") !== -1 || h === "provinsi korban" || (h.indexOf("provinsi") !== -1 && (h.indexOf("korban") !== -1 || h.indexOf("pasien") !== -1 || h.indexOf("domisili") !== -1))) {
+        return d.provinsiDomisili || d["Provinsi Domisili"] || d["Provinsi domisili korban"] || d.provinsi || "-";
       }
       if (h.indexOf("biosekuriti") !== -1 || h.indexOf("biosecurity") !== -1) {
         return d.biosekuriti || d["Biosekuriti"] || d["Biosekuriti Kandang"] || d["Biosecurity"] || d["Biosecurity Kandang"] || "-";
@@ -1768,6 +1768,46 @@ function prosesDataMasuk(data, action) {
             var newLogVal = String(newRow[c] || "").trim();
             if ((newLogVal === "-" || newLogVal === "" || newLogVal === "null") && oldLogVal !== "" && oldLogVal !== "-") {
               newRow[c] = oldLogVal;
+            }
+          }
+          // Pertahankan status pemantauan jika newRow kosong/-
+          if (hName.indexOf("status pemantauan") !== -1 || hName === "status" || hName === "status kasus") {
+            var oldStatusVal = String(existingRowValues[c] || "").trim();
+            var newStatusVal = String(newRow[c] || "").trim();
+            if ((newStatusVal === "-" || newStatusVal === "" || newStatusVal === "null") && oldStatusVal !== "" && oldStatusVal !== "-") {
+              newRow[c] = oldStatusVal;
+            }
+          }
+          // Pertahankan hari observasi jika newRow kosong/0/-
+          if (hName.indexOf("hari observasi") !== -1 || hName.indexOf("hari pemantauan") !== -1 || hName === "hari" || hName === "hari ke") {
+            var oldHariVal = String(existingRowValues[c] || "").trim();
+            var newHariVal = String(newRow[c] || "").trim();
+            if ((newHariVal === "-" || newHariVal === "" || newHariVal === "0" || newHariVal === "null") && oldHariVal !== "" && oldHariVal !== "-" && oldHariVal !== "0") {
+              newRow[c] = oldHariVal;
+            }
+          }
+          // Pertahankan status hewan observasi jika newRow kosong/-
+          if (hName.indexOf("hewan observasi") !== -1 || (hName.indexOf("status hewan") !== -1 && hName.indexOf("kondisi") === -1)) {
+            var oldHewanObsVal = String(existingRowValues[c] || "").trim();
+            var newHewanObsVal = String(newRow[c] || "").trim();
+            if ((newHewanObsVal === "-" || newHewanObsVal === "" || newHewanObsVal === "null") && oldHewanObsVal !== "" && oldHewanObsVal !== "-") {
+              newRow[c] = oldHewanObsVal;
+            }
+          }
+          // Pertahankan jadwal VAR jika newRow kosong/-
+          if (hName.indexOf("var") !== -1 || hName.indexOf("dosis") !== -1) {
+            var oldVarVal = String(existingRowValues[c] || "").trim();
+            var newVarVal = String(newRow[c] || "").trim();
+            if ((newVarVal === "-" || newVarVal === "" || newVarVal === "null") && oldVarVal !== "" && oldVarVal !== "-") {
+              newRow[c] = oldVarVal;
+            }
+          }
+          // Pertahankan kelurahan/kecamatan/kabupaten domisili jika newRow kosong/-
+          if (hName.indexOf("domisili") !== -1 || hName.indexOf("korban") !== -1) {
+            var oldDomVal = String(existingRowValues[c] || "").trim();
+            var newDomVal = String(newRow[c] || "").trim();
+            if ((newDomVal === "-" || newDomVal === "" || newDomVal === "null") && oldDomVal !== "" && oldDomVal !== "-") {
+              newRow[c] = oldDomVal;
             }
           }
           // Pertahankan timestamp submit awal jika newRow kosong
