@@ -82,9 +82,10 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
   const [tanggalBerkunjungFaskes, setTanggalBerkunjungFaskes] = useState<string>(
     patient?.tanggalBerkunjungFaskes || patient?.fullData?.tanggalBerkunjungFaskes || ""
   );
-  const [namaFaskes, setNamaFaskes] = useState<string>(
-    patient?.namaFaskes || patient?.fullData?.namaFaskes || "Puskesmas Sananwetan"
+  const [sumberLaporan, setSumberLaporan] = useState<string>(
+    patient?.fullData?.sumberLaporan || patient?.fullData?.sumberInfo || ""
   );
+  const [namaFaskes, setNamaFaskes] = useState<string>("");
   const [kondisiHewanText, setKondisiHewanText] = useState<string>(patient?.kondisiHewan || "");
   const [rekomendasi, setRekomendasi] = useState<string>(patient?.rekomendasi || "");
 
@@ -146,7 +147,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       setPertolonganPertama(patient.pertolonganPertama || patient.fullData?.pertolonganPertama || "");
       setTindakanKasus(patient.tindakanKasus || patient.fullData?.tindakanKasus || "");
       setTanggalBerkunjungFaskes(patient.tanggalBerkunjungFaskes || patient.fullData?.tanggalBerkunjungFaskes || "");
-      setNamaFaskes(patient.namaFaskes || patient.fullData?.namaFaskes || "Puskesmas Sananwetan");
+      setNamaFaskes(""); // Kosongkan di awal sesuai permintaan pengguna
+      setSumberLaporan(patient.fullData?.sumberLaporan || patient.fullData?.sumberInfo || "");
       setKondisiHewanText(patient.kondisiHewan || "");
       setRekomendasi(patient.rekomendasi || "");
       setJadwalVAR(patient.jadwalVAR || {
@@ -431,6 +433,23 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       ? updatedLogs[0].tanggal
       : new Date().toISOString().slice(0, 10);
 
+    const finalFaskes = namaFaskes.trim() || sumberLaporan.trim() || patient.namaFaskes || patient.fullData?.namaFaskes || "";
+    const finalSumberLaporan = namaFaskes.trim() || sumberLaporan.trim() || patient.fullData?.sumberLaporan || patient.fullData?.sumberInfo || "Puskesmas";
+
+    const rawUmurKorban = (() => {
+      const v = String(patient.umurKorban || rawData.umurKorban || "").trim();
+      const digits = v.replace(/[^\d]/g, "");
+      return digits ? `${digits} Tahun` : (v !== "-" ? v : "");
+    })();
+
+    const rawUmurHewan = (() => {
+      const v = String((patient as any).umurHewan || patient.fullData?.umurHewan || rawData.umurHewan || "").trim();
+      return v && v !== "-" ? v : "";
+    })();
+
+    const rawPakan = (rawData.pakan && rawData.pakan !== "-" && rawData.pakan !== "Sisa Makanan Rumah Tangga") ? rawData.pakan : (patient.fullData?.pakan || "");
+    const rawBiosekuriti = (rawData.biosekuriti && rawData.biosekuriti !== "-") ? rawData.biosekuriti : (patient.fullData?.biosekuriti || rawData["Biosekuriti Kandang"] || "");
+
     const updatePayload: SubmissionPayload = {
       id_kasus: patient.id_kasus,
       timestamp_submit: patient.timestamp_submit || new Date().toISOString(),
@@ -438,7 +457,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       tanggalKejadian: patient.tanggalKejadian || patient.waktuKejadian || rawData.waktuKejadian || "",
       jamKejadian: patient.jamKejadian || rawData.jamKejadian || "",
       tanggalBerkunjungFaskes: tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || rawData.tanggalBerkunjungFaskes || "",
-      namaFaskes: namaFaskes || patient.namaFaskes || rawData.namaFaskes || "Puskesmas Sananwetan",
+      namaFaskes: finalFaskes,
       alamatKejadian: patient.alamatKejadian || rawData.alamatKejadian || "",
       kelurahan: patient.kelurahanKejadian || rawData.kelurahan || "Sananwetan",
       kelurahanCustom: rawData.kelurahanCustom || "",
@@ -450,19 +469,19 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       kabupatenKotaCustom: rawData.kabupatenKotaCustom || "",
       kabupatenKota_final: patient.kabupatenKotaKejadian || rawData.kabupatenKota || "Kota Blitar",
       provinsi: patient.provinsiKejadian || rawData.provinsi || "Jawa Timur",
-      sumberInfo: rawData.sumberInfo || "Laporan Petugas Puskesmas",
+      sumberInfo: finalSumberLaporan,
       kronologi: rawData.kronologi || `Kasus gigitan HPR di wilayah Kel. ${patient.kelurahan}`,
       spesiesHPR: patient.spesiesHPR || "Anjing",
       spesiesLain: rawData.spesiesLain || "",
       spesies_final: patient.spesiesHPR || "Anjing",
       ras: patient.rasHewan || rawData.ras || "-",
       jkHewan: rawData.jkHewan || "Jantan",
-      umurHewan: rawData.umurHewan || "2",
+      umurHewan: rawUmurHewan || rawData.umurHewan || "",
       satuanUmur: rawData.satuanUmur || "Tahun",
       metodePelihara: rawData.metodePelihara || "Diliarkan / Bebas",
       asalHewan: rawData.asalHewan || "-",
-      pakan: rawData.pakan || "-",
-      biosekuriti: rawData.biosekuriti || "-",
+      pakan: rawPakan,
+      biosekuriti: rawBiosekuriti,
       sumberAir: rawData.sumberAir || "-",
       kondisiHewan: kondisiHewanText,
       riwayatVaksin: rawData.riwayatVaksin || "Tidak Tahu",
@@ -471,8 +490,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       alamatPemilik: patient.alamatPemilik || "-",
       kontakPemilik: patient.kontakPemilik || "-",
       namaKorban: patient.namaKorban,
-      noHpKorban: patient.noHpKorban || patient.kontakKorban || "-",
-      umurKorban: patient.umurKorban,
+      noHpKorban: patient.noHpKorban || patient.kontakKorban || rawData.noHpKorban || rawData.kontakKorban || "-",
+      umurKorban: rawUmurKorban,
       alamatKorban: patient.alamatKorban || rawData.alamatKorban || "-",
       kelurahanDomisili: patient.kelurahanDomisili || rawData.kelurahanDomisili || patient.kelurahan || "",
       kecamatanDomisili: patient.kecamatanDomisili || rawData.kecamatanDomisili || patient.kecamatan || "",
@@ -489,7 +508,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       tindakanHPR: patient.tindakanHPR || "Observasi 14 Hari",
       tindakanMasyarakat: rawData.tindakanMasyarakat || "Edukasi Bahaya Rabies",
       rekomendasi: rekomendasi,
-      sumberLaporan: rawData.sumberLaporan || "Puskesmas",
+      sumberLaporan: finalSumberLaporan,
       timKetua: rawData.timKetua || currentUser.nama,
       timAnggota: rawData.timAnggota || "Petugas Surveilans",
       tanggalPelaksanaan: rawData.tanggalPelaksanaan || new Date().toISOString().slice(0, 10),
@@ -515,8 +534,16 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       "Jam Kejadian": patient.jamKejadian || rawData.jamKejadian || "",
       "Tanggal Berkunjung ke Faskes": tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || rawData.tanggalBerkunjungFaskes || "",
       "Tanggal Berkunjung Faskes": tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || rawData.tanggalBerkunjungFaskes || "",
-      "Nama Faskes": namaFaskes || patient.namaFaskes || rawData.namaFaskes || "Puskesmas Sananwetan",
-      "Fasilitas Kesehatan": namaFaskes || patient.namaFaskes || rawData.namaFaskes || "Puskesmas Sananwetan",
+      "Nama Faskes": finalFaskes,
+      "Fasilitas Kesehatan": finalFaskes,
+      "Sumber Laporan": finalSumberLaporan,
+      "Sumber Informasi": finalSumberLaporan,
+      "Biosekuriti Kandang": rawBiosekuriti,
+      "Biosecurity Kandang": rawBiosekuriti,
+      "Biosekuriti": rawBiosekuriti,
+      "Pakan": rawPakan,
+      "Umur Hewan": rawUmurHewan,
+      "Umur Korban": rawUmurKorban,
       "Alamat Kejadian": patient.alamatKejadian || rawData.alamatKejadian || "",
       "Kelurahan Kejadian": patient.kelurahanKejadian || rawData.kelurahan || "Sananwetan",
       "Kecamatan Kejadian": patient.kecamatanKejadian || rawData.kecamatan || "Sananwetan",
@@ -1138,8 +1165,12 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                     type="text"
                     list="nama-faskes-options-modal"
                     value={namaFaskes}
-                    onChange={(e) => setNamaFaskes(e.target.value)}
-                    placeholder="Contoh: Puskesmas Sananwetan"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNamaFaskes(val);
+                      setSumberLaporan(val);
+                    }}
+                    placeholder={sumberLaporan ? `Sumber Laporan: ${sumberLaporan}` : "Contoh: Puskesmas Sananwetan"}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
                   <datalist id="nama-faskes-options-modal">
@@ -1152,6 +1183,15 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                     <option value="Klinik Pratama" />
                   </datalist>
                   <span className="text-[10px] text-slate-500">Puskesmas, RS, atau Klinik tempat pemeriksaan.</span>
+                  {Boolean(sumberLaporan && !namaFaskes) && (
+                    <button
+                      type="button"
+                      onClick={() => setNamaFaskes(sumberLaporan)}
+                      className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium underline flex items-center gap-1 cursor-pointer text-left"
+                    >
+                      Samakan dengan Sumber Laporan ({sumberLaporan})
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

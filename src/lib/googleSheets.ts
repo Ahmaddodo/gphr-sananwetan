@@ -194,8 +194,21 @@ export function mapPayloadToRowValues(payload: SubmissionPayload): (string | num
   const spesies = payload.spesies_final || payload.spesiesHPR || "Anjing";
   const namaKorban = payload.namaKorban || pAny.namaPasien || "-";
   const noHpKorban = payload.noHpKorban || pAny.noHpPasien || pAny.kontakKorban || "-";
-  const umurKorban = payload.umurKorban ? `${payload.umurKorban} Tahun` : "-";
-  const umurHewan = payload.umurHewan ? `${payload.umurHewan} ${payload.satuanUmur || "Tahun"}`.trim() : "-";
+  const cleanUmurKorban = String(payload.umurKorban || "").replace(/[^\d]/g, "").trim();
+  const umurKorban = cleanUmurKorban ? `${cleanUmurKorban} Tahun` : (payload.umurKorban && payload.umurKorban !== "-" ? String(payload.umurKorban).trim() : "-");
+
+  let cleanUmurHewanVal = "";
+  let satuanHewanVal = payload.satuanUmur || "Tahun";
+  if (payload.umurHewan) {
+    const matchH = String(payload.umurHewan).match(/^(\d+(?:[.,]\d+)?)\s*(Bulan|Tahun|Hari)?/i);
+    if (matchH) {
+      cleanUmurHewanVal = matchH[1];
+      if (matchH[2]) satuanHewanVal = matchH[2];
+    } else {
+      cleanUmurHewanVal = String(payload.umurHewan).replace(/[^\d.,]/g, "").trim();
+    }
+  }
+  const umurHewan = cleanUmurHewanVal ? `${cleanUmurHewanVal} ${satuanHewanVal}`.trim() : (payload.umurHewan && payload.umurHewan !== "-" ? String(payload.umurHewan).trim() : "-");
   const waktuKejadian = payload.waktuKejadian || "-";
   const tglPelaksanaan = payload.tanggalPelaksanaan || new Date().toISOString().slice(0, 10);
 
@@ -207,7 +220,11 @@ export function mapPayloadToRowValues(payload: SubmissionPayload): (string | num
   const jadwalVAR_3 = pAny.jadwalVAR_3 || pAny.jadwalVARDosis3 || pAny.dosis3 || "-";
   const jadwalVAR_7 = pAny.jadwalVAR_7 || pAny.jadwalVARDosis7 || pAny.dosis7 || "-";
   const jadwalVAR_21 = pAny.jadwalVAR_21 || pAny.jadwalVARDosis21 || pAny.dosis21 || "-";
-  const catatanPerkembanganHarian = pAny.catatanPerkembanganHarian || pAny.catatanLogHarian || pAny.riwayatLogHarian || "-";
+  const catatanPerkembanganHarian = (pAny.catatanPerkembanganHarian && pAny.catatanPerkembanganHarian !== "-")
+    ? pAny.catatanPerkembanganHarian
+    : (pAny.fullData?.catatanPerkembanganHarian && pAny.fullData?.catatanPerkembanganHarian !== "-")
+      ? pAny.fullData.catatanPerkembanganHarian
+      : (pAny.catatanLogHarian || pAny.riwayatLogHarian || "-");
   const petugasPJMonitoring = pAny.petugasPJMonitoring || pAny.petugasPJ || (pAny.nipPJMonitoring ? `${payload.pelaksanaNama || "Petugas"} (${pAny.nipPJMonitoring})` : (payload.pelaksanaNama || "-"));
   const lastUpdated = pAny.lastUpdated || new Date().toLocaleString("id-ID");
 
@@ -518,6 +535,11 @@ var FIELD_MAP = {
   "asal hewan": "asalHewan",
   "pakan": "pakan",
   "biosekuriti": "biosekuriti",
+  "biosekuriti kandang": "biosekuriti",
+  "biosekuritikandang": "biosekuriti",
+  "biosecurity": "biosekuriti",
+  "biosecurity kandang": "biosekuriti",
+  "biosecuritykandang": "biosekuriti",
   "sumberair": "sumberAir",
   "sumber air": "sumberAir",
   "kondisi hewan saat ini": "kondisiHewan",
@@ -583,6 +605,21 @@ var FIELD_MAP = {
   "alamatpasien": "alamatKorban",
   "alamat penderita": "alamatKorban",
   "alamat": "alamatKorban",
+  "kelurahan domisili": "kelurahanDomisili",
+  "kelurahan domisili korban": "kelurahanDomisili",
+  "kelurahandomisili": "kelurahanDomisili",
+  "kecamatan domisili": "kecamatanDomisili",
+  "kecamatan domisili korban": "kecamatanDomisili",
+  "kecamatandomisili": "kecamatanDomisili",
+  "kabupaten/kota domisili": "kabupatenKotaDomisili",
+  "kab kota domisili": "kabupatenKotaDomisili",
+  "kab/kota domisili": "kabupatenKotaDomisili",
+  "kabupaten domisili": "kabupatenKotaDomisili",
+  "kota domisili": "kabupatenKotaDomisili",
+  "kabupatendomilisi": "kabupatenKotaDomisili",
+  "provinsi domisili": "provinsiDomisili",
+  "provinsi domisili korban": "provinsiDomisili",
+  "provinsidomisili": "provinsiDomisili",
   "jenis kelamin korban": "jkKorban",
   "jkkorban": "jkKorban",
   "jk korban": "jkKorban",
@@ -754,7 +791,20 @@ var FIELD_MAP = {
   "lastupdated": "lastUpdated",
   "tandatanganurl": "tandaTanganUrl",
   "tandatanganotomatis": "tandaTanganOtomatis",
-  "jenistandatangan": "jenisTandaTangan"
+  "jenistandatangan": "jenisTandaTangan",
+  "nama faskes": "namaFaskes",
+  "namafaskes": "namaFaskes",
+  "fasilitas kesehatan": "namaFaskes",
+  "faskes": "namaFaskes",
+  "nama fasilitas kesehatan": "namaFaskes",
+  "tanggal berkunjung ke faskes": "tanggalBerkunjungFaskes",
+  "tanggal berkunjung faskes": "tanggalBerkunjungFaskes",
+  "tanggalberkunjungfaskes": "tanggalBerkunjungFaskes",
+  "sumber laporan": "sumberLaporan",
+  "sumberlaporan": "sumberLaporan",
+  "foto dokumentasi": "fotoDokumentasi",
+  "fotodokumentasi": "fotoDokumentasi",
+  "foto": "fotoDokumentasi"
 };
 
 // 3. FUNGSI UJI COBA LANGSUNG (Pilih 'testSimpanData' lalu klik 'Jalankan')
@@ -1486,6 +1536,33 @@ function prosesDataMasuk(data, action) {
       if (h === "alamat korban" || h === "alamat pasien" || h === "alamat domisili korban" || h === "alamat domisili" || h === "alamat") {
         return d.alamatKorban || d.alamatPasien || "-";
       }
+      if (h.indexOf("kelurahan domisili") !== -1 || h === "kelurahan korban" || h === "kelurahan tempat tinggal") {
+        return d.kelurahanDomisili || d["Kelurahan Domisili"] || "-";
+      }
+      if (h.indexOf("kecamatan domisili") !== -1 || h === "kecamatan korban") {
+        return d.kecamatanDomisili || d["Kecamatan Domisili"] || "-";
+      }
+      if (h.indexOf("kabupaten/kota domisili") !== -1 || h.indexOf("kab kota domisili") !== -1 || h.indexOf("kota domisili") !== -1 || h.indexOf("kabupaten domisili") !== -1 || h === "kab kota korban") {
+        return d.kabupatenKotaDomisili || d["Kabupaten/Kota Domisili"] || d["Kab Kota Domisili"] || "-";
+      }
+      if (h.indexOf("provinsi domisili") !== -1 || h === "provinsi korban") {
+        return d.provinsiDomisili || d["Provinsi Domisili"] || "-";
+      }
+      if (h.indexOf("biosekuriti") !== -1 || h.indexOf("biosecurity") !== -1) {
+        return d.biosekuriti || d["Biosekuriti"] || d["Biosekuriti Kandang"] || d["Biosecurity"] || d["Biosecurity Kandang"] || "-";
+      }
+      if (h.indexOf("pakan") !== -1) {
+        return d.pakan || d["Pakan"] || "-";
+      }
+      if (h.indexOf("sumber air") !== -1 || h === "sumberair") {
+        return d.sumberAir || d["Sumber Air"] || "-";
+      }
+      if (h.indexOf("asal hewan") !== -1 || h === "asalhewan") {
+        return d.asalHewan || d["Asal Hewan"] || "-";
+      }
+      if (h.indexOf("faskes") !== -1 || h.indexOf("fasilitas kesehatan") !== -1 || (h.indexOf("puskesmas") !== -1 && h.indexOf("nama") !== -1)) {
+        return d.namaFaskes || d["Nama Faskes"] || d.faskes || d.sumberLaporan || "-";
+      }
       if (h === "jenis kelamin korban" || h === "jk korban" || h === "jenis kelamin pasien" || h === "jk pasien" || h === "kelamin korban" || h === "jenis kelamin") {
         return d.jkKorban || d.jkPasien || "-";
       }
@@ -1680,6 +1757,30 @@ function prosesDataMasuk(data, action) {
 
     if (targetRowIdx > 0) {
       // PERBARUI (UPDATE) BARIS DATA YANG SUDAH ADA
+      // Pertahankan nilai lama di spreadsheet jika baris baru hanya berisi '-' atau kosong (misal riwayat catatan log atau timestamp pertama)
+      var existingRowValues = allData && allData[targetRowIdx - 2];
+      if (existingRowValues && Array.isArray(existingRowValues)) {
+        for (var c = 0; c < existingHeaders.length; c++) {
+          var hName = String(existingHeaders[c] || "").toLowerCase().trim();
+          // Pertahankan catatan riwayat perkembangan harian lama jika newRow tidak membawa catatan baru
+          if (hName.indexOf("catatan") !== -1 || hName.indexOf("perkembangan") !== -1 || hName.indexOf("log") !== -1) {
+            var oldLogVal = String(existingRowValues[c] || "").trim();
+            var newLogVal = String(newRow[c] || "").trim();
+            if ((newLogVal === "-" || newLogVal === "" || newLogVal === "null") && oldLogVal !== "" && oldLogVal !== "-") {
+              newRow[c] = oldLogVal;
+            }
+          }
+          // Pertahankan timestamp submit awal jika newRow kosong
+          if (hName.indexOf("timestamp") !== -1 || hName.indexOf("waktu submit") !== -1) {
+            var oldTimeVal = String(existingRowValues[c] || "").trim();
+            var newTimeVal = String(newRow[c] || "").trim();
+            if ((newTimeVal === "-" || newTimeVal === "") && oldTimeVal !== "" && oldTimeVal !== "-") {
+              newRow[c] = oldTimeVal;
+            }
+          }
+        }
+      }
+
       sheet.getRange(targetRowIdx, 1, 1, newRow.length).setValues([newRow]);
       return {
         status: "success",
@@ -2038,7 +2139,32 @@ export async function sendToAppsScript(
     "Jadwal VAR Dosis 21": jadwalVAR_21Val,
     "Catatan Perkembangan Harian": catatanPerkembanganHarianVal,
     "Petugas PJ Monitoring": petugasPJMonitoringVal,
-    "Terakhir Diperbarui": lastUpdatedVal
+    "Terakhir Diperbarui": lastUpdatedVal,
+    // Field Domisili Korban
+    kelurahanDomisili: payload.kelurahanDomisili || "",
+    "Kelurahan Domisili": payload.kelurahanDomisili || "",
+    kecamatanDomisili: payload.kecamatanDomisili || "",
+    "Kecamatan Domisili": payload.kecamatanDomisili || "",
+    kabupatenKotaDomisili: payload.kabupatenKotaDomisili || "",
+    "Kabupaten/Kota Domisili": payload.kabupatenKotaDomisili || "",
+    provinsiDomisili: payload.provinsiDomisili || "",
+    "Provinsi Domisili": payload.provinsiDomisili || "",
+    // Field Tambahan Hewan & Laporan
+    pakan: payload.pakan || "",
+    "Pakan": payload.pakan || "",
+    biosekuriti: payload.biosekuriti || "",
+    "Biosekuriti": payload.biosekuriti || "",
+    "Biosekuriti Kandang": payload.biosekuriti || "",
+    "Biosecurity": payload.biosekuriti || "",
+    "Biosecurity Kandang": payload.biosekuriti || "",
+    sumberAir: payload.sumberAir || "",
+    "Sumber Air": payload.sumberAir || "",
+    asalHewan: payload.asalHewan || "",
+    "Asal Hewan": payload.asalHewan || "",
+    sumberLaporan: payload.sumberLaporan || payload.sumberInfo || "",
+    "Sumber Laporan": payload.sumberLaporan || payload.sumberInfo || "",
+    fotoDokumentasi: payload.fotoDokumentasi || "",
+    "Foto Dokumentasi": payload.fotoDokumentasi || ""
   };
 
   const jsonStr = JSON.stringify(enhancedPayload);

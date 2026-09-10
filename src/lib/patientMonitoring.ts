@@ -2267,12 +2267,22 @@ export async function syncPatientsFromGoogleSheets(
             spesiesLain: String(getFieldFromRow(rd, ["Spesies Lain", "spesiesLain"], "")),
             ras: String(getFieldFromRow(rd, ["Ras Hewan", "rasHewan", "ras", "col_11"], ex.rasHewan || "Lokal")),
             jkHewan: String(getFieldFromRow(rd, ["Jenis Kelamin Hewan", "jkHewan", "col_12"], ex.fullData?.jkHewan || "Jantan")),
-            umurHewan: String(getFieldFromRow(rd, ["Umur Hewan", "umurHewan", "col_13"], ex.fullData?.umurHewan || "1")),
-            satuanUmur: String(getFieldFromRow(rd, ["Satuan Umur", "satuanUmur"], ex.fullData?.satuanUmur || "Tahun")),
+            umurHewan: (() => {
+              const rawH = String(getFieldFromRow(rd, ["Umur Hewan", "umurHewan", "col_13"], ex.fullData?.umurHewan || "")).trim();
+              if (!rawH || rawH === "-") return "";
+              const mH = rawH.match(/^(\d+(?:[.,]\d+)?)/);
+              return mH ? mH[1] : rawH.replace(/[^\d.,]/g, "").trim();
+            })(),
+            satuanUmur: (() => {
+              const rawH = String(getFieldFromRow(rd, ["Umur Hewan", "umurHewan", "col_13"], "")).trim();
+              if (rawH.toLowerCase().includes("bulan")) return "Bulan";
+              if (rawH.toLowerCase().includes("hari")) return "Hari";
+              return String(getFieldFromRow(rd, ["Satuan Umur", "satuanUmur"], ex.fullData?.satuanUmur || "Tahun"));
+            })(),
             metodePelihara: String(getFieldFromRow(rd, ["Metode Pemeliharaan", "metodePelihara", "col_14"], ex.fullData?.metodePelihara || "Diliarkan / Bebas")),
             asalHewan: String(getFieldFromRow(rd, ["Asal Hewan", "asalHewan"], ex.fullData?.asalHewan || "Lokal")),
-            pakan: String(getFieldFromRow(rd, ["Pakan", "pakan"], ex.fullData?.pakan || "Sisa Makanan Rumah Tangga")),
-            biosekuriti: String(getFieldFromRow(rd, ["Biosekuriti", "biosekuriti"], ex.fullData?.biosekuriti || "Tidak Ada")),
+            pakan: String(getFieldFromRow(rd, ["Pakan", "pakan"], ex.fullData?.pakan || "")).trim() === "Sisa Makanan Rumah Tangga" ? "" : String(getFieldFromRow(rd, ["Pakan", "pakan"], ex.fullData?.pakan || "")).trim(),
+            biosekuriti: String(getFieldFromRow(rd, ["Biosekuriti", "Biosekuriti Kandang", "Biosecurity", "Biosecurity Kandang", "biosekuriti"], ex.fullData?.biosekuriti || "")).trim(),
             sumberAir: String(getFieldFromRow(rd, ["Sumber Air", "sumberAir"], ex.fullData?.sumberAir || "Sumur")),
             kondisiHewan: kondisiHewan !== "-" ? kondisiHewan : ex.kondisiHewan,
             pemilikHewan: String(getFieldFromRow(rd, ["Nama Pemilik", "pemilikHewan", "col_18"], ex.pemilikHewan || "-")),
@@ -2281,16 +2291,20 @@ export async function syncPatientsFromGoogleSheets(
             riwayatVaksin: String(getFieldFromRow(rd, ["Riwayat Vaksinasi", "riwayatVaksin", "col_16"], ex.fullData?.riwayatVaksin || "Tidak Tahu")),
             tanggalVaksin: String(getFieldFromRow(rd, ["Tanggal Vaksinasi", "tanggalVaksin", "col_17"], ex.fullData?.tanggalVaksin || "")),
             namaKorban: nama && nama !== "-" ? nama : ex.namaKorban,
-            umurKorban: umur !== "-" ? umur : ex.umurKorban,
+            umurKorban: (() => {
+              const rawU = String(umur !== "-" ? umur : (ex.umurKorban || "")).trim();
+              const numOnly = rawU.replace(/[^\d]/g, "").trim();
+              return numOnly || (rawU !== "-" ? rawU : "");
+            })(),
             noHpKorban: noHp !== "-" ? noHp : (ex.noHpKorban || ex.kontakKorban || "-"),
             alamatKorban: rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (ex.alamatKorban || alamatKejadian || "-"),
-            kelurahanDomisili: kelurahanDomisili || ex.kelurahanDomisili || kelurahan,
+            kelurahanDomisili: kelurahanDomisili || ex.kelurahanDomisili || "",
             kelurahanDomisiliCustom: "",
-            kecamatanDomisili: kecamatanDomisili || ex.kecamatanDomisili || kecamatanKejadian || "Sananwetan",
+            kecamatanDomisili: kecamatanDomisili || ex.kecamatanDomisili || "",
             kecamatanDomisiliCustom: "",
-            kabupatenKotaDomisili: kabupatenKotaDomisili || ex.kabupatenKotaDomisili || kabupatenKotaKejadian || "Kota Blitar",
+            kabupatenKotaDomisili: kabupatenKotaDomisili || ex.kabupatenKotaDomisili || "",
             kabupatenKotaDomisiliCustom: "",
-            provinsiDomisili: provinsiDomisili || ex.provinsiDomisili || "Jawa Timur",
+            provinsiDomisili: provinsiDomisili || ex.provinsiDomisili || "",
             jkKorban: jk || ex.jkKorban,
             kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], ex.fullData?.kondisiKorban || "Sehat")),
             kondisiUmumKorban: String(getFieldFromRow(rd, ["Kondisi Umum Korban", "kondisiUmumKorban", "Kondisi Umum", "Keadaan Umum Korban", "Kondisi Korban", "kondisiKorban"], ex.fullData?.kondisiUmumKorban || ex.fullData?.kondisiKorban || "Sehat")),
@@ -2446,12 +2460,22 @@ export async function syncPatientsFromGoogleSheets(
             spesiesLain: String(getFieldFromRow(rd, ["Spesies Lain", "spesiesLain"], "")),
             ras: String(getFieldFromRow(rd, ["Ras Hewan", "rasHewan", "ras", "col_11"], "Lokal")),
             jkHewan: String(getFieldFromRow(rd, ["Jenis Kelamin Hewan", "jkHewan", "col_12"], "Jantan")),
-            umurHewan: String(getFieldFromRow(rd, ["Umur Hewan", "umurHewan", "col_13"], "1")),
-            satuanUmur: String(getFieldFromRow(rd, ["Satuan Umur", "satuanUmur"], "Tahun")),
+            umurHewan: (() => {
+              const rawH = String(getFieldFromRow(rd, ["Umur Hewan", "umurHewan", "col_13"], "")).trim();
+              if (!rawH || rawH === "-") return "";
+              const mH = rawH.match(/^(\d+(?:[.,]\d+)?)/);
+              return mH ? mH[1] : rawH.replace(/[^\d.,]/g, "").trim();
+            })(),
+            satuanUmur: (() => {
+              const rawH = String(getFieldFromRow(rd, ["Umur Hewan", "umurHewan", "col_13"], "")).trim();
+              if (rawH.toLowerCase().includes("bulan")) return "Bulan";
+              if (rawH.toLowerCase().includes("hari")) return "Hari";
+              return String(getFieldFromRow(rd, ["Satuan Umur", "satuanUmur"], "Tahun"));
+            })(),
             metodePelihara: String(getFieldFromRow(rd, ["Metode Pemeliharaan", "metodePelihara", "col_14"], "Diliarkan / Bebas")),
             asalHewan: String(getFieldFromRow(rd, ["Asal Hewan", "asalHewan"], "Lokal")),
-            pakan: String(getFieldFromRow(rd, ["Pakan", "pakan"], "Sisa Makanan Rumah Tangga")),
-            biosekuriti: String(getFieldFromRow(rd, ["Biosekuriti", "biosekuriti"], "Tidak Ada")),
+            pakan: String(getFieldFromRow(rd, ["Pakan", "pakan"], "")).trim() === "Sisa Makanan Rumah Tangga" ? "" : String(getFieldFromRow(rd, ["Pakan", "pakan"], "")).trim(),
+            biosekuriti: String(getFieldFromRow(rd, ["Biosekuriti", "Biosekuriti Kandang", "Biosecurity", "Biosecurity Kandang", "biosekuriti"], "")).trim(),
             sumberAir: String(getFieldFromRow(rd, ["Sumber Air", "sumberAir"], "Sumur")),
             kondisiHewan: kondisiHewan,
             pemilikHewan: String(getFieldFromRow(rd, ["Nama Pemilik", "pemilikHewan", "col_18"], "-")),
@@ -2460,16 +2484,20 @@ export async function syncPatientsFromGoogleSheets(
             riwayatVaksin: String(getFieldFromRow(rd, ["Riwayat Vaksinasi", "riwayatVaksin", "col_16"], "Tidak Tahu")),
             tanggalVaksin: String(getFieldFromRow(rd, ["Tanggal Vaksinasi", "tanggalVaksin", "col_17"], "")),
             namaKorban: nama,
-            umurKorban: umur,
-            noHpKorban: noHp,
+            umurKorban: (() => {
+              const rawU = String(umur !== "-" ? umur : "").trim();
+              const numOnly = rawU.replace(/[^\d]/g, "").trim();
+              return numOnly || (rawU !== "-" ? rawU : "");
+            })(),
+            noHpKorban: noHp !== "-" ? noHp : "",
             alamatKorban: rawAlamatKorban !== "-" && rawAlamatKorban !== "" ? rawAlamatKorban : (alamatKejadian || "-"),
-            kelurahanDomisili: kelurahanDomisili || kelurahan,
+            kelurahanDomisili: kelurahanDomisili || "",
             kelurahanDomisiliCustom: "",
-            kecamatanDomisili: kecamatanDomisili || kecamatanKejadian || "Sananwetan",
+            kecamatanDomisili: kecamatanDomisili || "",
             kecamatanDomisiliCustom: "",
-            kabupatenKotaDomisili: kabupatenKotaDomisili || kabupatenKotaKejadian || "Kota Blitar",
+            kabupatenKotaDomisili: kabupatenKotaDomisili || "",
             kabupatenKotaDomisiliCustom: "",
-            provinsiDomisili: provinsiDomisili || "Jawa Timur",
+            provinsiDomisili: provinsiDomisili || "",
             jkKorban: jk,
             kondisiKorban: String(getFieldFromRow(rd, ["Kondisi Korban", "kondisiKorban", "Kondisi Umum Korban", "kondisiUmumKorban"], "Sehat")),
             kondisiUmumKorban: String(getFieldFromRow(rd, ["Kondisi Umum Korban", "kondisiUmumKorban", "Kondisi Umum", "Keadaan Umum Korban", "Kondisi Korban", "kondisiKorban"], "Sehat")),

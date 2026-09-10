@@ -164,7 +164,12 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                 <input
                   list="namafaskes-datalist-step1"
                   value={formData.namaFaskes || ""}
-                  onChange={(e) => updateField("namaFaskes", e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    updateField("namaFaskes", val);
+                    updateField("sumberInfo", val);
+                    updateField("sumberLaporan", val);
+                  }}
                   placeholder="Puskesmas Sananwetan..."
                   className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                 />
@@ -179,6 +184,18 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                 </datalist>
               </div>
               <p className="text-[11px] text-slate-500">Puskesmas / RS tempat periksa.</p>
+              {Boolean((formData.sumberLaporan || formData.sumberInfo) && !formData.namaFaskes) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ans = formData.sumberLaporan || formData.sumberInfo;
+                    updateField("namaFaskes", ans);
+                  }}
+                  className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium underline flex items-center gap-1 cursor-pointer text-left"
+                >
+                  Samakan dengan Sumber Laporan ({formData.sumberLaporan || formData.sumberInfo})
+                </button>
+              )}
             </div>
           </div>
 
@@ -193,8 +210,12 @@ export const FormSteps: React.FC<FormStepsProps> = ({
               <div className="relative">
                 <input
                   list="sumberinfo-datalist"
-                  value={formData.sumberInfo}
-                  onChange={(e) => updateField("sumberInfo", e.target.value)}
+                  value={formData.sumberInfo || formData.sumberLaporan || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    updateField("sumberInfo", val);
+                    updateField("sumberLaporan", val);
+                  }}
                   placeholder="Ketik sumber informasi (misal: Laporan Warga, Puskesmas...)"
                   className={`w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 ${
                     errors.sumberInfo ? "border-rose-300 bg-rose-50/40" : "border-slate-200"
@@ -684,9 +705,39 @@ export const FormSteps: React.FC<FormStepsProps> = ({
           </div>
 
           <div className="rounded-xl border border-slate-200 p-5 bg-slate-50/80">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-800 mb-4 flex items-center gap-2">
-              <Users size={15} className="text-blue-600" /> Data Pemilik HPR
-            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-800 flex items-center gap-2">
+                <Users size={15} className="text-blue-600" /> Data Pemilik HPR
+              </h4>
+              <label className="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-blue-200 hover:border-blue-300 hover:bg-blue-50/50 transition select-none shadow-2xs">
+                <input
+                  type="checkbox"
+                  id="checkbox-pemilik-sama-korban"
+                  checked={Boolean(
+                    formData.pemilikHewan &&
+                    formData.namaKorban &&
+                    formData.pemilikHewan.trim() === formData.namaKorban.trim() &&
+                    (formData.alamatKorban ? formData.alamatPemilik.trim() === formData.alamatKorban.trim() : true)
+                  )}
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    if (isChecked) {
+                      updateField("pemilikHewan", formData.namaKorban || "");
+                      updateField("alamatPemilik", formData.alamatKorban || formData.alamatKejadian || "");
+                      updateField("kontakPemilik", formData.noHpKorban || "");
+                    } else {
+                      updateField("pemilikHewan", "");
+                      updateField("alamatPemilik", "");
+                      updateField("kontakPemilik", "");
+                    }
+                  }}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-blue-900">
+                  Data Pemilik HPR sama dengan Data Korban
+                </span>
+              </label>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <FormInput
                 label="Nama Pemilik"
@@ -748,9 +799,35 @@ export const FormSteps: React.FC<FormStepsProps> = ({
       {step === 3 && (
         <div className="space-y-6">
           <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-5">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-800 mb-4 flex items-center gap-2">
-              <User size={15} className="text-blue-600" /> Identitas Korban Gigitan
-            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-800 flex items-center gap-2">
+                <User size={15} className="text-blue-600" /> Identitas Korban Gigitan
+              </h4>
+              <label className="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-blue-200 hover:border-blue-300 hover:bg-blue-50/50 transition select-none shadow-2xs">
+                <input
+                  type="checkbox"
+                  id="checkbox-korban-sama-pemilik"
+                  checked={Boolean(
+                    formData.namaKorban &&
+                    formData.pemilikHewan &&
+                    formData.namaKorban.trim() === formData.pemilikHewan.trim() &&
+                    (formData.alamatPemilik ? formData.alamatKorban.trim() === formData.alamatPemilik.trim() : true)
+                  )}
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    if (isChecked) {
+                      updateField("namaKorban", formData.pemilikHewan || "");
+                      updateField("alamatKorban", formData.alamatPemilik || formData.alamatKejadian || "");
+                      updateField("noHpKorban", formData.kontakPemilik || "");
+                    }
+                  }}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-blue-900">
+                  Data Korban sama dengan Data Pemilik HPR
+                </span>
+              </label>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="md:col-span-2">
                 <FormInput
@@ -852,7 +929,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                   <div className="relative">
                     <input
                       list="kelurahan-domisili-datalist"
-                      value={formData.kelurahanDomisili || formData.kelurahan || ""}
+                      value={formData.kelurahanDomisili || ""}
                       onChange={(e) => updateField("kelurahanDomisili", e.target.value)}
                       placeholder="Pilih kelurahan domisili korban..."
                       className={`w-full rounded-lg border bg-white px-3.5 py-2.5 pr-9 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 ${
@@ -892,7 +969,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                   </label>
                   <input
                     list="kecamatan-domisili-datalist"
-                    value={formData.kecamatanDomisili || "Sananwetan"}
+                    value={formData.kecamatanDomisili || ""}
                     onChange={(e) => updateField("kecamatanDomisili", e.target.value)}
                     placeholder="Kecamatan domisili korban..."
                     className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -914,7 +991,7 @@ export const FormSteps: React.FC<FormStepsProps> = ({
                     <span>Kab / Kota Domisili</span>
                   </label>
                   <input
-                    value={formData.kabupatenKotaDomisili || "Kota Blitar"}
+                    value={formData.kabupatenKotaDomisili || ""}
                     onChange={(e) => updateField("kabupatenKotaDomisili", e.target.value)}
                     placeholder="Kota Blitar / Kab. Blitar..."
                     className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"

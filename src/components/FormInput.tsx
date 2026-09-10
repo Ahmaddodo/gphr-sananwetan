@@ -102,6 +102,13 @@ export const FormInput: React.FC<FormInputProps> = ({
             } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
               inputValue = dateOnly;
             }
+          } else if (type === "number" && inputValue) {
+            const m = String(inputValue).match(/^(\d+(?:[.,]\d+)?)/);
+            if (m) {
+              inputValue = m[1].replace(",", ".");
+            } else {
+              inputValue = String(inputValue).replace(/[^\d.]/g, "");
+            }
           }
 
           return (

@@ -127,6 +127,11 @@ const initialFormState: FormGHPRData = {
   tindakanMasyarakat: "",
   rekomendasi: "",
   sumberLaporan: "",
+  namaFaskes: "",
+  kelurahanDomisili: "",
+  kecamatanDomisili: "",
+  kabupatenKotaDomisili: "",
+  provinsiDomisili: "",
   fotoDokumentasi: "",
   timKetua: "",
   timAnggota: "",
@@ -627,9 +632,49 @@ export default function App() {
 
   const handleOpenPatientFullFormEdit = (patient: PatientMonitoringItem) => {
     const raw: Record<string, any> = patient.fullData || {};
+
+    const cleanUmurKorban = (() => {
+      const val = String(patient.umurKorban || raw.umurKorban || "").trim();
+      const digits = val.replace(/[^\d]/g, "");
+      return digits || (val !== "-" ? val : "");
+    })();
+
+    const cleanUmurHewan = (() => {
+      const val = String(raw.umurHewan || patient.fullData?.umurHewan || "").trim();
+      if (!val || val === "-") return "";
+      const m = val.match(/^(\d+(?:[.,]\d+)?)/);
+      return m ? m[1] : val.replace(/[^\d.,]/g, "").trim();
+    })();
+
+    const resolvedSatuanUmur = (() => {
+      const val = String(raw.umurHewan || patient.fullData?.umurHewan || "").trim().toLowerCase();
+      if (val.includes("bulan")) return "Bulan";
+      if (val.includes("hari")) return "Hari";
+      return raw.satuanUmur || patient.fullData?.satuanUmur || "Tahun";
+    })();
+
+    const cleanNoHpKorban = (() => {
+      const val = String(patient.noHpKorban || patient.kontakKorban || raw.noHpKorban || raw.kontakKorban || "").trim();
+      return val !== "-" ? val : "";
+    })();
+
+    const cleanPakan = (() => {
+      const val = String(raw.pakan || patient.fullData?.pakan || "").trim();
+      return (val === "-" || val === "Sisa Makanan Rumah Tangga") ? "" : val;
+    })();
+
+    const cleanBiosekuriti = (() => {
+      const val = String(raw.biosekuriti || raw["Biosekuriti Kandang"] || raw["Biosecurity"] || patient.fullData?.biosekuriti || "").trim();
+      return val === "-" ? "" : val;
+    })();
+
     const updatedForm: FormGHPRData = {
       ...initialFormState,
       waktuKejadian: patient.waktuKejadian || raw.waktuKejadian || "",
+      tanggalKejadian: patient.tanggalKejadian || patient.waktuKejadian || raw.waktuKejadian || "",
+      jamKejadian: patient.jamKejadian || raw.jamKejadian || "",
+      tanggalBerkunjungFaskes: patient.tanggalBerkunjungFaskes || raw.tanggalBerkunjungFaskes || "",
+      namaFaskes: "", // Isian di awal dikosongkan sesuai permintaan
       alamatKejadian: patient.alamatKorban || raw.alamatKejadian || "",
       kelurahan: patient.kelurahan || raw.kelurahan || "",
       kelurahanCustom: patient.kelurahan || "",
@@ -638,18 +683,19 @@ export default function App() {
       kabupatenKota: patient.kabupatenKota || "Kota Blitar",
       kabupatenKotaCustom: "",
       provinsi: "Jawa Timur",
-      sumberInfo: raw.sumberInfo || "Laporan Petugas Puskesmas",
+      sumberInfo: raw.sumberInfo || raw.sumberLaporan || "Laporan Petugas Puskesmas",
+      sumberLaporan: raw.sumberLaporan || raw.sumberInfo || "Laporan Faskes",
       kronologi: raw.kronologi || `Kasus gigitan HPR di wilayah Kel. ${patient.kelurahan}`,
       spesiesHPR: patient.spesiesHPR || "Anjing",
       spesiesLain: "",
       ras: patient.rasHewan || "",
       jkHewan: raw.jkHewan || "Jantan",
-      umurHewan: raw.umurHewan || "2",
-      satuanUmur: "Tahun",
+      umurHewan: cleanUmurHewan,
+      satuanUmur: resolvedSatuanUmur,
       metodePelihara: raw.metodePelihara || "Diliarkan / Bebas",
       asalHewan: raw.asalHewan || "Lokal",
-      pakan: raw.pakan || "Sisa Makanan Rumah Tangga",
-      biosekuriti: raw.biosekuriti || "Tidak Ada",
+      pakan: cleanPakan,
+      biosekuriti: cleanBiosekuriti,
       sumberAir: raw.sumberAir || "Sumur",
       kondisiHewan: patient.kondisiHewan || "Dalam Observasi",
       pemilikHewan: patient.pemilikHewan || "",
@@ -658,8 +704,16 @@ export default function App() {
       riwayatVaksin: raw.riwayatVaksin || "Tidak Tahu",
       tanggalVaksin: raw.tanggalVaksin || "",
       namaKorban: patient.namaKorban || "",
-      umurKorban: patient.umurKorban || "",
+      umurKorban: cleanUmurKorban,
+      noHpKorban: cleanNoHpKorban,
       alamatKorban: patient.alamatKorban || "",
+      kelurahanDomisili: patient.kelurahanDomisili || raw.kelurahanDomisili || "",
+      kelurahanDomisiliCustom: "",
+      kecamatanDomisili: patient.kecamatanDomisili || raw.kecamatanDomisili || "",
+      kecamatanDomisiliCustom: "",
+      kabupatenKotaDomisili: patient.kabupatenKotaDomisili || raw.kabupatenKotaDomisili || "",
+      kabupatenKotaDomisiliCustom: "",
+      provinsiDomisili: patient.provinsiDomisili || raw.provinsiDomisili || "",
       jkKorban: patient.jkKorban || "Laki-laki",
       kondisiKorban: raw.kondisiUmumKorban || raw.kondisiKorban || patient.kondisiUmumKorban || patient.kondisiKorban || "Sehat",
       kondisiUmumKorban: raw.kondisiUmumKorban || raw.kondisiKorban || patient.kondisiUmumKorban || patient.kondisiKorban || "Sehat",
@@ -671,7 +725,6 @@ export default function App() {
       tindakanKasus: patient.tindakanKasus || "Pemberian VAR",
       tindakanMasyarakat: raw.tindakanMasyarakat || "",
       rekomendasi: patient.rekomendasi || "Observasi harian kondisi hewan dan korban",
-      sumberLaporan: raw.sumberLaporan || "Laporan Faskes",
       fotoDokumentasi: raw.fotoDokumentasi || "",
       timKetua: raw.timKetua || currentUser.nama,
       timAnggota: raw.timAnggota || "Kader Kesehatan Kelurahan",
@@ -719,12 +772,17 @@ export default function App() {
       spesiesLain: raw.spesiesLain || "",
       ras: patient.rasHewan || raw.ras || "Lokal",
       jkHewan: raw.jkHewan || "Jantan",
-      umurHewan: raw.umurHewan || "1",
+      umurHewan: (() => {
+        const val = String(raw.umurHewan || patient.fullData?.umurHewan || "").trim();
+        if (!val || val === "-") return "";
+        const m = val.match(/^(\d+(?:[.,]\d+)?)/);
+        return m ? m[1] : val.replace(/[^\d.,]/g, "").trim();
+      })(),
       satuanUmur: raw.satuanUmur || "Tahun",
       metodePelihara: raw.metodePelihara || "Diliarkan / Bebas",
       asalHewan: raw.asalHewan || "Lokal",
-      pakan: raw.pakan || "Sisa Makanan Rumah Tangga",
-      biosekuriti: raw.biosekuriti || "Tidak Ada",
+      pakan: (raw.pakan && raw.pakan !== "-" && raw.pakan !== "Sisa Makanan Rumah Tangga") ? raw.pakan : "",
+      biosekuriti: (raw.biosekuriti && raw.biosekuriti !== "-") ? raw.biosekuriti : (raw["Biosekuriti Kandang"] || ""),
       sumberAir: raw.sumberAir || "Sumur",
       kondisiHewan: patient.kondisiHewan || raw.kondisiHewan || "Dalam Observasi",
       pemilikHewan: patient.pemilikHewan || raw.pemilikHewan || "-",
@@ -733,9 +791,16 @@ export default function App() {
       riwayatVaksin: raw.riwayatVaksin || "Tidak Tahu",
       tanggalVaksin: raw.tanggalVaksin || "",
       namaKorban: patient.namaKorban || raw.namaKorban || "",
-      umurKorban: patient.umurKorban || raw.umurKorban || "",
-      noHpKorban: patient.noHpKorban || patient.kontakKorban || raw.noHpKorban || "-",
+      umurKorban: (() => {
+        const val = String(patient.umurKorban || raw.umurKorban || "").trim();
+        return val.replace(/[^\d]/g, "") || (val !== "-" ? val : "");
+      })(),
+      noHpKorban: patient.noHpKorban || patient.kontakKorban || raw.noHpKorban || raw.kontakKorban || "-",
       alamatKorban: patient.alamatKorban || raw.alamatKorban || "-",
+      kelurahanDomisili: patient.kelurahanDomisili || raw.kelurahanDomisili || "",
+      kecamatanDomisili: patient.kecamatanDomisili || raw.kecamatanDomisili || "",
+      kabupatenKotaDomisili: patient.kabupatenKotaDomisili || raw.kabupatenKotaDomisili || "",
+      provinsiDomisili: patient.provinsiDomisili || raw.provinsiDomisili || "",
       jkKorban: patient.jkKorban || raw.jkKorban || "Laki-laki",
       kondisiKorban: raw.kondisiKorban || "Luka gigitan dalam perawatan",
       pertolonganPertama: patient.pertolonganPertama || raw.pertolonganPertama || "Cuci luka sabun air mengalir 15 menit",
