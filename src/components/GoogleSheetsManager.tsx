@@ -212,6 +212,12 @@ export const GoogleSheetsManager: React.FC<GoogleSheetsManagerProps> = ({
       timKetua: "dr. Widodo",
       timAnggota: "Petugas Surveilans",
       tanggalPelaksanaan: new Date().toISOString().slice(0, 10),
+      tanggalBerkunjungFaskes: new Date().toISOString().slice(0, 10),
+      "Tanggal Berkunjung ke Faskes": new Date().toISOString().slice(0, 10),
+      "Tgl berkunjung difaskes": new Date().toISOString().slice(0, 10),
+      namaFaskes: "Puskesmas Sananwetan",
+      "Nama Faskes": "Puskesmas Sananwetan",
+      "Fasilitas Kesehatan": "Puskesmas Sananwetan",
       pelaksanaNama: "Widodo",
       pelaksanaNIP: "198501012010011001"
     };

@@ -1198,6 +1198,13 @@ export default function App() {
       // Sinkronisasi Faskes & Sumber Laporan
       tanggalBerkunjungFaskes: formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
       "Tanggal Berkunjung ke Faskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      "Tanggal Berkunjung Faskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      "Tgl berkunjung difaskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      "Tgl berkunjung di faskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      "Tgl berkunjung faskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      "Tgl berkunjung ke faskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      "Tgl Kunjung Faskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
+      "Tanggal berkunjung difaskes": formData.tanggalBerkunjungFaskes || existingPat?.tanggalBerkunjungFaskes || "",
       namaFaskes: formData.namaFaskes || formData.sumberLaporan || existingPat?.namaFaskes || "",
       "Nama Faskes": formData.namaFaskes || formData.sumberLaporan || existingPat?.namaFaskes || "",
       sumberLaporan: formData.sumberLaporan || formData.namaFaskes || existingPat?.sumberLaporan || "",

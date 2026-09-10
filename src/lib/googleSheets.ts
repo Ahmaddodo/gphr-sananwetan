@@ -800,6 +800,18 @@ var FIELD_MAP = {
   "tanggal berkunjung ke faskes": "tanggalBerkunjungFaskes",
   "tanggal berkunjung faskes": "tanggalBerkunjungFaskes",
   "tanggalberkunjungfaskes": "tanggalBerkunjungFaskes",
+  "tanggal berkunjung difaskes": "tanggalBerkunjungFaskes",
+  "tanggal berkunjung di faskes": "tanggalBerkunjungFaskes",
+  "tgl berkunjung difaskes": "tanggalBerkunjungFaskes",
+  "tgl berkunjung di faskes": "tanggalBerkunjungFaskes",
+  "tgl berkunjung ke faskes": "tanggalBerkunjungFaskes",
+  "tgl berkunjung faskes": "tanggalBerkunjungFaskes",
+  "tglberkunjungdifaskes": "tanggalBerkunjungFaskes",
+  "tglberkunjungfaskes": "tanggalBerkunjungFaskes",
+  "tgl kunjung faskes": "tanggalBerkunjungFaskes",
+  "tgl berkunjung": "tanggalBerkunjungFaskes",
+  "tanggal berkunjung": "tanggalBerkunjungFaskes",
+  "waktu berkunjung faskes": "tanggalBerkunjungFaskes",
   "sumber laporan": "sumberLaporan",
   "sumberlaporan": "sumberLaporan",
   "foto dokumentasi": "fotoDokumentasi",
@@ -1560,8 +1572,28 @@ function prosesDataMasuk(data, action) {
       if (h.indexOf("asal hewan") !== -1 || h === "asalhewan") {
         return d.asalHewan || d["Asal Hewan"] || "-";
       }
-      if (h.indexOf("faskes") !== -1 || h.indexOf("fasilitas kesehatan") !== -1 || (h.indexOf("puskesmas") !== -1 && h.indexOf("nama") !== -1)) {
-        return d.namaFaskes || d["Nama Faskes"] || d.faskes || d.sumberLaporan || "-";
+      // TANGGAL BERKUNJUNG KE FASKES (Prioritas sebelum Nama Faskes agar kolom "Tgl berkunjung difaskes" tidak tertukar!)
+      if (
+        h.indexOf("berkunjung") !== -1 ||
+        h.indexOf("kunjung") !== -1 ||
+        (h.indexOf("tgl") !== -1 && (h.indexOf("faskes") !== -1 || h.indexOf("fasilitas") !== -1)) ||
+        (h.indexOf("tanggal") !== -1 && (h.indexOf("faskes") !== -1 || h.indexOf("fasilitas") !== -1)) ||
+        (h.indexOf("waktu") !== -1 && (h.indexOf("faskes") !== -1 || h.indexOf("fasilitas") !== -1)) ||
+        h === "tgl faskes" || h === "tanggal faskes"
+      ) {
+        return d.tanggalBerkunjungFaskes || d["Tanggal Berkunjung ke Faskes"] || d["Tgl berkunjung difaskes"] || d["Tgl berkunjung di faskes"] || d["Tgl berkunjung faskes"] || d["Tanggal Berkunjung Faskes"] || d.tglBerkunjungFaskes || "-";
+      }
+
+      // NAMA FASILITAS KESEHATAN (FASKES) - Kecualikan jika kolom memuat tanggal/waktu berkunjung
+      if (
+        (h.indexOf("faskes") !== -1 || h.indexOf("fasilitas kesehatan") !== -1 || (h.indexOf("puskesmas") !== -1 && h.indexOf("nama") !== -1)) &&
+        h.indexOf("berkunjung") === -1 &&
+        h.indexOf("kunjung") === -1 &&
+        h.indexOf("tgl") === -1 &&
+        h.indexOf("tanggal") === -1 &&
+        h.indexOf("waktu") === -1
+      ) {
+        return d.namaFaskes || d["Nama Faskes"] || d["Fasilitas Kesehatan"] || d.faskes || d.sumberLaporan || "-";
       }
       if (h === "jenis kelamin korban" || h === "jk korban" || h === "jenis kelamin pasien" || h === "jk pasien" || h === "kelamin korban" || h === "jenis kelamin") {
         return d.jkKorban || d.jkPasien || "-";
@@ -1800,6 +1832,14 @@ function prosesDataMasuk(data, action) {
             var newVarVal = String(newRow[c] || "").trim();
             if ((newVarVal === "-" || newVarVal === "" || newVarVal === "null") && oldVarVal !== "" && oldVarVal !== "-") {
               newRow[c] = oldVarVal;
+            }
+          }
+          // Pertahankan tanggal berkunjung faskes jika newRow kosong/-
+          if (hName.indexOf("berkunjung") !== -1 || (hName.indexOf("tgl") !== -1 && hName.indexOf("faskes") !== -1)) {
+            var oldTglFaskes = String(existingRowValues[c] || "").trim();
+            var newTglFaskes = String(newRow[c] || "").trim();
+            if ((newTglFaskes === "-" || newTglFaskes === "" || newTglFaskes === "null") && oldTglFaskes !== "" && oldTglFaskes !== "-") {
+              newRow[c] = oldTglFaskes;
             }
           }
           // Pertahankan kelurahan/kecamatan/kabupaten domisili jika newRow kosong/-

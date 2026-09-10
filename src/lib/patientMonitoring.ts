@@ -2071,13 +2071,20 @@ export async function syncPatientsFromGoogleSheets(
         }
 
         const rawTanggalBerkunjungFaskes = String(getFieldFromRow(rd, [
+          "Tgl berkunjung difaskes",
+          "Tgl berkunjung di faskes",
+          "Tgl berkunjung faskes",
+          "Tgl berkunjung ke faskes",
           "Tanggal Berkunjung ke Faskes",
           "Tanggal Berkunjung Faskes",
           "tanggalBerkunjungFaskes",
+          "Tanggal berkunjung difaskes",
+          "Tanggal berkunjung di faskes",
           "Tanggal Berkunjung",
           "Tgl Berkunjung",
           "Tanggal Faskes",
-          "Tgl Kunjungan Faskes"
+          "Tgl Kunjungan Faskes",
+          "Tgl Kunjung Faskes"
         ], "")).trim();
 
         const rawNamaFaskes = String(getFieldFromRow(rd, [
