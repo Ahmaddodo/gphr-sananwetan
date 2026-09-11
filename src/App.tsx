@@ -753,11 +753,18 @@ export default function App() {
 
   const handleOpenPatientPdfPrint = (patient: PatientMonitoringItem) => {
     const raw: Record<string, any> = patient.fullData || {};
+    const effectiveTglBerkunjung = patient.tanggalBerkunjungFaskes || raw.tanggalBerkunjungFaskes || raw["Tgl berkunjung difaskes"] || raw["Tanggal Berkunjung ke Faskes"] || "";
+    const effectiveFaskesOrSumber = patient.sumberLaporan || raw.sumberLaporan || patient.namaFaskes || raw.namaFaskes || raw["Sumber Laporan"] || raw["Nama Faskes"] || "";
+
     const printForm: FormGHPRData = {
       ...initialFormState,
       ...(patient.fullData || {}),
       id_kasus: patient.id_kasus,
       waktuKejadian: patient.waktuKejadian || raw.waktuKejadian || "",
+      tanggalKejadian: patient.tanggalKejadian || patient.waktuKejadian || raw.tanggalKejadian || raw.waktuKejadian || "",
+      jamKejadian: patient.jamKejadian || raw.jamKejadian || "",
+      tanggalBerkunjungFaskes: effectiveTglBerkunjung,
+      namaFaskes: effectiveFaskesOrSumber || "Puskesmas Sananwetan",
       alamatKejadian: patient.alamatKorban || raw.alamatKejadian || "",
       kelurahan: patient.kelurahan || raw.kelurahan || "",
       kelurahanCustom: patient.kelurahan || "",
@@ -811,13 +818,13 @@ export default function App() {
       tindakanKasus: patient.tindakanKasus || raw.tindakanKasus || "Pemberian VAR",
       tindakanMasyarakat: raw.tindakanMasyarakat || "-",
       rekomendasi: patient.rekomendasi || raw.rekomendasi || "Observasi harian kondisi hewan dan korban",
-      sumberLaporan: raw.sumberLaporan || "Laporan Petugas Faskes",
+      sumberLaporan: effectiveFaskesOrSumber || raw.sumberLaporan || "Laporan Petugas Faskes",
       fotoDokumentasi: raw.fotoDokumentasi || "",
-      timKetua: raw.timKetua || patient.petugasPJ || currentUser?.nama || "Petugas Puskesmas",
+      timKetua: raw.timKetua || currentUser?.nama || "Petugas Puskesmas",
       timAnggota: raw.timAnggota || "Kader Kesehatan Kelurahan",
       tanggalPelaksanaan: raw.tanggalPelaksanaan || patient.waktuKejadian || new Date().toISOString().slice(0, 10),
-      pelaksanaNama: patient.petugasPJ || raw.pelaksanaNama || DEFAULT_PELAKSANA_NAMA,
-      pelaksanaNIP: patient.nipPJ || raw.pelaksanaNIP || DEFAULT_PELAKSANA_NIP,
+      pelaksanaNama: DEFAULT_PELAKSANA_NAMA,
+      pelaksanaNIP: DEFAULT_PELAKSANA_NIP,
       statusPemantauan: patient.statusPemantauan || raw.statusPemantauan,
       hariObservasiKe: patient.hariObservasiKe || raw.hariObservasiKe,
       statusHewanObservasi: patient.statusHewanObservasi || raw.statusHewanObservasi,
@@ -1145,11 +1152,13 @@ export default function App() {
     } catch (e) {}
 
     // Ekstrak catatan riwayat perkembangan harian pasien agar TIDAK terhapus/menjadi '-' saat edit form
-    const resolvedCatatanPerkembangan = (existingPat?.riwayatLog && existingPat.riwayatLog.length > 0)
-      ? existingPat.riwayatLog.map((log: any, idx: number) =>
-          `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] (${log.petugasNama || "Petugas"}) Luka: ${log.statusLuka || log.kondisiKorban || "-"}, Suhu: ${log.suhuTubuh || "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`
-        ).join("\n")
-      : (existingPat?.catatanPerkembanganHarian && existingPat.catatanPerkembanganHarian !== "-" ? existingPat.catatanPerkembanganHarian : "-");
+    const resolvedCatatanPerkembangan = (existingPat?.catatanPerkembanganHarian && existingPat.catatanPerkembanganHarian !== "-")
+      ? existingPat.catatanPerkembanganHarian
+      : ((existingPat?.riwayatLog && existingPat.riwayatLog.length > 0)
+        ? existingPat.riwayatLog.map((log: any, idx: number) =>
+            `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] ${log.petugasNama ? `(${log.petugasNama})` : ""} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${log.suhuTubuh ? (log.suhuTubuh.includes("°C") ? log.suhuTubuh : `${log.suhuTubuh} °C`) : "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`
+          ).join("\n\n")
+        : "-");
 
     const jVAR0 = existingPat?.jadwalVAR?.dosis0?.tanggal
       ? `${existingPat.jadwalVAR.dosis0.status || "Diberikan"} (${existingPat.jadwalVAR.dosis0.tanggal})`

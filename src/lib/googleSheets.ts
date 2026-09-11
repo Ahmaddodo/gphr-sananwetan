@@ -1497,7 +1497,10 @@ function prosesDataMasuk(data, action) {
       if (h === "provinsi") {
         return d.provinsi || "Jawa Timur";
       }
-      if (h === "sumber informasi" || h === "sumber info" || h === "sumber laporan" || h === "sumber") {
+      if (h === "sumber laporan" || h === "sumberlaporan" || h === "sumber lap" || h.indexOf("sumber laporan") !== -1) {
+        return d.sumberLaporan || d.namaFaskes || d.sumberInfo || "-";
+      }
+      if (h === "sumber informasi" || h === "sumber info" || h === "sumber") {
         return d.sumberInfo || d.sumberLaporan || "-";
       }
       if (h === "kronologi kejadian" || h === "kronologi" || h === "kronologis" || h === "uraian kejadian") {
@@ -3003,11 +3006,18 @@ export async function pushAllPatientsToAppsScript(
       jadwalVAR_3: p.jadwalVAR?.dosis3 ? `${p.jadwalVAR.dosis3.status}${p.jadwalVAR.dosis3.tanggal ? ` (${p.jadwalVAR.dosis3.tanggal})` : ""}${p.jadwalVAR.dosis3.lokasiPemberian ? ` - ${p.jadwalVAR.dosis3.lokasiPemberian}` : ""}` : "-",
       jadwalVAR_7: p.jadwalVAR?.dosis7 ? `${p.jadwalVAR.dosis7.status}${p.jadwalVAR.dosis7.tanggal ? ` (${p.jadwalVAR.dosis7.tanggal})` : ""}${p.jadwalVAR.dosis7.lokasiPemberian ? ` - ${p.jadwalVAR.dosis7.lokasiPemberian}` : ""}` : "-",
       jadwalVAR_21: p.jadwalVAR?.dosis21 ? `${p.jadwalVAR.dosis21.status}${p.jadwalVAR.dosis21.tanggal ? ` (${p.jadwalVAR.dosis21.tanggal})` : ""}${p.jadwalVAR.dosis21.lokasiPemberian ? ` - ${p.jadwalVAR.dosis21.lokasiPemberian}` : ""}` : "-",
-      catatanPerkembanganHarian: p.riwayatLog && p.riwayatLog.length > 0
-        ? p.riwayatLog.map((log: any, idx: number) => `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] ${log.petugasNama ? `(${log.petugasNama})` : ""} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${log.suhuTubuh ? `${log.suhuTubuh}°C` : "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`).join("\n\n")
-        : "-",
+      catatanPerkembanganHarian: p.catatanPerkembanganHarian && p.catatanPerkembanganHarian !== "-"
+        ? p.catatanPerkembanganHarian
+        : (p.riwayatLog && p.riwayatLog.length > 0
+          ? p.riwayatLog.map((log: any, idx: number) => {
+              const tglStr = log.tanggal || `Hari ke-${log.hariKe || idx + 1}`;
+              const suhuStr = log.suhuTubuh ? (log.suhuTubuh.includes("°C") ? log.suhuTubuh : `${log.suhuTubuh} °C`) : "-";
+              const petStr = log.petugasNama ? `(${log.petugasNama})` : "";
+              return `[${tglStr}] ${petStr} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${suhuStr}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`;
+            }).join("\n\n")
+          : "-"),
       suhuTubuhTerkini: p.riwayatLog && p.riwayatLog.length > 0 && p.riwayatLog[p.riwayatLog.length - 1]?.suhuTubuh
-        ? `${p.riwayatLog[p.riwayatLog.length - 1].suhuTubuh} °C`
+        ? (p.riwayatLog[p.riwayatLog.length - 1].suhuTubuh.includes("°C") ? p.riwayatLog[p.riwayatLog.length - 1].suhuTubuh : `${p.riwayatLog[p.riwayatLog.length - 1].suhuTubuh} °C`)
         : "-",
       petugasPJMonitoring: p.petugasPJ || "Widodo Suprianto A.Md.Kep",
       nipPJMonitoring: p.nipPJ || "197606252009011007",

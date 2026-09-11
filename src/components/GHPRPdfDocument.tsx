@@ -55,6 +55,18 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // Penyelarasan Faskes & Sumber Laporan dari data spreadsheet (kolom: 'Tgl berkunjung difaskes' dan 'Sumber Laporan')
+  const displayTglBerkunjung = (formData.tanggalBerkunjungFaskes || (formData as any)["Tgl berkunjung difaskes"] || (formData as any)["Tanggal Berkunjung ke Faskes"] || "").trim();
+  const rawSumberLaporan = (formData.sumberLaporan || (formData as any)["Sumber Laporan"] || "").trim();
+  const rawNamaFaskes = (formData.namaFaskes || (formData as any)["Nama Faskes"] || (formData as any)["Fasilitas Kesehatan"] || "").trim();
+
+  // Jika Sumber Laporan diisi spesifik (seperti RSUD Mardi Waluyo), prioritaskan nilai tersebut sebagai nama faskes di PDF
+  const displayFaskes = (rawSumberLaporan && rawSumberLaporan.toLowerCase() !== "laporan petugas puskesmas" && rawSumberLaporan.toLowerCase() !== "laporan petugas faskes")
+    ? rawSumberLaporan
+    : (rawNamaFaskes && rawNamaFaskes.toLowerCase() !== "puskesmas sananwetan" ? rawNamaFaskes : (rawSumberLaporan || rawNamaFaskes || "Puskesmas Sananwetan"));
+
+  const displayKeteranganLain = rawSumberLaporan || displayFaskes || "Laporan Petugas Puskesmas";
+
   // Re-measure DOM elements when formData or props change
   useEffect(() => {
     const runMeasure = () => {
@@ -152,9 +164,9 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
                       <tr className="border-b border-black">
                         <td className="p-1 align-top">b. Kunjungan ke Faskes</td>
                         <td className="p-1 align-top">
-                          {formData.tanggalBerkunjungFaskes
-                            ? `${formatDateIndonesian(formData.tanggalBerkunjungFaskes)}${formData.namaFaskes ? ` (${formData.namaFaskes})` : ""}`
-                            : (formData.namaFaskes || "-")}
+                          {displayTglBerkunjung
+                            ? `${formatDateIndonesian(displayTglBerkunjung)}${displayFaskes ? ` (${displayFaskes})` : ""}`
+                            : (displayFaskes || "-")}
                         </td>
                       </tr>
                       <tr>
@@ -382,9 +394,9 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
                               <tr className="border-b border-black">
                                 <td className="p-1">Kunjungan ke Faskes</td>
                                 <td className="p-1">
-                                  {formData.tanggalBerkunjungFaskes
-                                    ? `${formatDateIndonesian(formData.tanggalBerkunjungFaskes)}${formData.namaFaskes ? ` (${formData.namaFaskes})` : ""}`
-                                    : (formData.namaFaskes || "-")}
+                                  {displayTglBerkunjung
+                                    ? `${formatDateIndonesian(displayTglBerkunjung)}${displayFaskes ? ` (${displayFaskes})` : ""}`
+                                    : (displayFaskes || "-")}
                                 </td>
                               </tr>
                               <tr className="border-b border-black">
@@ -497,7 +509,7 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
                   XI. Keterangan Lain
                 </td>
                 <td className="p-1 align-top">
-                  <div>{formData.sumberLaporan || "Laporan Petugas Puskesmas"}</div>
+                  <div>{displayKeteranganLain}</div>
                   {(formData.catatanPerkembanganHarian || formData.statusPemantauan) && (
                     <div className="mt-1 pt-1 border-t border-slate-300 text-[10px] space-y-0.5">
                       <div className="font-semibold text-slate-800">
@@ -596,9 +608,9 @@ export const GHPRPdfDocument: React.FC<GHPRPdfDocumentProps> = ({
               </div>
 
               <div>
-                ( <b className="uppercase">{formData.pelaksanaNama || "-"}</b> )
+                ( <b className="uppercase">{DEFAULT_PELAKSANA_NAMA}</b> )
               </div>
-              <div>NIP. {formData.pelaksanaNIP || "-"}</div>
+              <div>NIP. {DEFAULT_PELAKSANA_NIP}</div>
             </div>
           </div>
 

@@ -147,8 +147,9 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       setPertolonganPertama(patient.pertolonganPertama || patient.fullData?.pertolonganPertama || "");
       setTindakanKasus(patient.tindakanKasus || patient.fullData?.tindakanKasus || "");
       setTanggalBerkunjungFaskes(patient.tanggalBerkunjungFaskes || patient.fullData?.tanggalBerkunjungFaskes || "");
-      setNamaFaskes(""); // Kosongkan di awal sesuai permintaan pengguna
-      setSumberLaporan(patient.fullData?.sumberLaporan || patient.fullData?.sumberInfo || "");
+      const initialFaskesOrSumber = (patient.sumberLaporan || patient.fullData?.sumberLaporan || patient.namaFaskes || patient.fullData?.namaFaskes || "").trim();
+      setNamaFaskes(initialFaskesOrSumber);
+      setSumberLaporan(patient.fullData?.sumberLaporan || patient.sumberLaporan || initialFaskesOrSumber || patient.fullData?.sumberInfo || "");
       setKondisiHewanText(patient.kondisiHewan || "");
       setRekomendasi(patient.rekomendasi || "");
       setJadwalVAR(patient.jadwalVAR || {
@@ -272,7 +273,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
         tindakanDilakukan: logTindakan,
         catatanKhusus: logCatatan
       };
-      setLogsList((prev) => [...prev, newLog]);
+      // Terapkan deduplikasi cerdas agar tidak ada duplikasi record pada hari/tanggal yang sama
+      setLogsList((prev) => deduplicateAndSortLogs([...prev, newLog]));
     }
 
     if (logStatusLuka && !kondisiLuka) setKondisiLuka(logStatusLuka);
@@ -350,7 +352,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
           }
           return item;
         });
-      } else if (logCatatan.trim() || logKondisiKorban.trim() || logTindakan.trim() || logStatusLuka.trim()) {
+      } else if (logCatatan.trim() || (logKondisiKorban.trim() && logKondisiKorban !== "Kondisi umum baik, tidak demam.") || (logTindakan.trim() && logTindakan !== "Pemantauan berkala & edukasi perawatan luka.")) {
         const newLog: MonitoringDailyLog = {
           id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           tanggal: chosenDate,
@@ -369,20 +371,29 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       }
     }
 
-    // Pastikan log bersih, terurut, dan tidak ganda
+    // Pastikan log bersih, terurut, dan tidak ganda (1 entri per hari observasi)
     updatedLogs = deduplicateAndSortLogs(updatedLogs);
 
     // Format Data Pemantauan Tambahan (Kolom 37 - 46)
     const catatanLogText = updatedLogs.length > 0
-      ? updatedLogs.map((log: any, idx: number) => `[${log.tanggal || `Hari ke-${log.hariKe || idx + 1}`}] ${log.petugasNama ? `(${log.petugasNama})` : ""} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${log.suhuTubuh ? `${log.suhuTubuh}` : "-"}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`).join("\n\n")
+      ? updatedLogs.map((log: any, idx: number) => {
+          const tglStr = log.tanggal || `Hari ke-${log.hariKe || idx + 1}`;
+          const suhuStr = log.suhuTubuh ? (log.suhuTubuh.includes("°C") ? log.suhuTubuh : `${log.suhuTubuh} °C`) : "-";
+          const petStr = log.petugasNama ? `(${log.petugasNama})` : "";
+          return `[${tglStr}] ${petStr} Kondisi: ${log.kondisiKorban || log.statusLuka || "-"}, Suhu: ${suhuStr}, Hewan: ${log.kondisiHewan || "-"}, Tindakan: ${log.tindakanDilakukan || "-"}, Catatan: ${log.catatanKhusus || "-"}`;
+        }).join("\n\n")
       : "-";
 
     const lastUpdateTimestamp = new Date().toLocaleString("id-ID");
 
+    const finalFaskes = (namaFaskes.trim() || sumberLaporan.trim() || patient.namaFaskes || patient.fullData?.namaFaskes || patient.sumberLaporan || patient.fullData?.sumberLaporan || "");
+    const finalSumberLaporan = (sumberLaporan.trim() || namaFaskes.trim() || patient.sumberLaporan || patient.fullData?.sumberLaporan || patient.namaFaskes || patient.fullData?.namaFaskes || "Laporan Petugas Faskes");
+
     const updatedItem: PatientMonitoringItem = {
       ...patient,
       tanggalBerkunjungFaskes: tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || "",
-      namaFaskes: namaFaskes || patient.namaFaskes || "Puskesmas Sananwetan",
+      namaFaskes: finalFaskes || "Puskesmas Sananwetan",
+      sumberLaporan: finalSumberLaporan,
       statusPemantauan,
       statusHewanObservasi: statusHewan,
       hariObservasiKe: Number(hariObservasi),
@@ -403,7 +414,10 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
       fullData: {
         ...(patient.fullData || {}),
         tanggalBerkunjungFaskes: tanggalBerkunjungFaskes || patient.tanggalBerkunjungFaskes || "",
-        namaFaskes: namaFaskes || patient.namaFaskes || "Puskesmas Sananwetan",
+        namaFaskes: finalFaskes || "Puskesmas Sananwetan",
+        sumberLaporan: finalSumberLaporan,
+        pelaksanaNama: DEFAULT_PELAKSANA_NAMA,
+        pelaksanaNIP: DEFAULT_PELAKSANA_NIP,
         kondisiLuka,
         kondisiUmumKorban: kondisiUmumKorban || "Sehat",
         kondisiKorban: kondisiUmumKorban || "Sehat",
@@ -432,9 +446,6 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     const latestLogDate = updatedLogs.length > 0 && updatedLogs[0].tanggal
       ? updatedLogs[0].tanggal
       : new Date().toISOString().slice(0, 10);
-
-    const finalFaskes = namaFaskes.trim() || sumberLaporan.trim() || patient.namaFaskes || patient.fullData?.namaFaskes || "";
-    const finalSumberLaporan = namaFaskes.trim() || sumberLaporan.trim() || patient.fullData?.sumberLaporan || patient.fullData?.sumberInfo || "Puskesmas";
 
     const rawUmurKorban = (() => {
       const v = String(patient.umurKorban || rawData.umurKorban || "").trim();
