@@ -5,6 +5,7 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+# Permissions for GitHub Pages and branch push
 permissions:
   contents: write
   pages: write
@@ -12,7 +13,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -24,34 +25,54 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: 'npm'
+
+      # Configure GitHub Pages first to obtain the repository base path
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
 
       - name: Install Dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          else
+            npm install --legacy-peer-deps
+          fi
 
       - name: Build Application
         run: npm run build
         env:
           VITE_WEB_APP_URL: ${{ secrets.VITE_WEB_APP_URL }}
-          BASE_URL: ./
+          BASE_URL: ${{ steps.pages.outputs.base_path && format('{0}/', steps.pages.outputs.base_path) || './' }}
 
-      - name: Deploy to gh-pages branch (Branch Fallback)
-        uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          keep_files: false
+      - name: Ensure .nojekyll and 404 fallback exist in dist
+        run: |
+          touch ./dist/.nojekyll
+          if [ -f ./public/404.html ]; then
+            cp ./public/404.html ./dist/404.html
+          elif [ -f ./dist/index.html ]; then
+            cp ./dist/index.html ./dist/404.html
+          fi
 
-      - name: Setup Pages (Actions Method)
-        uses: actions/configure-pages@v5
-        continue-on-error: true
-
+      # Method 1: Deploy using modern GitHub Actions Pages
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         continue-on-error: true
         with:
           path: './dist'
+
+      # Method 2 (Fallback): Push to gh-pages branch in case repository uses Branch deployment
+      - name: Deploy to gh-pages branch (Branch Fallback)
+        uses: peaceiris/actions-gh-pages@v4
+        continue-on-error: true
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          keep_files: false
 
   deploy:
     environment:

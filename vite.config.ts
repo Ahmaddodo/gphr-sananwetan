@@ -5,7 +5,10 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const base = process.env.BASE_URL || '/';
+  let base = process.env.BASE_URL || './';
+  if (base && base !== './' && !base.endsWith('/')) {
+    base = `${base}/`;
+  }
   return {
     base,
     plugins: [
