@@ -319,7 +319,7 @@ export const Header: React.FC<HeaderProps & {
           />
 
           {/* Status User Logged In & Tombol Log Out (Tampil saat petugas sedang login) */}
-          {currentUser && (
+          {currentUser ? (
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl p-1 sm:pr-2 transition shadow-2xs">
               <button
                 type="button"
@@ -360,6 +360,19 @@ export const Header: React.FC<HeaderProps & {
                 </button>
               )}
             </div>
+          ) : (
+            onOpenLogin && (
+              <button
+                id="btn-header-login"
+                type="button"
+                onClick={onOpenLogin}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white px-3 sm:px-3.5 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer ring-2 ring-blue-500/20"
+                title="Masuk ke Akun Petugas Puskesmas / Admin"
+              >
+                <LogIn size={14} />
+                <span>Masuk Petugas</span>
+              </button>
+            )
           )}
 
           {/* Tombol Tampilan Admin Khusus Hak Akses Admin Saat Berada di Form Publik */}

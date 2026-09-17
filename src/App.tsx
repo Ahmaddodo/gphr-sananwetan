@@ -37,6 +37,7 @@ import { NavigationTabs, ActiveAppTab } from "./components/NavigationTabs";
 import { PatientMonitoringDashboard } from "./components/PatientMonitoringDashboard";
 import { LoginModal } from "./components/LoginModal";
 import { UserLoginView } from "./components/UserLoginView";
+import { GHPRPublicHomeView } from "./components/GHPRPublicHomeView";
 import { GoogleSheetsManager } from "./components/GoogleSheetsManager";
 import { OfflineSyncModal } from "./components/OfflineSyncModal";
 import { PWAInstallBanner } from "./components/PWAInstallBanner";
@@ -60,7 +61,9 @@ import {
   getLastUserActivityTimestamp,
   INACTIVITY_TIMEOUT_MS,
   isSessionExpired,
-  pullAllCloudData
+  pullAllCloudData,
+  syncOfficerProfilesFromGoogleSheets,
+  syncPatientsFromGoogleSheets
 } from "./lib/patientMonitoring";
 import {
   computeAppNotifications,
@@ -261,20 +264,15 @@ export default function App() {
   const [submitError, setSubmitError] = useState<string>("");
   const [feedbackCount, setFeedbackCount] = useState<number>(0);
 
-  // Tab Navigasi & Hak Akses Pengguna (Admin: form/monitoring, Selain Admin: monitoring)
+  // Tab Navigasi & Hak Akses Pengguna (Default: "home" untuk Portal Publikasi Infografis Kasus GHPR)
   const [activeTab, setActiveTab] = useState<ActiveAppTab>(() => {
     try {
-      const user = getActiveUserProfile();
-      const isAdmin = user && user.username.toLowerCase() === "admin";
-      if (!isAdmin) {
-        return "monitoring";
-      }
       const saved = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(STORAGE_KEY_ACTIVE_TAB) : null;
-      if (saved === "monitoring" || saved === "form" || saved === "settings") {
+      if (saved === "home" || saved === "monitoring" || saved === "form" || saved === "settings") {
         return saved as ActiveAppTab;
       }
     } catch (e) {}
-    return "monitoring";
+    return "home";
   });
 
   const [adminSettingsSubTab, setAdminSettingsSubTab] = useState<"accounts" | "sync" | "sheets" | "github" | "flexible_form">("flexible_form");
@@ -398,6 +396,22 @@ export default function App() {
   // State untuk navigasi dari notifikasi langsung ke pasien tertentu di dashboard
   const [targetNotificationPatientId, setTargetNotificationPatientId] = useState<string | null>(null);
   const [targetNotificationAction, setTargetNotificationAction] = useState<"update_var" | "open_detail" | "update_log" | null>(null);
+
+  // Otomatis sinkronisasi data publik dari Google Sheets saat aplikasi pertama kali dibuka
+  useEffect(() => {
+    const syncInitialPublicData = async () => {
+      try {
+        await Promise.allSettled([
+          syncOfficerProfilesFromGoogleSheets(),
+          syncPatientsFromGoogleSheets()
+        ]);
+        setPatientsList(getAllPatients());
+      } catch (err) {
+        console.warn("Public initial sync notice:", err);
+      }
+    };
+    syncInitialPublicData();
+  }, []);
 
   useEffect(() => {
     const handleOfficersSync = () => {
@@ -568,8 +582,14 @@ export default function App() {
     setCurrentUser(null);
     setShowLoginModal(false);
     setSessionExpiredNotice("");
-    setActiveTab("monitoring");
+    setActiveTab("home");
     setIsAdminMode(false);
+    try {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "home");
+      }
+      localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "home");
+    } catch (e) {}
 
     // Segarkan ulang data dari Google Sheets / Cloud saat logout
     pullAllCloudData(webAppUrl)
@@ -582,19 +602,35 @@ export default function App() {
   };
 
   const handleSwitchTab = (tab: ActiveAppTab) => {
+    if (tab === "home") {
+      setActiveTab("home");
+      try {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "home");
+        }
+        localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, "home");
+      } catch (e) {}
+      return;
+    }
+
+    if (tab === "monitoring" && !currentUser) {
+      setShowLoginModal(true);
+      return;
+    }
+
     const isUserAdmin = (currentUser?.username || "").toLowerCase() === "admin";
     if (!isUserAdmin) {
       if (tab === "settings") {
-        setActiveTab("monitoring");
+        setActiveTab(currentUser ? "monitoring" : "home");
         return;
       }
       if (tab === "form" && !editingCaseId) {
-        setActiveTab("monitoring");
+        setActiveTab(currentUser ? "monitoring" : "home");
         return;
       }
     }
     if (tab === "settings" && !isAdminMode) {
-      setActiveTab("monitoring");
+      setActiveTab(currentUser ? "monitoring" : "home");
       return;
     }
     setActiveTab(tab);
@@ -1466,16 +1502,6 @@ export default function App() {
 
   const currentStepItem = stepsList[step - 1] || stepsList[0];
 
-  // JIKA PENGGUNA BELUM LOGIN: Halaman Pertama yang Ditampilkan adalah Form Login (2 Kolom: Username & Password)
-  if (!currentUser) {
-    return (
-      <UserLoginView
-        onLoginSuccess={handleLoginSuccess}
-        sessionExpiredNotice={sessionExpiredNotice}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#F1F5F9] text-slate-800 font-sans antialiased flex flex-col print:bg-white">
       {/* Header */}
@@ -1521,13 +1547,13 @@ export default function App() {
         }
       />
 
-      {/* Navigation Tabs: Form Input vs Daftar Pasien Dipantau vs Setting Login & Akun */}
+      {/* Navigation Tabs: Beranda vs Daftar Pasien Dipantau vs Form Input vs Setting Login */}
       <NavigationTabs
         activeTab={activeTab}
         setActiveTab={handleSwitchTab}
         activePatientCount={
           patientsList.filter((p) =>
-            currentUser.isKoordinator
+            !currentUser || currentUser.isKoordinator
               ? p.statusPemantauan === "Dalam Pemantauan (Aktif)"
               : p.kelurahan.toLowerCase() === currentUser.kelurahan.toLowerCase() &&
                 p.statusPemantauan === "Dalam Pemantauan (Aktif)"
@@ -1540,6 +1566,7 @@ export default function App() {
         dueCount={dueNotificationCount}
         newPatientCount={newPatientNotificationCount}
         onLogout={handleLogout}
+        onOpenLogin={() => setShowLoginModal(true)}
       />
 
       {/* Success Notification Banner */}
@@ -1610,34 +1637,59 @@ export default function App() {
       )}
 
       {/* RENDER TAB KONTEN */}
-      {activeTab === "monitoring" ? (
+      {activeTab === "home" ? (
         <main className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 py-5 sm:py-6 flex-1 print:hidden">
-          <PatientMonitoringDashboard
+          <GHPRPublicHomeView
             patientsList={patientsList}
             currentUser={currentUser}
-            onRefreshPatients={handleRefreshPatients}
-            onNewInputCase={handleStartNewPatientInput}
-            onEditFullFormCase={handleOpenPatientFullFormEdit}
-            onPrintPatientCase={handleOpenPatientPdfPrint}
-            onOpenLoginModal={currentUser.username.toLowerCase() === "admin" || currentUser.role === "admin" ? () => setShowLoginModal(true) : undefined}
-            onLogout={handleLogout}
-            onOpenSettings={isAdminMode ? () => {
-              setAdminSettingsSubTab("accounts");
-              handleSwitchTab("settings");
-            } : undefined}
-            onOpenGitHubSync={isAdminMode ? () => {
-              setAdminSettingsSubTab("github");
-              handleSwitchTab("settings");
-            } : undefined}
-            onOpenOfflineSync={() => setShowOfflineModal(true)}
-            webAppUrl={webAppUrl}
-            initialTargetPatientId={targetNotificationPatientId}
-            initialTargetAction={targetNotificationAction}
-            onClearTargetPatient={() => {
-              setTargetNotificationPatientId(null);
-              setTargetNotificationAction(null);
+            onOpenLogin={() => setShowLoginModal(true)}
+            onNavigateToMonitoring={() => {
+              if (!currentUser) {
+                setShowLoginModal(true);
+              } else {
+                handleSwitchTab("monitoring");
+              }
             }}
+            onNavigateToForm={() => handleSwitchTab("form")}
           />
+        </main>
+      ) : activeTab === "monitoring" ? (
+        <main className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 py-5 sm:py-6 flex-1 print:hidden">
+          {!currentUser ? (
+            <div className="max-w-md mx-auto my-8">
+              <UserLoginView
+                onLoginSuccess={handleLoginSuccess}
+                sessionExpiredNotice={sessionExpiredNotice}
+              />
+            </div>
+          ) : (
+            <PatientMonitoringDashboard
+              patientsList={patientsList}
+              currentUser={currentUser}
+              onRefreshPatients={handleRefreshPatients}
+              onNewInputCase={handleStartNewPatientInput}
+              onEditFullFormCase={handleOpenPatientFullFormEdit}
+              onPrintPatientCase={handleOpenPatientPdfPrint}
+              onOpenLoginModal={currentUser.username.toLowerCase() === "admin" || currentUser.role === "admin" ? () => setShowLoginModal(true) : undefined}
+              onLogout={handleLogout}
+              onOpenSettings={isAdminMode ? () => {
+                setAdminSettingsSubTab("accounts");
+                handleSwitchTab("settings");
+              } : undefined}
+              onOpenGitHubSync={isAdminMode ? () => {
+                setAdminSettingsSubTab("github");
+                handleSwitchTab("settings");
+              } : undefined}
+              onOpenOfflineSync={() => setShowOfflineModal(true)}
+              webAppUrl={webAppUrl}
+              initialTargetPatientId={targetNotificationPatientId}
+              initialTargetAction={targetNotificationAction}
+              onClearTargetPatient={() => {
+                setTargetNotificationPatientId(null);
+                setTargetNotificationAction(null);
+              }}
+            />
+          )}
         </main>
       ) : (activeTab === "settings" && isAdminMode) ? (
         <main className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 py-5 sm:py-6 flex-1 print:hidden space-y-5 animate-in fade-in">

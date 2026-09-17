@@ -221,16 +221,24 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
 
           {/* Jadwal Vaksin Anti Rabies (VAR) */}
           <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-            <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-1.5 text-xs uppercase tracking-wider">
-              <Syringe size={14} className="text-emerald-600" />
-              C. Jadwal & Status Vaksinasi Anti Rabies (VAR)
-            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2">
+              <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                <Syringe size={14} className="text-emerald-600" />
+                C. Jadwal & Status Vaksinasi Anti Rabies (VAR)
+              </h4>
+              <span className="text-[11px] text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 w-fit">
+                Regimen: Dosis 0, 7, dan 21
+              </span>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               {/* Dosis 0 */}
               <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between">
                 <div>
-                  <span className="font-bold text-slate-700 block">Dosis 0 (Hari 0)</span>
-                  <span className="text-[11px] text-slate-600 block mt-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 block">Dosis 0</span>
+                    <span className="text-[9px] text-emerald-700 bg-emerald-100/70 font-bold px-1 rounded">Hari Ke-0</span>
+                  </div>
+                  <span className="text-[11px] text-slate-600 block mt-1">
                     Tgl: <span className="font-medium text-slate-900">{patient.jadwalVAR?.dosis0?.tanggal || "Belum diisi"}</span>
                   </span>
                   {patient.jadwalVAR?.dosis0?.lokasiPemberian && (
@@ -252,37 +260,14 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
                 </span>
               </div>
 
-              {/* Dosis 3 */}
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between">
-                <div>
-                  <span className="font-bold text-slate-700 block">Dosis 3 (Hari 3)</span>
-                  <span className="text-[11px] text-slate-600 block mt-0.5">
-                    Tgl: <span className="font-medium text-slate-900">{patient.jadwalVAR?.dosis3?.tanggal || "Belum diisi"}</span>
-                  </span>
-                  {patient.jadwalVAR?.dosis3?.lokasiPemberian && (
-                    <span className="text-[10px] text-slate-500 block truncate mt-0.5" title={patient.jadwalVAR.dosis3.lokasiPemberian}>
-                      📍 {patient.jadwalVAR.dosis3.lokasiPemberian}
-                    </span>
-                  )}
-                </div>
-                <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded w-fit ${
-                  patient.jadwalVAR?.dosis3?.status === "Sudah Diberikan"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : patient.jadwalVAR?.dosis3?.status === "Terjadwal"
-                    ? "bg-blue-100 text-blue-800"
-                    : patient.jadwalVAR?.dosis3?.status === "Tidak Perlu"
-                    ? "bg-slate-200 text-slate-600"
-                    : "bg-slate-100 text-slate-600 border border-slate-200"
-                }`}>
-                  {patient.jadwalVAR?.dosis3?.status || "Belum Diberikan"}
-                </span>
-              </div>
-
               {/* Dosis 7 */}
               <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between">
                 <div>
-                  <span className="font-bold text-slate-700 block">Dosis 7 (Hari 7)</span>
-                  <span className="text-[11px] text-slate-600 block mt-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 block">Dosis 7</span>
+                    <span className="text-[9px] text-emerald-700 bg-emerald-100/70 font-bold px-1 rounded">Hari Ke-7</span>
+                  </div>
+                  <span className="text-[11px] text-slate-600 block mt-1">
                     Tgl: <span className="font-medium text-slate-900">{patient.jadwalVAR?.dosis7?.tanggal || "Belum diisi"}</span>
                   </span>
                   {patient.jadwalVAR?.dosis7?.lokasiPemberian && (
@@ -307,8 +292,11 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
               {/* Dosis 21 */}
               <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between">
                 <div>
-                  <span className="font-bold text-slate-700 block">Dosis 21 (Hari 21)</span>
-                  <span className="text-[11px] text-slate-600 block mt-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 block">Dosis 21</span>
+                    <span className="text-[9px] text-emerald-700 bg-emerald-100/70 font-bold px-1 rounded">Hari Ke-21</span>
+                  </div>
+                  <span className="text-[11px] text-slate-600 block mt-1">
                     Tgl: <span className="font-medium text-slate-900">{patient.jadwalVAR?.dosis21?.tanggal || "Belum diisi"}</span>
                   </span>
                   {patient.jadwalVAR?.dosis21?.lokasiPemberian && (
@@ -326,7 +314,36 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
                     ? "bg-slate-200 text-slate-600"
                     : "bg-slate-100 text-slate-600 border border-slate-200"
                 }`}>
-                  {patient.jadwalVAR?.dosis21?.status || "Opsional"}
+                  {patient.jadwalVAR?.dosis21?.status || "Belum Diberikan"}
+                </span>
+              </div>
+
+              {/* Dosis 3 (Opsional) */}
+              <div className="p-2.5 rounded-lg bg-slate-50/70 border border-slate-200 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700 block">Dosis 3</span>
+                    <span className="text-[9px] text-slate-500 bg-slate-200 font-medium px-1 rounded">Opsional</span>
+                  </div>
+                  <span className="text-[11px] text-slate-600 block mt-1">
+                    Tgl: <span className="font-medium text-slate-900">{patient.jadwalVAR?.dosis3?.tanggal || "-"}</span>
+                  </span>
+                  {patient.jadwalVAR?.dosis3?.lokasiPemberian && (
+                    <span className="text-[10px] text-slate-500 block truncate mt-0.5" title={patient.jadwalVAR.dosis3.lokasiPemberian}>
+                      📍 {patient.jadwalVAR.dosis3.lokasiPemberian}
+                    </span>
+                  )}
+                </div>
+                <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded w-fit ${
+                  patient.jadwalVAR?.dosis3?.status === "Sudah Diberikan"
+                    ? "bg-emerald-100 text-emerald-800"
+                    : patient.jadwalVAR?.dosis3?.status === "Terjadwal"
+                    ? "bg-blue-100 text-blue-800"
+                    : patient.jadwalVAR?.dosis3?.status === "Tidak Perlu"
+                    ? "bg-slate-200 text-slate-600"
+                    : "bg-slate-100 text-slate-600 border border-slate-200"
+                }`}>
+                  {patient.jadwalVAR?.dosis3?.status || "Tidak Perlu"}
                 </span>
               </div>
             </div>

@@ -182,10 +182,10 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
     if (!patient) return;
     const baseDateStr = normalizeDateToIso(patient.waktuKejadian || patient.tglMulaiObservasi);
     setJadwalVAR({
-      dosis0: { tanggal: baseDateStr, status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan" },
-      dosis3: { tanggal: normalizeDateToIso(baseDateStr, 3), status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" },
-      dosis7: { tanggal: normalizeDateToIso(baseDateStr, 7), status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan" },
-      dosis21: { tanggal: normalizeDateToIso(baseDateStr, 21), status: "Belum Diberikan", lokasiPemberian: "Puskesmas Sananwetan" }
+      dosis0: { tanggal: baseDateStr, status: "Sudah Diberikan", lokasiPemberian: "Puskesmas Sananwetan (FKTP)" },
+      dosis3: { tanggal: "", status: "Tidak Perlu", lokasiPemberian: "", keterangan: "Regimen standar VAR Dosis 0, 7, dan 21" },
+      dosis7: { tanggal: normalizeDateToIso(baseDateStr, 7), status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan (FKTP)" },
+      dosis21: { tanggal: normalizeDateToIso(baseDateStr, 21), status: "Terjadwal", lokasiPemberian: "Puskesmas Sananwetan (FKTP)" }
     });
   };
 
@@ -1266,14 +1266,14 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                   2. Jadwal & Pemberian Vaksin Anti Rabies (VAR)
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Isi tanggal dan status pemberian VAR sesuai riwayat/rencana vaksinasi korban.
+                  Regimen standar VAR: <b>Dosis 0</b> (Hari ke-0), <b>Dosis 7</b> (Hari ke-7), dan <b>Dosis 21</b> (Hari ke-21).
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleClearAllVarDates}
-                  className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors"
+                  className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors cursor-pointer"
                   title="Kosongkan seluruh isian tanggal VAR"
                 >
                   Kosongkan Jadwal
@@ -1281,11 +1281,11 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAutoCalculateVarDates}
-                  className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1"
-                  title="Bantu isi tanggal otomatis berdasarkan tanggal kejadian (H+0, H+3, H+7, H+21)"
+                  className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Bantu isi tanggal otomatis regimen Dosis 0, 7, dan 21 berdasarkan tanggal kejadian"
                 >
                   <RefreshCw size={11} />
-                  Hitung Otomatis
+                  Hitung Otomatis (0, 7, 21)
                 </button>
               </div>
             </div>
@@ -1295,7 +1295,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
               <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-800">VAR Dosis 0 (Hari ke-0)</span>
-                  <span className="text-[10px] text-slate-400 font-medium">2 Injeksi IM</span>
+                  <span className="text-[10px] text-emerald-700 bg-emerald-50 font-bold px-1.5 py-0.5 rounded border border-emerald-200">Dosis Awal</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -1324,50 +1324,9 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                 <div>
                   <input
                     type="text"
-                    placeholder="Lokasi faskes / Keterangan batch (opsional)"
+                    placeholder="Lokasi faskes (Puskesmas Sananwetan / RSUD Mardi Waluyo)"
                     value={jadwalVAR.dosis0?.lokasiPemberian || ""}
                     onChange={(e) => handleUpdateVarDose("dosis0", "lokasiPemberian", e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-700 placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-
-              {/* Dosis 3 */}
-              <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800">VAR Dosis 3 (Hari ke-3)</span>
-                  <span className="text-[10px] text-slate-400 font-medium">1 Injeksi IM</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-semibold block">Tanggal</label>
-                    <input
-                      type="date"
-                      value={jadwalVAR.dosis3?.tanggal || ""}
-                      onChange={(e) => handleUpdateVarDose("dosis3", "tanggal", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 p-1.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-semibold block">Status</label>
-                    <select
-                      value={jadwalVAR.dosis3?.status || "Belum Diberikan"}
-                      onChange={(e) => handleUpdateVarDose("dosis3", "status", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 p-1.5 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value="Belum Diberikan">Belum Diberikan</option>
-                      <option value="Terjadwal">Terjadwal</option>
-                      <option value="Sudah Diberikan">Sudah Diberikan</option>
-                      <option value="Tidak Perlu">Tidak Perlu</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Lokasi faskes / Keterangan batch (opsional)"
-                    value={jadwalVAR.dosis3?.lokasiPemberian || ""}
-                    onChange={(e) => handleUpdateVarDose("dosis3", "lokasiPemberian", e.target.value)}
                     className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-700 placeholder:text-slate-400"
                   />
                 </div>
@@ -1377,7 +1336,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
               <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-800">VAR Dosis 7 (Hari ke-7)</span>
-                  <span className="text-[10px] text-slate-400 font-medium">1 Injeksi IM</span>
+                  <span className="text-[10px] text-emerald-700 bg-emerald-50 font-bold px-1.5 py-0.5 rounded border border-emerald-200">Dosis Lanjutan</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -1406,7 +1365,7 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                 <div>
                   <input
                     type="text"
-                    placeholder="Lokasi faskes / Keterangan batch (opsional)"
+                    placeholder="Lokasi faskes (Puskesmas Sananwetan / RSUD Mardi Waluyo)"
                     value={jadwalVAR.dosis7?.lokasiPemberian || ""}
                     onChange={(e) => handleUpdateVarDose("dosis7", "lokasiPemberian", e.target.value)}
                     className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-700 placeholder:text-slate-400"
@@ -1417,8 +1376,8 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
               {/* Dosis 21 */}
               <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800">VAR Dosis 21 (Bila Hewan Positif/Mati)</span>
-                  <span className="text-[10px] text-slate-400 font-medium">Opsional</span>
+                  <span className="font-bold text-slate-800">VAR Dosis 21 (Hari ke-21)</span>
+                  <span className="text-[10px] text-emerald-700 bg-emerald-50 font-bold px-1.5 py-0.5 rounded border border-emerald-200">Dosis Akhir</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -1447,10 +1406,51 @@ export const PatientUpdateModal: React.FC<PatientUpdateModalProps> = ({
                 <div>
                   <input
                     type="text"
-                    placeholder="Lokasi faskes / Keterangan batch (opsional)"
+                    placeholder="Lokasi faskes (Puskesmas Sananwetan / RSUD Mardi Waluyo)"
                     value={jadwalVAR.dosis21?.lokasiPemberian || ""}
                     onChange={(e) => handleUpdateVarDose("dosis21", "lokasiPemberian", e.target.value)}
                     className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-700 placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              {/* Dosis 3 (Opsional / Khusus) */}
+              <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/70 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700">VAR Dosis 3 (Opsional / Khusus)</span>
+                  <span className="text-[10px] text-slate-500 bg-slate-200/70 font-medium px-1.5 py-0.5 rounded">Bila Diperlukan</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-semibold block">Tanggal</label>
+                    <input
+                      type="date"
+                      value={jadwalVAR.dosis3?.tanggal || ""}
+                      onChange={(e) => handleUpdateVarDose("dosis3", "tanggal", e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 p-1.5 text-xs text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-semibold block">Status</label>
+                    <select
+                      value={jadwalVAR.dosis3?.status || "Tidak Perlu"}
+                      onChange={(e) => handleUpdateVarDose("dosis3", "status", e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 p-1.5 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-white"
+                    >
+                      <option value="Tidak Perlu">Tidak Perlu (Regimen 0, 7, 21)</option>
+                      <option value="Belum Diberikan">Belum Diberikan</option>
+                      <option value="Terjadwal">Terjadwal</option>
+                      <option value="Sudah Diberikan">Sudah Diberikan</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Keterangan khusus (default: Tidak Perlu)"
+                    value={jadwalVAR.dosis3?.lokasiPemberian || ""}
+                    onChange={(e) => handleUpdateVarDose("dosis3", "lokasiPemberian", e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-700 placeholder:text-slate-400 bg-white"
                   />
                 </div>
               </div>

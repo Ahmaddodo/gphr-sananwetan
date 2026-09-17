@@ -1,20 +1,33 @@
 import React, { useState } from "react";
-import { FileText, Users, PlusCircle, ShieldCheck, KeyRound, Settings, Clock, Sparkles, LogOut } from "lucide-react";
+import {
+  FileText,
+  Users,
+  PlusCircle,
+  ShieldCheck,
+  KeyRound,
+  Settings,
+  Clock,
+  Sparkles,
+  LogOut,
+  Home,
+  LogIn
+} from "lucide-react";
 import { UserAccessProfile } from "../types";
 
-export type ActiveAppTab = "form" | "monitoring" | "settings";
+export type ActiveAppTab = "home" | "monitoring" | "form" | "settings";
 
 interface NavigationTabsProps {
   activeTab: ActiveAppTab;
   setActiveTab: (tab: ActiveAppTab) => void;
   activePatientCount: number;
-  userProfile: UserAccessProfile;
+  userProfile: UserAccessProfile | null;
   editingCaseId: string | null;
   onNewInputClick: () => void;
   isAdminMode?: boolean;
   dueCount?: number;
   newPatientCount?: number;
   onLogout?: () => void;
+  onOpenLogin?: () => void;
 }
 
 export const NavigationTabs: React.FC<NavigationTabsProps> = ({
@@ -27,7 +40,8 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
   isAdminMode = false,
   dueCount = 0,
   newPatientCount = 0,
-  onLogout
+  onLogout,
+  onOpenLogin
 }) => {
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
   const isAdmin = (userProfile?.username || "").toLowerCase() === "admin";
@@ -38,7 +52,22 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
         <div className="flex items-center justify-between gap-3 overflow-x-auto no-scrollbar py-2">
           {/* Main Navigation Tabs */}
           <div className="flex items-center gap-2">
-            {/* Tab Formulir PE GHPR: HANYA TAMPIL UNTUK USERNAME ADMIN ATAU EDIT KASUS */}
+            {/* Tab 1: Beranda Infografis Publik (Selalu Tampil Pertama) */}
+            <button
+              id="nav-tab-home"
+              type="button"
+              onClick={() => setActiveTab("home")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === "home"
+                  ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              <Home size={16} />
+              <span>Beranda</span>
+            </button>
+
+            {/* Tab 2: Formulir PE GHPR: HANYA TAMPIL UNTUK USERNAME ADMIN ATAU EDIT KASUS */}
             {(isAdmin || editingCaseId) && (
               <button
                 id="nav-tab-form"
@@ -60,10 +89,17 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
               </button>
             )}
 
+            {/* Tab 3: Daftar Pasien Dipantau (Memerlukan Login Petugas) */}
             <button
               id="nav-tab-monitoring"
               type="button"
-              onClick={() => setActiveTab("monitoring")}
+              onClick={() => {
+                if (!userProfile && onOpenLogin) {
+                  onOpenLogin();
+                } else {
+                  setActiveTab("monitoring");
+                }
+              }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer relative ${
                 activeTab === "monitoring"
                   ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20"
@@ -129,40 +165,58 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
 
           {/* Quick Info / Quick Action Button / Log Out */}
           <div className="flex items-center gap-2 shrink-0">
-            {activeTab === "monitoring" && isAdmin ? (
-              <button
-                id="btn-quick-new-case"
-                type="button"
-                onClick={onNewInputClick}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white px-3.5 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
-                title="Buka form input kasus baru (Khusus Admin)"
-              >
-                <PlusCircle size={15} />
-                <span>+ Input Pasien Baru</span>
-              </button>
-            ) : (
-              <div className="hidden sm:flex items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-600">
-                <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
-                <span className="truncate max-w-[220px]">
-                  {userProfile.isKoordinator
-                    ? `Semua Kelurahan (${userProfile.nama.split(",")[0]})`
-                    : `Kel. ${userProfile.kelurahan} (${userProfile.nama.split(",")[0]})`}
-                </span>
-              </div>
-            )}
+            {userProfile ? (
+              <>
+                {activeTab === "monitoring" && isAdmin ? (
+                  <button
+                    id="btn-quick-new-case"
+                    type="button"
+                    onClick={onNewInputClick}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white px-3.5 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
+                    title="Buka form input kasus baru (Khusus Admin)"
+                  >
+                    <PlusCircle size={15} />
+                    <span>+ Input Pasien Baru</span>
+                  </button>
+                ) : (
+                  <div className="hidden sm:flex items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-600">
+                    <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+                    <span className="truncate max-w-[220px]">
+                      {userProfile.isKoordinator
+                        ? `Semua Kelurahan (${userProfile.nama.split(",")[0]})`
+                        : `Kel. ${userProfile.kelurahan} (${userProfile.nama.split(",")[0]})`}
+                    </span>
+                  </div>
+                )}
 
-            {/* Tombol Logout Cepat di Nav Tabs */}
-            {onLogout && (
-              <button
-                id="btn-nav-logout"
-                type="button"
-                onClick={() => setShowLogoutModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700 hover:text-rose-800 transition shadow-2xs cursor-pointer"
-                title="Keluar (Log Out) dari akun petugas"
-              >
-                <LogOut size={14} className="text-rose-600" />
-                <span className="hidden md:inline">Log Out</span>
-              </button>
+                {/* Tombol Logout Cepat di Nav Tabs */}
+                {onLogout && (
+                  <button
+                    id="btn-nav-logout"
+                    type="button"
+                    onClick={() => setShowLogoutModal(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700 hover:text-rose-800 transition shadow-2xs cursor-pointer"
+                    title="Keluar (Log Out) dari akun petugas"
+                  >
+                    <LogOut size={14} className="text-rose-600" />
+                    <span className="hidden md:inline">Log Out</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              /* Jika Belum Login: Tampilkan Tombol Masuk Petugas */
+              onOpenLogin && (
+                <button
+                  id="btn-nav-login"
+                  type="button"
+                  onClick={onOpenLogin}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 text-xs font-bold transition shadow-2xs cursor-pointer"
+                  title="Masuk ke Akun Petugas Puskesmas"
+                >
+                  <LogIn size={15} />
+                  <span>Masuk Petugas</span>
+                </button>
+              )
             )}
           </div>
         </div>
