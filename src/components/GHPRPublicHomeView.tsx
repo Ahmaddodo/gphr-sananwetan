@@ -616,7 +616,7 @@ export const GHPRPublicHomeView: React.FC<GHPRPublicHomeViewProps> = ({
       {/* 4. VISUALISASI GRAFIK UTAMA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Grafik 1: Sebaran Kasus per Kelurahan */}
-        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4 min-w-0">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-slate-900">Sebaran Kasus per Kelurahan</h3>
@@ -627,8 +627,8 @@ export const GHPRPublicHomeView: React.FC<GHPRPublicHomeViewProps> = ({
             </span>
           </div>
 
-          <div className="h-72 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-72 w-full pt-2 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={260}>
               <BarChart data={kelurahanBarData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis
@@ -658,7 +658,7 @@ export const GHPRPublicHomeView: React.FC<GHPRPublicHomeViewProps> = ({
         </div>
 
         {/* Grafik 2: Spesies Hewan Penular Rabies */}
-        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4 min-w-0">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-slate-900">Spesies Hewan Gigitan (HPR)</h3>
@@ -669,9 +669,9 @@ export const GHPRPublicHomeView: React.FC<GHPRPublicHomeViewProps> = ({
             </span>
           </div>
 
-          <div className="h-72 w-full flex items-center justify-center">
+          <div className="h-72 w-full flex items-center justify-center min-w-0">
             {spesiesPieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={260}>
                 <PieChart>
                   <Pie
                     data={spesiesPieData}
@@ -707,7 +707,7 @@ export const GHPRPublicHomeView: React.FC<GHPRPublicHomeViewProps> = ({
         </div>
 
         {/* Grafik 3: Tren Kasus Bulanan */}
-        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4 min-w-0">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-slate-900">Tren Kasus Gigitan Bulanan</h3>
@@ -718,8 +718,8 @@ export const GHPRPublicHomeView: React.FC<GHPRPublicHomeViewProps> = ({
             </span>
           </div>
 
-          <div className="h-72 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-72 w-full pt-2 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={260}>
               <AreaChart data={monthlyTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorKasus" x1="0" y1="0" x2="0" y2="1">
@@ -754,7 +754,7 @@ export const GHPRPublicHomeView: React.FC<GHPRPublicHomeViewProps> = ({
         </div>
 
         {/* Grafik 4: Distribusi Kelompok Usia Korban */}
-        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4 min-w-0">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-slate-900">Demografi Kelompok Usia Korban</h3>
@@ -765,8 +765,8 @@ export const GHPRPublicHomeView: React.FC<GHPRPublicHomeViewProps> = ({
             </span>
           </div>
 
-          <div className="h-72 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-72 w-full pt-2 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={260}>
               <BarChart data={ageGroupData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="kelompok" tick={{ fontSize: 11, fill: "#475569" }} />
